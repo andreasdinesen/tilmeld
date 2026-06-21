@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block content %}
+<div class="card narrow">
+  {% if group.image_path %}
+    <img class="group-image" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
+  {% endif %}
+  <h1>{{ group.name }}</h1>
+  {% if group.login_text %}<div class="login-text">{{ group.login_text }}</div>{% endif %}
+  <form method="post">
+    <label>Adgangskode
+      <input type="password" name="password" autofocus required>
+    </label>
+    <button type="submit">Log ind</button>
+  </form>
+</div>
+{% endblock %}

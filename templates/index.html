@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Tilmeld</h1>
+  <p>Event-tilmeldingssystem.</p>
+  <ul>
+    <li>Bruger-side: <code>/gruppenavn</code></li>
+    <li>Gruppe-admin: <code>/gruppenavn/admin</code></li>
+    <li>Master-admin: <a href="{{ url_for('master_home') }}">/master</a></li>
+  </ul>
+</div>
+{% endblock %}

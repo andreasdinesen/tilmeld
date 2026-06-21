@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }} · admin{% endblock %}
+{% block nav %}<a href="{{ url_for('admin_home', slug=group.slug) }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="row">
+    <h1>{{ ev.name }} — deltagere</h1>
+    <a class="btn primary" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
+  </div>
+  <p class="count">Deltagere: <strong>{{ count }}</strong> / {{ ev.expected_count }} forventet{% if total > count %} <span class="muted small">({{ total - count }} afbud)</span>{% endif %}</p>
+  {% if not regs %}<p>Ingen tilmeldinger endnu.</p>{% else %}
+  <div class="tablewrap">
+  <table>
+    <thead><tr>
+      <th>Navn</th><th>E-mail</th><th>Telefon</th>
+      {% for f in fields %}<th>{{ f.label }}</th>{% endfor %}
+      <th>Tilmeldt</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for r in regs %}
+      {% set ns = namespace(declined=false) %}
+      {% for did in decline_ids %}{% if r['values'].get(did) == 'Ja' %}{% set ns.declined = true %}{% endif %}{% endfor %}
+      <tr class="{{ 'declined' if ns.declined }}">
+        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}</td>
+        <td>{{ r.email }}</td><td>{{ r.phone }}</td>
+        {% for f in fields %}<td>{{ r['values'].get(f.id, '') }}</td>{% endfor %}
+        <td class="muted small">{{ r.created_at|dt }}</td>
+        <td class="actions">
+          <a class="btn small" href="{{ url_for('user_edit', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}">Redigér</a>
+          <form method="post" action="{{ url_for('user_delete', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}"
+                class="inline" onsubmit="return confirm('Fjern {{ r.name }}?')">
+            <button class="danger small">Fjern</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

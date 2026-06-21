@@ -1,0 +1,45 @@
+{# Delt felt-render til både ny tilmelding og redigering.
+   Forventer: fields. Valgfrit: reg, current (field_id->value), mail_on, sms_on. #}
+{% set reg = reg|default(none) %}
+{% set current = current|default({}) %}
+{% set mail_on = mail_on|default(false) %}
+{% set sms_on = sms_on|default(false) %}
+<label>Navn *
+  <input type="text" name="name" value="{{ reg.name if reg else '' }}" required>
+</label>
+{% if mail_on %}
+<label>E-mail (til kvittering)
+  <input type="email" name="email" value="{{ reg.email if reg else '' }}">
+</label>
+{% endif %}
+{% if sms_on %}
+<label>Telefon (til SMS)
+  <input type="text" name="phone" value="{{ reg.phone if reg else '' }}">
+</label>
+{% endif %}
+{% for item in fields %}
+  {% set f = item.f %}
+  {% set val = current.get(f.id, '') %}
+  {% if f.field_type == 'text' and f.multiline %}
+    <label>{{ f.label }}{% if f.required %} *{% endif %}
+      <textarea name="field_{{ f.id }}" rows="3" {{ 'required' if f.required }}>{{ val }}</textarea>
+    </label>
+  {% elif f.field_type == 'text' %}
+    <label>{{ f.label }}{% if f.required %} *{% endif %}
+      <input type="text" name="field_{{ f.id }}" value="{{ val }}" {{ 'required' if f.required }}>
+    </label>
+  {% elif f.field_type == 'dropdown' %}
+    <label>{{ f.label }}{% if f.required %} *{% endif %}
+      <select name="field_{{ f.id }}" {{ 'required' if f.required }}>
+        <option value="">— vælg —</option>
+        {% for opt in item.options %}
+          <option value="{{ opt }}" {{ 'selected' if val == opt }}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  {% elif f.field_type == 'checkbox' %}
+    <label class="chk"><input type="checkbox" name="field_{{ f.id }}"
+      {% if f.is_decline %}data-decline="1"{% endif %}
+      {{ 'required' if f.required }} {{ 'checked' if val == 'Ja' }}> {{ f.label }}{% if f.required %} *{% endif %}</label>
+  {% endif %}
+{% endfor %}

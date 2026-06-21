@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }} · admin{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('admin_home', slug=group.slug) }}">Events</a>
+  <a href="{{ url_for('admin_logout', slug=group.slug) }}">Log ud</a>
+{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Gruppe-opsætning</h1>
+
+  <h2>Gruppe-password</h2>
+  <p class="muted small">Adgangskode til bruger-siden <code>/{{ group.slug }}</code>.
+     Tomt password = åben adgang uden login.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="password">
+    <label>Nuværende / nyt password (vist i klartekst)
+      <input type="text" name="user_password" value="{{ group.user_password }}">
+    </label>
+    <button type="submit">Gem password</button>
+  </form>
+  <form method="post" onsubmit="return confirm('Slet gruppe-password og gør siden åben?')">
+    <input type="hidden" name="action" value="delete_password">
+    <button type="submit" class="danger">Slet password</button>
+  </form>
+
+  {% if mail_on or sms_on %}
+  <h2>Kontakt for notifikationer</h2>
+  <form method="post">
+    <input type="hidden" name="action" value="contact">
+    {% if mail_on %}<label>Admin e-mail <input type="email" name="admin_email" value="{{ group.admin_email }}"></label>{% endif %}
+    {% if sms_on %}<label>Admin telefon <input type="text" name="admin_phone" value="{{ group.admin_phone }}"></label>{% endif %}
+    <button type="submit">Gem kontakt</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card narrow">
+  <h2>Tilmeldings-punkter</h2>
+  <p class="muted small">Punkter som vises på alle gruppens events ved tilmelding.</p>
+  {% if not fields %}<p>Ingen punkter endnu.</p>{% endif %}
+  {% for item in fields %}
+    <div class="row">
+      <div>
+        {% set typelabel = 'notefelt' if item.f.multiline else ('deltager ikke' if item.f.is_decline else item.f.field_type) %}
+        <strong>{{ loop.index }}. {{ item.f.label }}</strong>
+        <span class="muted">({{ typelabel }}{% if item.f.required %}, påkrævet{% endif %})</span>
+        {% if item.options %}<div class="muted small">Valg: {{ item.options|join(', ') }}</div>{% endif %}
+      </div>
+      <div class="actions">
+        <form method="post" class="inline">
+          <input type="hidden" name="action" value="move_field">
+          <input type="hidden" name="field_id" value="{{ item.f.id }}">
+          <input type="hidden" name="direction" value="up">
+          <button {{ 'disabled' if loop.first }} title="Flyt op">▲</button>
+        </form>
+        <form method="post" class="inline">
+          <input type="hidden" name="action" value="move_field">
+          <input type="hidden" name="field_id" value="{{ item.f.id }}">
+          <input type="hidden" name="direction" value="down">
+          <button {{ 'disabled' if loop.last }} title="Flyt ned">▼</button>
+        </form>
+        <form method="post" class="inline" onsubmit="return confirm('Slet punktet?')">
+          <input type="hidden" name="action" value="delete_field">
+          <input type="hidden" name="field_id" value="{{ item.f.id }}">
+          <button class="danger">Slet</button>
+        </form>
+      </div>
+    </div>
+  {% endfor %}
+
+  <h3>Tilføj punkt</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="add_field">
+    <label>Navn på punkt <input type="text" name="label" required></label>
+    <label>Type
+      <select name="field_type">
+        <option value="text">Tekstfelt</option>
+        <option value="note">Notefelt (flere linjer — alle kan se den)</option>
+        <option value="dropdown">Dropdown</option>
+        <option value="checkbox">Checkbox</option>
+      </select>
+    </label>
+    <label>Dropdown-valg (kommasepareret, kun ved dropdown)
+      <input type="text" name="options" placeholder="fx Kød, Vegetar, Vegansk">
+    </label>
+    <p class="muted small">Nye punkter placeres nederst — brug ▲/▼ ovenfor til at flytte dem.</p>
+    <label class="chk"><input type="checkbox" name="required"> Skal udfyldes</label>
+    <label class="chk"><input type="checkbox" name="is_decline"> "Deltager ikke"-felt (checkbox — hvis afkrydset ved tilmelding kræves kun navn)</label>
+    <button type="submit">Tilføj punkt</button>
+  </form>
+</div>
+
+<div class="card narrow">
+  <h2>Bruger-sidens udseende</h2>
+  <p class="muted small">Billede vises på login-skærmen og i toppen af bruger-siden.
+     Teksten vises på login-skærmen.</p>
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="action" value="branding">
+    {% if group.image_path %}
+      <p><img src="{{ url_for('group_image', slug=group.slug) }}" alt="Billede" style="max-height:90px;border-radius:8px"></p>
+      <label class="chk"><input type="checkbox" name="remove_image"> Fjern nuværende billede</label>
+    {% endif %}
+    <label>Upload billede (png/jpg/gif/webp)
+      <input type="file" name="image" accept="image/*">
+    </label>
+    <label>Tekst på login-skærmen
+      <textarea name="login_text" rows="4">{{ group.login_text }}</textarea>
+    </label>
+    <button type="submit">Gem</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block brand %}Master-admin{% endblock %}
+{% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Opret ny gruppe</h1>
+  <form method="post">
+    <label>Gruppenavn
+      <input type="text" name="name" required>
+    </label>
+    <label>Slug (bruges i url'en, fx /klubben). Tomt = udledes af navnet.
+      <input type="text" name="slug" placeholder="auto">
+    </label>
+    <label>Bruger-password (adgangskode til bruger-siden — kan ændres senere)
+      <input type="text" name="user_password">
+    </label>
+    <label>Admin-password (til gruppe-admin) *
+      <input type="password" name="admin_password" required>
+    </label>
+    <hr>
+    <label>Admin e-mail (modtager notifikationer)
+      <input type="email" name="admin_email">
+    </label>
+    <label>Admin telefon (modtager SMS, fx 4512345678)
+      <input type="text" name="admin_phone">
+    </label>
+    <label class="chk"><input type="checkbox" name="mail_enabled"> Tillad mail-notifikationer</label>
+    <label class="chk"><input type="checkbox" name="sms_enabled"> Tillad SMS-notifikationer</label>
+    <button type="submit">Opret gruppe</button>
+  </form>
+</div>
+{% endblock %}

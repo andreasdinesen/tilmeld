@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  {% if group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
+{% endblock %}
+{% block content %}
+{% if group.image_path %}
+  <img class="group-image banner" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
+{% endif %}
+<div class="card">
+  <h1>Kommende events</h1>
+  {% if not events %}<p>Ingen kommende events.</p>{% endif %}
+  {% for item in events %}
+    {% set ev = item.ev %}
+    <a class="event-card link state-{{ item.state }}" href="{{ url_for('user_event', slug=group.slug, event_slug=ev.slug) }}">
+      <div>
+        <strong>{{ ev.name }}</strong>
+        {% if item.state == 'locked' %}<span class="tag locked">Tilmelding lukket</span>{% endif %}
+        <div class="muted small">
+          {{ ev.event_date|d }}{% if ev.start_time %} {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
+        </div>
+      </div>
+      <div class="count">{{ item.count }} / {{ ev.expected_count }} deltagere</div>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

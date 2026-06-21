@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}<a href="{{ url_for('user_event', slug=group.slug, event_slug=ev.slug) }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Redigér tilmelding</h1>
+  <p class="muted">{{ ev.name }}</p>
+  {% if state != 'open' %}
+    <p class="flash error">Tilmeldingen er lukket og kan ikke ændres.</p>
+  {% else %}
+  <form id="edit-form" method="post">
+    {% include "user/_fields.html" %}
+    <button type="submit" class="primary">Gem ændringer</button>
+  </form>
+  <script src="{{ url_for('static', filename='forms.js') }}"></script>
+  <script>initSignupForm('edit-form', { autoDecline: false });</script>
+  {% endif %}
+</div>
+{% endblock %}

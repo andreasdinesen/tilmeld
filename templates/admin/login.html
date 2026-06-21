@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }} · admin{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Admin-login</h1>
+  <p class="muted">{{ group.name }}</p>
+  <form method="post">
+    <label>Admin-password
+      <input type="password" name="password" autofocus required>
+    </label>
+    <button type="submit">Log ind</button>
+  </form>
+</div>
+{% endblock %}

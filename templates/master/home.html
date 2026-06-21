@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block brand %}Master-admin{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('master_settings') }}">Opsætning</a>
+  <a href="{{ url_for('master_system') }}">System</a>
+  <a href="{{ url_for('master_group_new') }}">Ny gruppe</a>
+  <a href="{{ url_for('master_logout') }}">Log ud</a>
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Grupper</h1>
+  <a class="btn primary" href="{{ url_for('master_group_new') }}">+ Ny gruppe</a>
+</div>
+
+{% if not groups %}
+  <div class="card"><p>Ingen grupper endnu. <a href="{{ url_for('master_group_new') }}">Opret den første.</a></p></div>
+{% endif %}
+
+{% for item in groups %}
+  {% set g = item.g %}
+  <div class="card group-card">
+    <div class="group-head">
+      <div>
+        <span class="group-name">{{ g.name }}</span>
+        <code>/{{ g.slug }}</code>
+        <div class="muted small">{{ item.events }} event(s)</div>
+      </div>
+      <div class="group-links">
+        <a class="btn" href="{{ url_for('admin_home', slug=g.slug) }}">Åbn admin</a>
+        <a class="btn" href="/{{ g.slug }}">Bruger-side</a>
+      </div>
+    </div>
+
+    <div class="group-foot">
+      <form method="post" action="{{ url_for('master_group_toggle', slug=g.slug) }}" class="toggle-form">
+        <span class="muted small">Notifikationer:</span>
+        <label class="chk"><input type="checkbox" name="mail_enabled" {{ 'checked' if g.mail_enabled }}> Mail</label>
+        <label class="chk"><input type="checkbox" name="sms_enabled" {{ 'checked' if g.sms_enabled }}> SMS</label>
+        <button type="submit">Gem</button>
+      </form>
+      <form method="post" action="{{ url_for('master_group_delete', slug=g.slug) }}"
+            onsubmit="return confirm('Slet gruppen {{ g.name }} og alle dens events?')">
+        <button type="submit" class="danger">Slet gruppe</button>
+      </form>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

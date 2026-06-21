@@ -1,0 +1,35 @@
+gameskill:
+  id: tilmeld
+  name: "Tilmeld"
+  category: "Apps"
+  description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister og CSV-eksport."
+  author: "andreasdinesen"
+  version: 1
+  icon: "app"
+
+  docker:
+    image: "ghcr.io/andreasdinesen/tilmeld:latest"
+    keep_entrypoint: true
+    user: "0:0"
+    data_path: "/data"
+
+  variables:
+    - key: MASTER_PASSWORD
+      name: "Master-admin password (sættes ved første opstart)"
+      type: string
+      default: "skift-mig"
+      required: true
+    - key: SECRET_KEY
+      name: "Hemmelig nøgle til login-sessioner (tom = auto-genereres)"
+      type: string
+      default: ""
+
+  startup:
+    command: ""
+    done_regex: 'Serving on'
+
+  ports:
+    - { name: web, default: 8080, protocol: tcp }
+
+  backup:
+    include: ["."]

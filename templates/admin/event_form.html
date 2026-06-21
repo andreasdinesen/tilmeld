@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }} · admin{% endblock %}
+{% block nav %}<a href="{{ url_for('admin_home', slug=group.slug) }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>{{ 'Redigér event' if ev else 'Nyt event' }}</h1>
+  <form method="post">
+    <label>Event-navn <input type="text" name="name" value="{{ ev.name if ev else '' }}" required></label>
+    <label>Slug (url, tomt = auto) <input type="text" name="slug" value="{{ ev.slug if ev else '' }}" placeholder="auto"></label>
+    <label>Dato <input type="date" name="event_date" value="{{ ev.event_date if ev else '' }}" required></label>
+    <div class="grid2">
+      <label>Start <input type="time" name="start_time" value="{{ ev.start_time if ev else '' }}"></label>
+      <label>Slut <input type="time" name="end_time" value="{{ ev.end_time if ev else '' }}"></label>
+    </div>
+    <label>Beskrivelse <textarea name="description" rows="5">{{ ev.description if ev else '' }}</textarea></label>
+    <label>Forventet antal deltagere <input type="number" name="expected_count" value="{{ ev.expected_count if ev else 0 }}"></label>
+    <label class="chk"><input type="checkbox" name="capacity_limit" {{ 'checked' if ev and ev.capacity_limit }}> Begræns tilmeldinger til det forventede antal (luk når der er fyldt)</label>
+    <label>Tilmeldingsfrist
+      <input type="datetime-local" id="signup_deadline" name="signup_deadline" value="{{ ev.signup_deadline if ev else '' }}">
+    </label>
+    <p class="muted small">Tom = {{ default_deadline_days }} dage før event-start (standard sat af master).</p>
+
+    {% if fields %}
+    <h2>Vis punkter på dette event</h2>
+    <p class="muted small">Fjern flueben for at skjule et punkt ved tilmelding til netop dette event.</p>
+    {% for f in fields %}
+      <label class="chk"><input type="checkbox" name="show_field_{{ f.id }}"
+        {{ 'checked' if f.id not in hidden }}> {{ f.label }}</label>
+    {% endfor %}
+    {% endif %}
+
+    {% if mail_on or sms_on %}
+    <h2>Notifikationer</h2>
+    <label class="chk"><input type="checkbox" name="notify_new_signup" {{ 'checked' if ev and ev.notify_new_signup }}> Besked til admin ved ny tilmelding</label>
+    <label class="chk"><input type="checkbox" name="notify_change" {{ 'checked' if ev and ev.notify_change }}> Besked til admin ved ændring</label>
+    <label class="chk"><input type="checkbox" name="notify_receipt" {{ 'checked' if ev and ev.notify_receipt }}> Kvittering til deltager</label>
+    <label class="chk"><input type="checkbox" name="notify_reminder" {{ 'checked' if ev and ev.notify_reminder }}> Påmindelse 24t før frist</label>
+    {% if mail_on %}
+    <label class="chk"><input type="checkbox" name="csv_after_deadline" {{ 'checked' if ev and ev.csv_after_deadline }}> Send deltagerliste (CSV) til admin-mail 2 timer efter frist</label>
+    {% endif %}
+    {% endif %}
+
+    <button type="submit">{{ 'Gem ændringer' if ev else 'Opret event' }}</button>
+  </form>
+</div>
+<script>
+  // Forudfyld tilmeldingsfrist til N dage før event-start, hvis feltet er tomt.
+  (function () {
+    var days = {{ default_deadline_days }};
+    var dateEl = document.querySelector('input[name=event_date]');
+    var timeEl = document.querySelector('input[name=start_time]');
+    var dl = document.getElementById('signup_deadline');
+    function update() {
+      if (!dateEl.value || dl.value) return;
+      var t = timeEl.value || '12:00';
+      var d = new Date(dateEl.value + 'T' + t);
+      d.setDate(d.getDate() - days);
+      var pad = function (n) { return String(n).padStart(2, '0'); };
+      dl.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    dateEl.addEventListener('change', update);
+    timeEl.addEventListener('change', update);
+  })();
+</script>
+{% endblock %}

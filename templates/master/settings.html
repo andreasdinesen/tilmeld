@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block brand %}Master-admin{% endblock %}
+{% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Opsætning</h1>
+  <form method="post">
+    <h2>Master-password</h2>
+    <label>Nyt master-password (tomt = uændret)
+      <input type="password" name="new_master_password">
+    </label>
+
+    <h2>Events</h2>
+    <label>Standard tilmeldingsfrist: antal dage før event-start
+      <input type="number" name="default_deadline_days" min="0" value="{{ s.default_deadline_days }}">
+    </label>
+    <p class="muted small">Bruges som forudfyldt frist når en admin opretter et nyt event.</p>
+
+    <h2>E-mail (SMTP)</h2>
+    <label>SMTP-host <input type="text" name="smtp_host" value="{{ s.smtp_host }}"></label>
+    <label>SMTP-port <input type="number" name="smtp_port" value="{{ s.smtp_port }}"></label>
+    <label>Brugernavn <input type="text" name="smtp_user" value="{{ s.smtp_user }}"></label>
+    <label>Adgangskode <input type="password" name="smtp_password" value="{{ s.smtp_password }}"></label>
+    <label>Afsender (From) <input type="text" name="smtp_from" value="{{ s.smtp_from }}"></label>
+    <label class="chk"><input type="checkbox" name="smtp_use_tls" {{ 'checked' if s.smtp_use_tls }}> Brug STARTTLS</label>
+
+    <h2>SMS</h2>
+    <label>Udbyder
+      <select name="sms_provider">
+        <option value="gatewayapi" {{ 'selected' if s.sms_provider == 'gatewayapi' }}>GatewayAPI</option>
+      </select>
+    </label>
+    <label>API-nøgle <input type="password" name="sms_api_key" value="{{ s.sms_api_key }}"></label>
+    <label>Afsendernavn <input type="text" name="sms_sender" value="{{ s.sms_sender }}"></label>
+
+    <h2>Opdatering (GitHub)</h2>
+    <label>GitHub-repo (ejer/repo) til versions-tjek
+      <input type="text" name="github_repo" value="{{ s.github_repo }}" placeholder="fx kristianwind/tilmeld">
+    </label>
+    <label>Branch <input type="text" name="update_branch" value="{{ s.update_branch }}"></label>
+    <p class="muted small">Bruges på <a href="{{ url_for('master_system') }}">System-siden</a> til at tjekke og hente nye versioner.</p>
+
+    <p class="muted small">Uden konfiguration logges notifikationer blot i serverens konsol — fint til test.</p>
+    <button type="submit">Gem indstillinger</button>
+  </form>
+</div>
+{% endblock %}

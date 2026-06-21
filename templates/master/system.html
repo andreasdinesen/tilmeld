@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block brand %}Master-admin{% endblock %}
+{% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>System</h1>
+
+  <h2>Installerede versioner</h2>
+  <table>
+    <thead><tr><th>System</th><th>Version</th></tr></thead>
+    <tbody>
+      {% for name, ver in components %}
+        <tr><td>{{ name }}</td><td><code>{{ ver }}</code></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" style="margin-top:12px">
+    <input type="hidden" name="action" value="update_deps">
+    <button type="submit" onclick="return confirm('Opdater alle afhængigheder via pip?')">Opdater afhængigheder</button>
+  </form>
+
+  <h2>App-version &amp; opdatering</h2>
+  {% if not s.github_repo %}
+    <p class="muted">Ingen GitHub-adresse angivet. Sæt den under
+       <a href="{{ url_for('master_settings') }}">Opsætning</a> for at kunne tjekke for nye versioner.</p>
+  {% else %}
+    <p class="muted small">Repo: <code>{{ s.github_repo }}</code> (branch <code>{{ s.update_branch }}</code>)</p>
+  {% endif %}
+
+  <form method="post" class="inline">
+    <input type="hidden" name="action" value="check">
+    <button type="submit">Tjek for ny version</button>
+  </form>
+  <form method="post" class="inline">
+    <input type="hidden" name="action" value="update_app">
+    <button type="submit" onclick="return confirm('Hent og installer nyeste version (git pull)?')">Kør opdatering</button>
+  </form>
+
+  {% if check %}
+    {% if check.ok %}
+      <div class="flash {{ 'ok' if check.update_available else '' }}" style="margin-top:14px">
+        Nuværende: <strong>{{ check.current }}</strong> · Nyeste på GitHub: <strong>{{ check.latest }}</strong>
+        {% if check.update_available %} — der findes en nyere version!{% else %} — du kører den nyeste.{% endif %}
+      </div>
+    {% else %}
+      <div class="flash error" style="margin-top:14px">{{ check.error }}</div>
+    {% endif %}
+  {% endif %}
+
+  {% if not is_git %}
+    <p class="muted small">Bemærk: appen kører ikke fra et git-repo, så "Kør opdatering" virker først når den er
+       installeret via <code>git clone</code> fra GitHub.</p>
+  {% endif %}
+
+  {% if update_log %}
+    <h3>Opdaterings-log</h3>
+    <pre class="log">{{ update_log }}</pre>
+    <p class="muted small">Genstart appen for at ændringer træder i kraft.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
+  {% if group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
+{% endblock %}
+{% block content %}
+{% if group.image_path %}
+  <img class="group-image banner" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
+{% endif %}
+<div class="card state-{{ state }}">
+  <h1>{{ ev.name }}</h1>
+  {% if state == 'locked' %}<div class="tag locked big">Tilmelding er lukket — fristen er passeret</div>{% endif %}
+  <div class="muted">
+    {{ ev.event_date|d }}{% if ev.start_time %} kl. {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
+    {% if ev.signup_deadline %}· Tilmeldingsfrist: {{ ev.signup_deadline|dt }}{% endif %}
+  </div>
+  <div class="count big">{{ count }} / {{ ev.expected_count }} deltagere
+    {% if full %}<span class="tag locked">FULDT</span>{% endif %}</div>
+  {% if ev.description %}<div class="description">{{ ev.description }}</div>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Deltagere</h2>
+  {% if not regs %}<p>Ingen tilmeldte endnu.</p>{% else %}
+  <table>
+    <thead><tr><th>Navn</th>{% for item in fields %}<th>{{ item.f.label }}</th>{% endfor %}<th></th></tr></thead>
+    <tbody>
+      {% for r in regs %}
+      {% set ns = namespace(declined=false) %}
+      {% for did in decline_ids %}{% if r['values'].get(did) == 'Ja' %}{% set ns.declined = true %}{% endif %}{% endfor %}
+      <tr class="{{ 'declined' if ns.declined }}">
+        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}</td>
+        {% for item in fields %}<td>{{ r['values'].get(item.f.id, '') }}</td>{% endfor %}
+        <td class="actions">
+          {% if state == 'open' %}
+          <a class="btn small" href="{{ url_for('user_edit', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}">Redigér</a>
+          <form method="post" action="{{ url_for('user_delete', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}"
+                class="inline" onsubmit="return confirm('Fjern tilmeldingen for {{ r.name }}?')">
+            <button class="danger small">Fjern</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% if state == 'open' %}
+<div class="card">
+  <h2>Tilmeld dig</h2>
+  {% if full %}
+    <p class="flash error">Der er ikke plads til flere — du kan kun melde afbud ("deltager ikke").</p>
+  {% endif %}
+  {% if decline_ids %}<p class="muted small">Sæt flueben ved "deltager ikke" (efter du har skrevet dit navn) for at melde afbud med det samme.</p>{% endif %}
+  <form id="signup-form" method="post" action="{{ url_for('user_signup', slug=group.slug, event_slug=ev.slug) }}">
+    {% include "user/_fields.html" %}
+    <button type="submit" class="primary">Tilmeld</button>
+  </form>
+</div>
+<script src="{{ url_for('static', filename='forms.js') }}"></script>
+<script>initSignupForm('signup-form', { autoDecline: true });</script>
+{% endif %}
+{% endblock %}
