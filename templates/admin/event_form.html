@@ -12,7 +12,9 @@
       <label>Start <input type="time" name="start_time" value="{{ ev.start_time if ev else '' }}"></label>
       <label>Slut <input type="time" name="end_time" value="{{ ev.end_time if ev else '' }}"></label>
     </div>
-    <label>Beskrivelse <textarea name="description" rows="5">{{ ev.description if ev else '' }}</textarea></label>
+    <label>Beskrivelse <textarea name="description" rows="6">{{ ev.description if ev else '' }}</textarea></label>
+    <p class="muted small">Understøtter Markdown: <code>**fed**</code>, <code>*kursiv*</code>,
+       <code># overskrift</code>, <code>- punktliste</code>, <code>[link](https://...)</code>.</p>
     <label>Forventet antal deltagere <input type="number" name="expected_count" value="{{ ev.expected_count if ev else 0 }}"></label>
     <label class="chk"><input type="checkbox" name="capacity_limit" {{ 'checked' if ev and ev.capacity_limit }}> Begræns tilmeldinger til det forventede antal (luk når der er fyldt)</label>
     <label>Tilmeldingsfrist

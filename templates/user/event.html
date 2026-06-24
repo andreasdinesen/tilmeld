@@ -17,7 +17,7 @@
   </div>
   <div class="count big">{{ count }} / {{ ev.expected_count }} deltagere
     {% if full %}<span class="tag locked">FULDT</span>{% endif %}</div>
-  {% if ev.description %}<div class="description">{{ ev.description }}</div>{% endif %}
+  {% if ev.description %}<div class="description">{{ ev.description | md }}</div>{% endif %}
 </div>
 
 <div class="card">

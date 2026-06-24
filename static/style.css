@@ -74,7 +74,23 @@ button:hover, .btn:hover { background: #f8fafc; }
 
 .count { color: var(--muted); }
 .count.big { font-size: 1.1rem; margin: 10px 0; }
-.description { margin-top: 14px; white-space: pre-wrap; }
+.description { margin-top: 14px; }
+.description > :first-child { margin-top: 0; }
+.description > :last-child { margin-bottom: 0; }
+.description h1, .description h2, .description h3, .description h4 { margin: .6em 0 .3em; line-height: 1.25; }
+.description h1 { font-size: 1.4rem; }
+.description h2 { font-size: 1.2rem; }
+.description h3 { font-size: 1.05rem; }
+.description p { margin: .5em 0; }
+.description ul, .description ol { margin: .5em 0; padding-left: 1.4em; }
+.description li { margin: .2em 0; }
+.description a { color: var(--primary); }
+.description blockquote { margin: .6em 0; padding: .2em 0 .2em 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.description code { background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
+.description pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+.description pre code { background: none; padding: 0; color: inherit; }
+.description table { border-collapse: collapse; }
+.description th, .description td { border: 1px solid var(--line); padding: 6px 10px; }
 
 .tag { display: inline-block; font-size: .72rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
 .tag.locked { background: var(--locked-line); color: #fff; }

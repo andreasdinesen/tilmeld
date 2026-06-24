@@ -6,14 +6,25 @@ import os
 from datetime import datetime, timedelta
 from functools import wraps
 
+import bleach
+import markdown as markdown_lib
 from flask import (Flask, Response, abort, flash, redirect, render_template,
                    request, send_file, session, url_for)
+from markupsafe import Markup
 from werkzeug.utils import secure_filename
 
 import auth
 import db
 import notifications
 import system_info
+
+# Tilladte HTML-tags i renderet Markdown (alt andet fjernes, så en beskrivelse
+# ikke kan injicere fx <script> hos brugerne).
+_MD_TAGS = ["p", "br", "hr", "strong", "em", "b", "i", "u", "del", "a",
+            "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+            "blockquote", "code", "pre", "span",
+            "table", "thead", "tbody", "tr", "th", "td"]
+_MD_ATTRS = {"a": ["href", "title"]}
 
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
@@ -155,6 +166,18 @@ def fmt_d(value):
         return datetime.strptime(value, "%Y-%m-%d").strftime("%d-%m-%Y")
     except (ValueError, TypeError):
         return value
+
+
+@app.template_filter("md")
+def render_markdown(text):
+    """Render Markdown til sikker HTML (allowlist-renset)."""
+    if not text:
+        return ""
+    html = markdown_lib.markdown(
+        text, extensions=["nl2br", "sane_lists", "fenced_code", "tables"])
+    clean = bleach.clean(html, tags=_MD_TAGS, attributes=_MD_ATTRS,
+                         protocols=["http", "https", "mailto"], strip=True)
+    return Markup(clean)
 
 
 # --------------------------------------------------------------------------- #

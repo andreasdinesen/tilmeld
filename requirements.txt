@@ -1,2 +1,4 @@
 Flask>=2.3,<4
 waitress>=2.1
+Markdown>=3.5
+bleach>=6.1
