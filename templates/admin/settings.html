@@ -23,12 +23,13 @@
     <button type="submit" class="danger">Slet password</button>
   </form>
 
-  {% if mail_on or sms_on %}
+  {% if group.mail_enabled or group.whatsapp_enabled %}
   <h2>Kontakt for notifikationer</h2>
+  <p class="muted small">Modtagere som master admin satte ved oprettelsen — du kan rette dem her.</p>
   <form method="post">
     <input type="hidden" name="action" value="contact">
-    {% if mail_on %}<label>Admin e-mail <input type="email" name="admin_email" value="{{ group.admin_email }}"></label>{% endif %}
-    {% if sms_on %}<label>Admin telefon <input type="text" name="admin_phone" value="{{ group.admin_phone }}"></label>{% endif %}
+    {% if group.mail_enabled %}<label>Admin e-mail <input type="email" name="admin_email" value="{{ group.admin_email }}"></label>{% endif %}
+    {% if group.whatsapp_enabled %}<label>WhatsApp-modtager (bruger-nummer eller gruppe-id) <input type="text" name="whatsapp_recipient" value="{{ group.whatsapp_recipient }}"></label>{% endif %}
     <button type="submit">Gem kontakt</button>
   </form>
   {% endif %}

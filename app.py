@@ -86,12 +86,12 @@ def all_group_fields(conn, group_id):
 
 
 def group_channels(conn, group):
-    """Kan gruppen reelt sende mail/SMS? Kræver global opsætning OG at master har
+    """Kan gruppen reelt sende mail/WhatsApp? Kræver global opsætning OG at master har
     aktiveret kanalen for gruppen. Bruges til at skjule felter/valg når intet er sat op."""
     s = db.get_settings(conn)
     mail = bool(s["smtp_host"]) and bool(group["mail_enabled"])
-    sms = bool(s["sms_api_key"]) and bool(group["sms_enabled"])
-    return mail, sms
+    whatsapp = bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"])
+    return mail, whatsapp
 
 
 def count_attending(conn, group_id, event_id, exclude_reg_id=None):
@@ -244,14 +244,14 @@ def master_group_new():
             conn = db.get_db()
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
-                "mail_enabled, sms_enabled, admin_email, admin_phone, created_at) "
+                "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, created_at) "
                 "VALUES (?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
-                 1 if request.form.get("sms_enabled") else 0,
+                 1 if request.form.get("whatsapp_enabled") else 0,
                  request.form.get("admin_email", "").strip(),
-                 request.form.get("admin_phone", "").strip(),
+                 request.form.get("whatsapp_recipient", "").strip(),
                  db.now_iso()),
             )
             conn.commit()
@@ -269,9 +269,9 @@ def master_group_toggle(slug):
         abort(404)
     conn = db.get_db()
     conn.execute(
-        "UPDATE groups SET mail_enabled = ?, sms_enabled = ? WHERE id = ?",
+        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ? WHERE id = ?",
         (1 if request.form.get("mail_enabled") else 0,
-         1 if request.form.get("sms_enabled") else 0, g["id"]),
+         1 if request.form.get("whatsapp_enabled") else 0, g["id"]),
     )
     conn.commit()
     conn.close()
@@ -305,7 +305,7 @@ def master_settings():
             )
         conn.execute(
             "UPDATE settings SET smtp_host=?, smtp_port=?, smtp_user=?, smtp_password=?, "
-            "smtp_from=?, smtp_use_tls=?, sms_provider=?, sms_api_key=?, sms_sender=?, "
+            "smtp_from=?, smtp_use_tls=?, whatsapp_api_url=?, whatsapp_api_key=?, "
             "default_deadline_days=?, github_repo=?, update_branch=? WHERE id = 1",
             (request.form.get("smtp_host", "").strip(),
              int(request.form.get("smtp_port") or 587),
@@ -313,9 +313,8 @@ def master_settings():
              request.form.get("smtp_password", ""),
              request.form.get("smtp_from", "").strip(),
              1 if request.form.get("smtp_use_tls") else 0,
-             request.form.get("sms_provider", "gatewayapi"),
-             request.form.get("sms_api_key", "").strip(),
-             request.form.get("sms_sender", "Tilmeld").strip(),
+             request.form.get("whatsapp_api_url", "").strip(),
+             request.form.get("whatsapp_api_key", "").strip(),
              int(request.form.get("default_deadline_days") or 4),
              request.form.get("github_repo", "").strip(),
              request.form.get("update_branch", "main").strip() or "main"),
@@ -413,9 +412,14 @@ def admin_settings(slug):
             conn.execute("UPDATE groups SET user_password = '' WHERE id = ?", (group["id"],))
             flash("Gruppe-password slettet — bruger-siden er nu åben uden login.", "ok")
         elif action == "contact":
-            conn.execute("UPDATE groups SET admin_email = ?, admin_phone = ? WHERE id = ?",
-                         (request.form.get("admin_email", "").strip(),
-                          request.form.get("admin_phone", "").strip(), group["id"]))
+            # Opdatér kun de felter der faktisk blev vist/sendt, så den ene kanal
+            # ikke nulstiller den anden.
+            if "admin_email" in request.form:
+                conn.execute("UPDATE groups SET admin_email = ? WHERE id = ?",
+                             (request.form.get("admin_email", "").strip(), group["id"]))
+            if "whatsapp_recipient" in request.form:
+                conn.execute("UPDATE groups SET whatsapp_recipient = ? WHERE id = ?",
+                             (request.form.get("whatsapp_recipient", "").strip(), group["id"]))
             flash("Kontaktoplysninger gemt.", "ok")
         elif action == "add_field":
             is_decline = 1 if request.form.get("is_decline") else 0
@@ -470,11 +474,11 @@ def admin_settings(slug):
         conn.commit()
         group = get_group(slug)
     fields = all_group_fields(conn, group["id"])
-    mail_on, sms_on = group_channels(conn, group)
+    mail_on, wa_on = group_channels(conn, group)
     conn.close()
     parsed = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("admin/settings.html", group=group, fields=parsed,
-                           mail_on=mail_on, sms_on=sms_on)
+                           mail_on=mail_on, wa_on=wa_on)
 
 
 def _move_field(conn, group_id, field_id, direction):
@@ -497,11 +501,11 @@ def _render_event_form(group, ev):
     fields = all_group_fields(conn, group["id"])
     hidden = hidden_field_ids(conn, ev["id"]) if ev else set()
     days = db.get_settings(conn)["default_deadline_days"]
-    mail_on, sms_on = group_channels(conn, group)
+    mail_on, wa_on = group_channels(conn, group)
     conn.close()
     return render_template("admin/event_form.html", group=group, ev=ev,
                            fields=fields, hidden=hidden, default_deadline_days=days,
-                           mail_on=mail_on, sms_on=sms_on)
+                           mail_on=mail_on, wa_on=wa_on)
 
 
 @app.route("/<slug>/admin/events/new", methods=["GET", "POST"])
@@ -680,7 +684,7 @@ def build_csv(conn, group, ev):
     buf = io.StringIO()
     buf.write("﻿")  # BOM så Excel viser æøå korrekt
     writer = csv.writer(buf, delimiter=";")
-    writer.writerow(["Navn", "E-mail", "Telefon"] + [f["label"] for f in fields] + ["Tilmeldt"])
+    writer.writerow(["Navn", "E-mail", "WhatsApp"] + [f["label"] for f in fields] + ["Tilmeldt"])
     for r in regs:
         row = [r["name"], r["email"], r["phone"]]
         row += [r["values"].get(f["id"], "") for f in fields]
@@ -779,13 +783,13 @@ def user_event(slug, event_slug):
     attending = count_attending(conn, group["id"], ev["id"])
     full = bool(ev["capacity_limit"] and ev["expected_count"]
                 and attending >= ev["expected_count"])
-    mail_on, sms_on = group_channels(conn, group)
+    mail_on, wa_on = group_channels(conn, group)
     decline_ids = [f["id"] for f in fields if f["is_decline"]]
     conn.close()
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("user/event.html", group=group, ev=ev, state=event_state(ev),
                            fields=parsed_fields, regs=regs, count=attending, full=full,
-                           mail_on=mail_on, sms_on=sms_on, decline_ids=decline_ids)
+                           mail_on=mail_on, wa_on=wa_on, decline_ids=decline_ids)
 
 
 @app.route("/<slug>/<event_slug>/signup", methods=["POST"])
@@ -818,13 +822,13 @@ def user_edit(slug, event_slug, reg_id):
     vals = conn.execute(
         "SELECT field_id, value FROM registration_values WHERE registration_id = ?",
         (reg_id,)).fetchall()
-    mail_on, sms_on = group_channels(conn, group)
+    mail_on, wa_on = group_channels(conn, group)
     conn.close()
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     current = {v["field_id"]: v["value"] for v in vals}
     return render_template("user/signup_form.html", group=group, ev=ev,
                            fields=parsed_fields, reg=reg, current=current,
-                           state=event_state(ev), mail_on=mail_on, sms_on=sms_on)
+                           state=event_state(ev), mail_on=mail_on, wa_on=wa_on)
 
 
 def _handle_registration(slug, event_slug, reg_id):

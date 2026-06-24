@@ -24,14 +24,12 @@
     <label>Afsender (From) <input type="text" name="smtp_from" value="{{ s.smtp_from }}"></label>
     <label class="chk"><input type="checkbox" name="smtp_use_tls" {{ 'checked' if s.smtp_use_tls }}> Brug STARTTLS</label>
 
-    <h2>SMS</h2>
-    <label>Udbyder
-      <select name="sms_provider">
-        <option value="gatewayapi" {{ 'selected' if s.sms_provider == 'gatewayapi' }}>GatewayAPI</option>
-      </select>
+    <h2>WhatsApp</h2>
+    <label>Gateway-URL (din WhatsApp-bro, der modtager POST med JSON)
+      <input type="text" name="whatsapp_api_url" value="{{ s.whatsapp_api_url }}" placeholder="https://din-bro.dk/send">
     </label>
-    <label>API-nøgle <input type="password" name="sms_api_key" value="{{ s.sms_api_key }}"></label>
-    <label>Afsendernavn <input type="text" name="sms_sender" value="{{ s.sms_sender }}"></label>
+    <label>API-nøgle (sendes som Bearer-token) <input type="password" name="whatsapp_api_key" value="{{ s.whatsapp_api_key }}"></label>
+    <p class="muted small">Broen kaldes med <code>POST {{ '{' }}"to": "&lt;nummer eller gruppe-id&gt;", "message": "..."{{ '}' }}</code> og header <code>Authorization: Bearer &lt;nøgle&gt;</code>.</p>
 
     <h2>Opdatering (GitHub)</h2>
     <label>GitHub-repo (ejer/repo) til versions-tjek

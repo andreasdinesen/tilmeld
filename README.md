@@ -28,7 +28,7 @@ MASTER_PASSWORD="dit-hemmelige-kodeord" bash run.sh
 ## Sådan hænger det sammen
 
 1. **Master-admin** (`/master`) opretter grupper, sætter hver gruppes admin-password
-   og slår mail/SMS til/fra. Her konfigureres også SMTP/SMS globalt.
+   og slår mail/WhatsApp til/fra. Her konfigureres også SMTP og WhatsApp-gateway globalt.
 2. **Gruppe-admin** (`/gruppe/admin`) opretter events, definerer tilmeldings-punkter
    (tekst/dropdown/checkbox, påkrævet eller ej), sætter/sletter gruppe-password og
    henter deltagerlister (vis eller CSV).
@@ -40,9 +40,13 @@ MASTER_PASSWORD="dit-hemmelige-kodeord" bash run.sh
 
 ## Notifikationer
 
-Uden SMTP/SMS-konfiguration logges notifikationer i serverens konsol — fint til test.
+Uden SMTP/WhatsApp-konfiguration logges notifikationer i serverens konsol — fint til test.
 Sæt rigtige værdier under master → Opsætning for at sende rigtige beskeder.
-SMS bruger GatewayAPI (dansk) som standard.
+
+**WhatsApp** sendes via en HTTP-bro/gateway du selv hoster (fx wppconnect/Baileys).
+Tilmeld kalder den med `POST <gateway-url>` og JSON-body `{"to": "<nummer eller gruppe-id>",
+"message": "..."}` samt header `Authorization: Bearer <api-nøgle>`. Konfigurér din bro
+til at acceptere det format (eller sæt en lille adapter foran).
 
 ## Data
 

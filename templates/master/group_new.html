@@ -21,11 +21,12 @@
     <label>Admin e-mail (modtager notifikationer)
       <input type="email" name="admin_email">
     </label>
-    <label>Admin telefon (modtager SMS, fx 4512345678)
-      <input type="text" name="admin_phone">
+    <label>WhatsApp-modtager (bruger-nummer, fx 4512345678, eller gruppe-id)
+      <input type="text" name="whatsapp_recipient">
     </label>
+    <p class="muted small">Gruppe-admin kan selv rette disse to felter bagefter.</p>
     <label class="chk"><input type="checkbox" name="mail_enabled"> Tillad mail-notifikationer</label>
-    <label class="chk"><input type="checkbox" name="sms_enabled"> Tillad SMS-notifikationer</label>
+    <label class="chk"><input type="checkbox" name="whatsapp_enabled"> Tillad WhatsApp-notifikationer</label>
     <button type="submit">Opret gruppe</button>
   </form>
 </div>

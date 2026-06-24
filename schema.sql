@@ -10,9 +10,8 @@ CREATE TABLE IF NOT EXISTS settings (
     smtp_password       TEXT DEFAULT '',
     smtp_from           TEXT DEFAULT '',
     smtp_use_tls        INTEGER DEFAULT 1,
-    sms_provider        TEXT DEFAULT 'gatewayapi',
-    sms_api_key         TEXT DEFAULT '',
-    sms_sender          TEXT DEFAULT 'Tilmeld',
+    whatsapp_api_url    TEXT DEFAULT '',             -- URL til WhatsApp-bro/gateway
+    whatsapp_api_key    TEXT DEFAULT '',             -- API-nøgle (sendes som Bearer-token)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT '',             -- "ejer/repo" til opdaterings-tjek
     update_branch       TEXT DEFAULT 'main'
@@ -25,9 +24,9 @@ CREATE TABLE IF NOT EXISTS groups (
     user_password       TEXT DEFAULT '',          -- plaintext: skal kunne "vises" i admin (delt adgangskode)
     admin_password_hash TEXT NOT NULL,
     mail_enabled        INTEGER DEFAULT 0,         -- slået til af master admin
-    sms_enabled         INTEGER DEFAULT 0,
-    admin_email         TEXT DEFAULT '',           -- modtager af admin-notifikationer
-    admin_phone         TEXT DEFAULT '',
+    whatsapp_enabled    INTEGER DEFAULT 0,
+    admin_email         TEXT DEFAULT '',           -- modtager af admin-notifikationer (mail)
+    whatsapp_recipient  TEXT DEFAULT '',           -- WhatsApp bruger-nr eller gruppe-id
     image_path          TEXT DEFAULT '',           -- logo/billede vist på bruger-siden
     login_text          TEXT DEFAULT '',           -- tekst vist på bruger-login-skærmen
     created_at          TEXT NOT NULL

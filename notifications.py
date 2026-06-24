@@ -1,4 +1,4 @@
-"""E-mail (SMTP), SMS (HTTP-gateway) og påmindelses-scheduler.
+"""E-mail (SMTP), WhatsApp (HTTP-bro/gateway) og påmindelses-scheduler.
 
 Uden konfiguration logges beskeder blot til konsollen, så lokal test virker
 uden rigtige udbydere.
@@ -7,7 +7,6 @@ import json
 import smtplib
 import threading
 import time
-import urllib.parse
 import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -71,28 +70,29 @@ def send_email_with_attachment(settings, to, subject, body, filename, content):
         _log("MAIL+CSV", to, subject, f"{body}\n[vedhæftet: {filename}]")
 
 
-def send_sms(settings, to: str, body: str) -> None:
+def send_whatsapp(settings, to: str, body: str) -> None:
+    """Send en WhatsApp-besked via en HTTP-bro/gateway.
+
+    Kontrakt (konfigurér din bro derefter): POST til whatsapp_api_url med
+    Authorization: Bearer <whatsapp_api_key> og JSON-body {"to": <modtager>,
+    "message": <tekst>}. Modtager kan være et telefonnummer eller et gruppe-id.
+    """
     if not to:
         return
-    if not settings["sms_api_key"]:
-        _log("SMS", to, "(sms)", body)
+    if not settings["whatsapp_api_url"]:
+        _log("WHATSAPP", to, "(whatsapp)", body)
         return
     try:
-        # GatewayAPI (dansk) som default-skabelon. Andre udbydere kan tilføjes her.
-        data = urllib.parse.urlencode({
-            "token": settings["sms_api_key"],
-            "sender": settings["sms_sender"] or "Tilmeld",
-            "message": body,
-            "msisdn": to,
-        }).encode()
+        data = json.dumps({"to": to, "message": body}).encode()
+        headers = {"Content-Type": "application/json"}
+        if settings["whatsapp_api_key"]:
+            headers["Authorization"] = "Bearer " + settings["whatsapp_api_key"]
         req = urllib.request.Request(
-            "https://gatewayapi.com/rest/mtsms", data=data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
+            settings["whatsapp_api_url"], data=data, headers=headers)
         urllib.request.urlopen(req, timeout=15).read()
     except Exception as e:
-        print(f"[SMS-FEJL] {e}")
-        _log("SMS", to, "(sms)", body)
+        print(f"[WHATSAPP-FEJL] {e}", flush=True)
+        _log("WHATSAPP", to, "(whatsapp)", body)
 
 
 def notify_admin(conn, group, subject: str, body: str) -> None:
@@ -100,16 +100,16 @@ def notify_admin(conn, group, subject: str, body: str) -> None:
     settings = db.get_settings(conn)
     if group["mail_enabled"] and group["admin_email"]:
         send_email(settings, group["admin_email"], subject, body)
-    if group["sms_enabled"] and group["admin_phone"]:
-        send_sms(settings, group["admin_phone"], f"{subject}: {body}")
+    if group["whatsapp_enabled"] and group["whatsapp_recipient"]:
+        send_whatsapp(settings, group["whatsapp_recipient"], f"{subject}: {body}")
 
 
-def notify_participant(conn, group, email: str, phone: str, subject: str, body: str) -> None:
+def notify_participant(conn, group, email: str, whatsapp: str, subject: str, body: str) -> None:
     settings = db.get_settings(conn)
     if group["mail_enabled"] and email:
         send_email(settings, email, subject, body)
-    if group["sms_enabled"] and phone:
-        send_sms(settings, phone, f"{subject}: {body}")
+    if group["whatsapp_enabled"] and whatsapp:
+        send_whatsapp(settings, whatsapp, f"{subject}: {body}")
 
 
 # ---- Scheduler: påmindelse 24t før frist + CSV 2t efter frist ------------------

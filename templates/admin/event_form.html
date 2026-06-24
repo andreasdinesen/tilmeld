@@ -31,7 +31,7 @@
     {% endfor %}
     {% endif %}
 
-    {% if mail_on or sms_on %}
+    {% if mail_on or wa_on %}
     <h2>Notifikationer</h2>
     <label class="chk"><input type="checkbox" name="notify_new_signup" {{ 'checked' if ev and ev.notify_new_signup }}> Besked til admin ved ny tilmelding</label>
     <label class="chk"><input type="checkbox" name="notify_change" {{ 'checked' if ev and ev.notify_change }}> Besked til admin ved ændring</label>

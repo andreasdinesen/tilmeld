@@ -1,9 +1,9 @@
 {# Delt felt-render til både ny tilmelding og redigering.
-   Forventer: fields. Valgfrit: reg, current (field_id->value), mail_on, sms_on. #}
+   Forventer: fields. Valgfrit: reg, current (field_id->value), mail_on, wa_on. #}
 {% set reg = reg|default(none) %}
 {% set current = current|default({}) %}
 {% set mail_on = mail_on|default(false) %}
-{% set sms_on = sms_on|default(false) %}
+{% set wa_on = wa_on|default(false) %}
 <label>Navn *
   <input type="text" name="name" value="{{ reg.name if reg else '' }}" required>
 </label>
@@ -12,8 +12,8 @@
   <input type="email" name="email" value="{{ reg.email if reg else '' }}">
 </label>
 {% endif %}
-{% if sms_on %}
-<label>Telefon (til SMS)
+{% if wa_on %}
+<label>WhatsApp-nummer (til kvittering)
   <input type="text" name="phone" value="{{ reg.phone if reg else '' }}">
 </label>
 {% endif %}
