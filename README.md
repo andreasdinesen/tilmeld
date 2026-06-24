@@ -61,9 +61,13 @@ GitHub Actions ved hvert push til `main`.
 
 ## Yggdrasil-rune
 
-`rune.yaml` pakker appen som en rune til
+`runes/tilmeld.yaml` pakker appen som en rune til
 [yggdrasil](https://github.com/kristianwind/yggdrasil) (peger på GHCR-imaget).
-Installér den i yggdrasil ved at importere YAML-filen, eller pege på denne repo.
+
+Installér via yggdrasils **"Browse runes on GitHub"**:
+- Repository: `andreasdinesen/tilmeld`
+- Folder: `runes`
+
 Sæt `MASTER_PASSWORD` ved oprettelsen. Port 8080 eksponeres.
 
 ## Opdatering fra master-admin
