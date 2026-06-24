@@ -13,6 +13,12 @@ gameskill:
     user: "0:0"
     data_path: "/data"
 
+  install:
+    image: "ghcr.io/andreasdinesen/tilmeld:latest"
+    script: |
+      mkdir -p /data
+      echo "Tilmeld er klar – tryk Start."
+
   variables:
     - key: MASTER_PASSWORD
       name: "Master-admin password (sættes ved første opstart)"
