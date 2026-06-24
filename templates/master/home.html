@@ -36,6 +36,7 @@
         <span class="muted small">Notifikationer:</span>
         <label class="chk"><input type="checkbox" name="mail_enabled" {{ 'checked' if g.mail_enabled }}> Mail</label>
         <label class="chk"><input type="checkbox" name="whatsapp_enabled" {{ 'checked' if g.whatsapp_enabled }}> WhatsApp</label>
+        <label class="chk"><input type="checkbox" name="templates_enabled" {{ 'checked' if g.templates_enabled }}> Skabeloner</label>
         <button type="submit">Gem</button>
       </form>
       <form method="post" action="{{ url_for('master_group_delete', slug=g.slug) }}"

@@ -74,6 +74,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("groups", "login_text", "TEXT DEFAULT ''")
     add("groups", "whatsapp_enabled", "INTEGER DEFAULT 0")
     add("groups", "whatsapp_recipient", "TEXT DEFAULT ''")
+    add("groups", "templates_enabled", "INTEGER DEFAULT 0")
     add("group_fields", "is_decline", "INTEGER DEFAULT 0")
     add("group_fields", "multiline", "INTEGER DEFAULT 0")
     add("events", "csv_after_deadline", "INTEGER DEFAULT 0")

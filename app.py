@@ -244,14 +244,15 @@ def master_group_new():
             conn = db.get_db()
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
-                "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?)",
+                "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, "
+                "templates_enabled, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
                  1 if request.form.get("whatsapp_enabled") else 0,
                  request.form.get("admin_email", "").strip(),
                  request.form.get("whatsapp_recipient", "").strip(),
+                 1 if request.form.get("templates_enabled") else 0,
                  db.now_iso()),
             )
             conn.commit()
@@ -269,9 +270,11 @@ def master_group_toggle(slug):
         abort(404)
     conn = db.get_db()
     conn.execute(
-        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ? WHERE id = ?",
+        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, templates_enabled = ? "
+        "WHERE id = ?",
         (1 if request.form.get("mail_enabled") else 0,
-         1 if request.form.get("whatsapp_enabled") else 0, g["id"]),
+         1 if request.form.get("whatsapp_enabled") else 0,
+         1 if request.form.get("templates_enabled") else 0, g["id"]),
     )
     conn.commit()
     conn.close()
@@ -382,16 +385,19 @@ def admin_home(slug):
     events = conn.execute(
         "SELECT * FROM events WHERE group_id = ?", (group["id"],)
     ).fetchall()
-    rows = []
+    rows, past = [], []
     for ev in sorted(events, key=event_sort_key):
-        rows.append({
+        state = event_state(ev)
+        item = {
             "ev": ev,
-            "state": event_state(ev),
+            "state": state,
             "count": count_attending(conn, group["id"], ev["id"]),
             "total": count_registrations(conn, ev["id"]),
-        })
+        }
+        (past if state == "finished" else rows).append(item)
+    past.reverse()  # afholdte: nyeste øverst
     conn.close()
-    return render_template("admin/home.html", group=group, events=rows)
+    return render_template("admin/home.html", group=group, events=rows, past=past)
 
 
 @app.route("/<slug>/admin/settings", methods=["GET", "POST"])
@@ -471,14 +477,34 @@ def admin_settings(slug):
             conn.execute("UPDATE groups SET login_text = ?, image_path = ? WHERE id = ?",
                          (login_text, image_path, group["id"]))
             flash("Bruger-side opdateret.", "ok")
+        elif action == "templates" and group["templates_enabled"]:
+            for tkey in notifications.DEFAULT_TEMPLATES:
+                conn.execute(
+                    "INSERT INTO mail_templates (group_id, tkey, subject, body) "
+                    "VALUES (?,?,?,?) ON CONFLICT(group_id, tkey) DO UPDATE SET "
+                    "subject = excluded.subject, body = excluded.body",
+                    (group["id"], tkey,
+                     request.form.get(f"subject_{tkey}", "").strip(),
+                     request.form.get(f"body_{tkey}", "").strip()))
+            flash("Mail-skabeloner gemt.", "ok")
         conn.commit()
         group = get_group(slug)
     fields = all_group_fields(conn, group["id"])
     mail_on, wa_on = group_channels(conn, group)
+    templates = []
+    if group["templates_enabled"]:
+        labels = {"new_signup": "Ny tilmelding (til admin)",
+                  "change": "Ændret tilmelding (til admin)",
+                  "receipt": "Kvittering (til deltager)",
+                  "reminder": "Påmindelse før frist"}
+        for tkey in notifications.DEFAULT_TEMPLATES:
+            subj, body = notifications.template_for(conn, group, tkey)
+            templates.append({"key": tkey, "label": labels.get(tkey, tkey),
+                              "subject": subj, "body": body})
     conn.close()
     parsed = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("admin/settings.html", group=group, fields=parsed,
-                           mail_on=mail_on, wa_on=wa_on)
+                           mail_on=mail_on, wa_on=wa_on, templates=templates)
 
 
 def _move_field(conn, group_id, field_id, direction):
@@ -911,17 +937,18 @@ def _handle_registration(slug, event_slug, reg_id):
             (rid, fid, val))
     conn.commit()
 
-    # Notifikationer
+    # Notifikationer (tekst hentes fra gruppens mail-skabeloner eller standard)
+    ctx = {"event": ev["name"], "name": name, "date": ev["event_date"],
+           "group": group["name"], "deadline": ev["signup_deadline"]}
     if is_new and ev["notify_new_signup"]:
-        notifications.notify_admin(conn, group, f"Ny tilmelding: {ev['name']}",
-                                   f"{name} har tilmeldt sig {ev['name']}.")
+        subj, body = notifications.render_message(conn, group, "new_signup", ctx)
+        notifications.notify_admin(conn, group, subj, body)
     if not is_new and ev["notify_change"]:
-        notifications.notify_admin(conn, group, f"Ændret tilmelding: {ev['name']}",
-                                   f"{name} har ændret sin tilmelding til {ev['name']}.")
+        subj, body = notifications.render_message(conn, group, "change", ctx)
+        notifications.notify_admin(conn, group, subj, body)
     if is_new and ev["notify_receipt"]:
-        notifications.notify_participant(
-            conn, group, email, phone, f"Kvittering: {ev['name']}",
-            f"Tak for din tilmelding til {ev['name']} d. {ev['event_date']}.")
+        subj, body = notifications.render_message(conn, group, "receipt", ctx)
+        notifications.notify_participant(conn, group, email, phone, subj, body)
     conn.close()
     flash("Tilmelding gemt." if is_new else "Tilmelding opdateret.", "ok")
     return redirect(url_for("user_event", slug=slug, event_slug=event_slug))

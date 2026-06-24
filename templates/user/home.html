@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
+  <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
   {% if group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
 {% block content %}
 {% if group.image_path %}
-  <img class="group-image banner" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
+  <img class="group-image" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
 {% endif %}
 <div class="card">
   <h1>Kommende events</h1>

@@ -5,36 +5,47 @@
   <a href="{{ url_for('admin_settings', slug=group.slug) }}">Opsætning</a>
   <a href="{{ url_for('admin_logout', slug=group.slug) }}">Log ud</a>
 {% endblock %}
+
+{% macro event_card(item) %}
+  {% set ev = item.ev %}
+  <div class="event-card state-{{ item.state }}">
+    <div>
+      <strong>{{ ev.name }}</strong>
+      {% if item.state == 'locked' %}<span class="tag locked">Låst (frist passeret)</span>{% endif %}
+      {% if item.state == 'finished' %}<span class="tag finished">Afholdt</span>{% endif %}
+      <div class="muted small">
+        {{ ev.event_date|d }}{% if ev.start_time %} {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
+        · Frist: {{ ev.signup_deadline|dt or '—' }}
+      </div>
+      <div class="count">Deltagere: <strong>{{ item.count }}</strong> / {{ ev.expected_count }} forventet{% if item.total > item.count %} <span class="muted small">({{ item.total - item.count }} afbud)</span>{% endif %}</div>
+    </div>
+    <div class="actions">
+      <a class="btn" href="{{ url_for('admin_event_list', slug=group.slug, event_id=ev.id) }}">Vis liste</a>
+      <a class="btn" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
+      <a class="btn" href="{{ url_for('admin_event_edit', slug=group.slug, event_id=ev.id) }}">Redigér</a>
+      <form method="post" action="{{ url_for('admin_event_delete', slug=group.slug, event_id=ev.id) }}"
+            class="inline" onsubmit="return confirm('Slet eventet {{ ev.name }}?')">
+        <button class="danger">Slet</button>
+      </form>
+    </div>
+  </div>
+{% endmacro %}
+
 {% block content %}
 <div class="card">
   <div class="row">
     <h1>Events</h1>
     <a class="btn primary" href="{{ url_for('admin_event_new', slug=group.slug) }}">+ Nyt event</a>
   </div>
-  {% if not events %}<p>Ingen events endnu.</p>{% endif %}
-  {% for item in events %}
-    {% set ev = item.ev %}
-    <div class="event-card state-{{ item.state }}">
-      <div>
-        <strong>{{ ev.name }}</strong>
-        {% if item.state == 'locked' %}<span class="tag locked">Låst (frist passeret)</span>{% endif %}
-        {% if item.state == 'finished' %}<span class="tag finished">Afsluttet</span>{% endif %}
-        <div class="muted small">
-          {{ ev.event_date|d }}{% if ev.start_time %} {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
-          · Frist: {{ ev.signup_deadline|dt or '—' }}
-        </div>
-        <div class="count">Deltagere: <strong>{{ item.count }}</strong> / {{ ev.expected_count }} forventet{% if item.total > item.count %} <span class="muted small">({{ item.total - item.count }} afbud)</span>{% endif %}</div>
-      </div>
-      <div class="actions">
-        <a class="btn" href="{{ url_for('admin_event_list', slug=group.slug, event_id=ev.id) }}">Vis liste</a>
-        <a class="btn" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
-        <a class="btn" href="{{ url_for('admin_event_edit', slug=group.slug, event_id=ev.id) }}">Redigér</a>
-        <form method="post" action="{{ url_for('admin_event_delete', slug=group.slug, event_id=ev.id) }}"
-              class="inline" onsubmit="return confirm('Slet eventet {{ ev.name }}?')">
-          <button class="danger">Slet</button>
-        </form>
-      </div>
-    </div>
-  {% endfor %}
+  {% if not events and not past %}<p>Ingen events endnu.</p>{% endif %}
+  {% if not events and past %}<p>Ingen kommende events.</p>{% endif %}
+  {% for item in events %}{{ event_card(item) }}{% endfor %}
 </div>
+
+{% if past %}
+<div class="card">
+  <h2>Afholdte events</h2>
+  {% for item in past %}{{ event_card(item) }}{% endfor %}
+</div>
+{% endif %}
 {% endblock %}

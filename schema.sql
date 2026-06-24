@@ -29,7 +29,17 @@ CREATE TABLE IF NOT EXISTS groups (
     whatsapp_recipient  TEXT DEFAULT '',           -- WhatsApp bruger-nr eller gruppe-id
     image_path          TEXT DEFAULT '',           -- logo/billede vist på bruger-siden
     login_text          TEXT DEFAULT '',           -- tekst vist på bruger-login-skærmen
+    templates_enabled   INTEGER DEFAULT 0,         -- master tillader admin at redigere mail-skabeloner
     created_at          TEXT NOT NULL
+);
+
+-- Tilpassede mail-skabeloner pr. gruppe (tom = brug standard fra koden)
+CREATE TABLE IF NOT EXISTS mail_templates (
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    tkey                TEXT NOT NULL,             -- new_signup | change | receipt | reminder
+    subject             TEXT DEFAULT '',
+    body                TEXT DEFAULT '',
+    PRIMARY KEY (group_id, tkey)
 );
 
 CREATE TABLE IF NOT EXISTS group_fields (

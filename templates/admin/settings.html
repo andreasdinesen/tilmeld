@@ -110,4 +110,22 @@
     <button type="submit">Gem</button>
   </form>
 </div>
+
+{% if templates %}
+<div class="card narrow">
+  <h2>Mail-skabeloner</h2>
+  <p class="muted small">Teksten der bruges når der sendes mails. Pladsholdere du kan bruge:
+     <code>{event}</code>, <code>{name}</code>, <code>{date}</code>,
+     <code>{deadline}</code>, <code>{group}</code>.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="templates">
+    {% for t in templates %}
+      <h3>{{ t.label }}</h3>
+      <label>Emne <input type="text" name="subject_{{ t.key }}" value="{{ t.subject }}"></label>
+      <label>Tekst <textarea name="body_{{ t.key }}" rows="3">{{ t.body }}</textarea></label>
+    {% endfor %}
+    <button type="submit">Gem skabeloner</button>
+  </form>
+</div>
+{% endif %}
 {% endblock %}

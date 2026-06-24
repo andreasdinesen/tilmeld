@@ -16,6 +16,49 @@ import db
 # Sættes af app.py: funktion (conn, group, event) -> csv-tekst. Undgår cirkulær import.
 csv_builder = None
 
+# Standard-mail-skabeloner. Admin kan overskrive dem pr. gruppe (hvis master tillader).
+# Pladsholdere: {event} {name} {date} {group} {deadline}
+DEFAULT_TEMPLATES = {
+    "new_signup": ("Ny tilmelding: {event}",
+                   "{name} har tilmeldt sig {event}."),
+    "change": ("Ændret tilmelding: {event}",
+               "{name} har ændret sin tilmelding til {event}."),
+    "receipt": ("Kvittering: {event}",
+                "Tak for din tilmelding til {event} d. {date}."),
+    "reminder": ("Påmindelse: tilmeldingsfrist for {event}",
+                 "Tilmeldingsfristen for '{event}' er {deadline}. "
+                 "Husk at tilmelde dig eller opdatere din tilmelding."),
+}
+
+
+def _safe_format(text, ctx):
+    class _Default(dict):
+        def __missing__(self, key):
+            return ""
+    try:
+        return text.format_map(_Default(ctx))
+    except Exception:
+        return text
+
+
+def template_for(conn, group, tkey):
+    """Returnér (subject, body) for en skabelon — admin-tilpasset eller standard."""
+    subject, body = DEFAULT_TEMPLATES.get(tkey, ("", ""))
+    try:
+        row = conn.execute(
+            "SELECT subject, body FROM mail_templates WHERE group_id = ? AND tkey = ?",
+            (group["id"], tkey)).fetchone()
+        if row and (row["subject"] or row["body"]):
+            subject, body = row["subject"] or subject, row["body"] or body
+    except Exception:
+        pass
+    return subject, body
+
+
+def render_message(conn, group, tkey, ctx):
+    subject, body = template_for(conn, group, tkey)
+    return _safe_format(subject, ctx), _safe_format(body, ctx)
+
 
 def _log(channel: str, to: str, subject: str, body: str) -> None:
     print(f"[NOTIFIKATION/{channel}] -> {to or '(ingen modtager)'}: {subject}\n{body}\n",
@@ -134,9 +177,9 @@ def process_scheduled(now=None):
                     "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
                 regs = conn.execute(
                     "SELECT * FROM registrations WHERE event_id = ?", (ev["id"],)).fetchall()
-                subject = f"Påmindelse: tilmeldingsfrist for {ev['name']}"
-                body = (f"Tilmeldingsfristen for '{ev['name']}' er {ev['signup_deadline']}. "
-                        "Husk at tilmelde dig eller opdatere din tilmelding.")
+                ctx = {"event": ev["name"], "date": ev["event_date"],
+                       "group": group["name"], "deadline": ev["signup_deadline"]}
+                subject, body = render_message(conn, group, "reminder", ctx)
                 notify_admin(conn, group, subject, body)
                 for r in regs:
                     notify_participant(conn, group, r["email"], r["phone"], subject, body)

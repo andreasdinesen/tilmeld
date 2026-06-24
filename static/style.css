@@ -104,7 +104,6 @@ th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: 
 
 .group-image { display: block; max-width: 100%; max-height: 160px; margin: 0 auto 14px;
   border-radius: 10px; object-fit: contain; }
-.group-image.banner { max-height: 200px; width: 100%; object-fit: cover; }
 .login-text { white-space: pre-wrap; margin-bottom: 14px; color: var(--muted); }
 
 .flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
