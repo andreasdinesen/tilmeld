@@ -30,18 +30,28 @@ def init_db() -> None:
 
     row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
     if row is None:
-        master_pw = os.environ.get("MASTER_PASSWORD", "admin")
-        secret = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+        # Brug 'or' så en *tom* env-variabel (fx SECRET_KEY="") falder tilbage til
+        # standard/genereret værdi i stedet for at give en tom nøgle.
+        master_pw = os.environ.get("MASTER_PASSWORD") or "admin"
+        secret = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
         conn.execute(
             "INSERT INTO settings (id, master_password_hash, secret_key) VALUES (1, ?, ?)",
             (auth.hash_password(master_pw), secret),
         )
         conn.commit()
-        if not os.environ.get("MASTER_PASSWORD"):
+        if not (os.environ.get("MASTER_PASSWORD") or "").strip():
             print("=" * 64)
             print(" ADVARSEL: intet MASTER_PASSWORD sat. Standard er 'admin'.")
             print(" Log ind på /master og skift det med det samme.")
             print("=" * 64)
+
+    # Reparér en tom secret_key (fx databaser oprettet mens SECRET_KEY="" blev sendt
+    # som env) — ellers fejler login med 500, fordi Flask-sessioner kræver en nøgle.
+    cur = conn.execute("SELECT secret_key FROM settings WHERE id = 1").fetchone()
+    if not (cur and (cur["secret_key"] or "").strip()):
+        conn.execute("UPDATE settings SET secret_key = ? WHERE id = 1",
+                     (os.environ.get("SECRET_KEY") or secrets.token_hex(32),))
+        conn.commit()
     conn.commit()
     conn.close()
 

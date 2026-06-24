@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister og CSV-eksport."
   author: "andreasdinesen"
-  version: 3
+  version: 4
   icon: "app"
 
   docker:
@@ -25,10 +25,6 @@ gameskill:
       type: string
       default: "skift-mig"
       required: true
-    - key: SECRET_KEY
-      name: "Hemmelig nøgle til login-sessioner (tom = auto-genereres)"
-      type: string
-      default: ""
 
   startup:
     command: ""
