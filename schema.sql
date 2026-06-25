@@ -94,6 +94,15 @@ CREATE TABLE IF NOT EXISTS registration_values (
     value               TEXT DEFAULT ''
 );
 
+-- Aktivitetslog til master-admin (oprettelser + sendte mail/WhatsApp-beskeder)
+CREATE TABLE IF NOT EXISTS activity_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at          TEXT NOT NULL,
+    category            TEXT NOT NULL,             -- group | event | signup | mail | whatsapp
+    group_slug          TEXT DEFAULT '',
+    message             TEXT NOT NULL
+);
+
 -- Punkter der er skjult på et bestemt event (default: alle vises)
 CREATE TABLE IF NOT EXISTS event_hidden_fields (
     event_id            INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,

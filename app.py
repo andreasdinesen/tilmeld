@@ -256,6 +256,7 @@ def master_group_new():
                  db.now_iso()),
             )
             conn.commit()
+            db.add_log(conn, "group", f"Gruppe '{name}' oprettet (/{slug})", slug)
             conn.close()
             flash(f"Gruppe '{name}' oprettet.", "ok")
             return redirect(url_for("master_home"))
@@ -291,9 +292,26 @@ def master_group_delete(slug):
     conn = db.get_db()
     conn.execute("DELETE FROM groups WHERE id = ?", (g["id"],))
     conn.commit()
+    db.add_log(conn, "group", f"Gruppe '{g['name']}' slettet", slug)
     conn.close()
     flash(f"Gruppe '{g['name']}' slettet.", "ok")
     return redirect(url_for("master_home"))
+
+
+@app.route("/master/log")
+@master_required
+def master_log():
+    conn = db.get_db()
+    category = request.args.get("category", "")
+    if category:
+        entries = conn.execute(
+            "SELECT * FROM activity_log WHERE category = ? ORDER BY id DESC LIMIT 500",
+            (category,)).fetchall()
+    else:
+        entries = conn.execute(
+            "SELECT * FROM activity_log ORDER BY id DESC LIMIT 500").fetchall()
+    conn.close()
+    return render_template("master/log.html", entries=entries, category=category)
 
 
 @app.route("/master/settings", methods=["GET", "POST"])
@@ -631,6 +649,7 @@ def _save_event(group, ev):
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             vals + (group["id"], db.now_iso()))
         event_id = cur.lastrowid
+        db.add_log(conn, "event", f"Event '{name}' oprettet i {group['name']}", group["slug"])
         flash("Event oprettet.", "ok")
 
     # Gem hvilke punkter der er skjult på dette event (ukrydsede = skjult)
@@ -936,6 +955,11 @@ def _handle_registration(slug, event_slug, reg_id):
             "INSERT INTO registration_values (registration_id, field_id, value) VALUES (?,?,?)",
             (rid, fid, val))
     conn.commit()
+    if is_new:
+        suffix = " (afbud)" if declining else ""
+        db.add_log(conn, "signup", f"{name} tilmeldt {ev['name']}{suffix}", group["slug"])
+    else:
+        db.add_log(conn, "signup", f"{name} ændrede tilmelding til {ev['name']}", group["slug"])
 
     # Notifikationer (tekst hentes fra gruppens mail-skabeloner eller standard)
     ctx = {"event": ev["name"], "name": name, "date": ev["event_date"],
@@ -965,9 +989,13 @@ def user_delete(slug, event_slug, reg_id):
     ev = conn.execute("SELECT * FROM events WHERE group_id = ? AND slug = ?",
                       (group["id"], event_slug)).fetchone()
     if ev and event_state(ev) == "open":
+        reg = conn.execute("SELECT name FROM registrations WHERE id = ? AND event_id = ?",
+                           (reg_id, ev["id"])).fetchone()
         conn.execute("DELETE FROM registrations WHERE id = ? AND event_id = ?",
                      (reg_id, ev["id"]))
         conn.commit()
+        if reg:
+            db.add_log(conn, "signup", f"{reg['name']} fjernet fra {ev['name']}", group["slug"])
         flash("Tilmelding fjernet.", "ok")
     else:
         flash("Kan ikke ændre en lukket tilmelding.", "error")

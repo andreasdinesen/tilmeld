@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block brand %}Master-admin{% endblock %}
+{% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Aktivitetslog</h1>
+  <p class="muted small">Oprettelser og sendte mail/WhatsApp-beskeder (nyeste øverst, op til 500).</p>
+
+  <div class="log-filters">
+    {% set cats = [('', 'Alle'), ('group', 'Grupper'), ('event', 'Events'),
+                   ('signup', 'Tilmeldinger'), ('mail', 'Mail'), ('whatsapp', 'WhatsApp')] %}
+    {% for val, lbl in cats %}
+      <a class="btn small {{ 'primary' if category == val }}"
+         href="{{ url_for('master_log', category=val) if val else url_for('master_log') }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+
+  {% if not entries %}
+    <p>Ingen aktivitet endnu.</p>
+  {% else %}
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Tidspunkt</th><th>Type</th><th>Gruppe</th><th>Hændelse</th></tr></thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td class="muted small nowrap">{{ e.created_at|dt }}</td>
+        <td><span class="tag cat-{{ e.category }}">{{ e.category }}</span></td>
+        <td class="muted small">{{ e.group_slug }}</td>
+        <td>{{ e.message }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

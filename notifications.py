@@ -143,16 +143,21 @@ def notify_admin(conn, group, subject: str, body: str) -> None:
     settings = db.get_settings(conn)
     if group["mail_enabled"] and group["admin_email"]:
         send_email(settings, group["admin_email"], subject, body)
+        db.add_log(conn, "mail", f"Mail til {group['admin_email']}: {subject}", group["slug"])
     if group["whatsapp_enabled"] and group["whatsapp_recipient"]:
         send_whatsapp(settings, group["whatsapp_recipient"], f"{subject}: {body}")
+        db.add_log(conn, "whatsapp",
+                   f"WhatsApp til {group['whatsapp_recipient']}: {subject}", group["slug"])
 
 
 def notify_participant(conn, group, email: str, whatsapp: str, subject: str, body: str) -> None:
     settings = db.get_settings(conn)
     if group["mail_enabled"] and email:
         send_email(settings, email, subject, body)
+        db.add_log(conn, "mail", f"Mail til {email}: {subject}", group["slug"])
     if group["whatsapp_enabled"] and whatsapp:
         send_whatsapp(settings, whatsapp, f"{subject}: {body}")
+        db.add_log(conn, "whatsapp", f"WhatsApp til {whatsapp}: {subject}", group["slug"])
 
 
 # ---- Scheduler: påmindelse 24t før frist + CSV 2t efter frist ------------------

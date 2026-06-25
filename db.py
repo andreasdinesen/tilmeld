@@ -100,3 +100,14 @@ def get_settings(conn: sqlite3.Connection) -> sqlite3.Row:
 
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def add_log(conn, category: str, message: str, group_slug: str = "") -> None:
+    """Skriv en linje til master-admins aktivitetslog. Må aldrig vælte en handling."""
+    try:
+        conn.execute(
+            "INSERT INTO activity_log (created_at, category, group_slug, message) "
+            "VALUES (?,?,?,?)", (now_iso(), category, group_slug, message))
+        conn.commit()
+    except Exception as e:
+        print(f"[LOG-FEJL] {e}", flush=True)

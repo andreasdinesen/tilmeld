@@ -116,6 +116,15 @@ tr.declined { opacity: .6; }
 tr.declined td:first-child { text-decoration: line-through; }
 button:disabled, .btn:disabled { opacity: .4; cursor: not-allowed; }
 
+/* Aktivitetslog */
+.log-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.nowrap { white-space: nowrap; }
+.tag.cat-group { background: #6366f1; color: #fff; }
+.tag.cat-event { background: #2563eb; color: #fff; }
+.tag.cat-signup { background: #0d9488; color: #fff; }
+.tag.cat-mail { background: #d97706; color: #fff; }
+.tag.cat-whatsapp { background: #16a34a; color: #fff; }
+
 /* Master: gruppe-kort */
 .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .page-head h1 { margin: 0; }
