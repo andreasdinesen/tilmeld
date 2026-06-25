@@ -68,12 +68,13 @@ def _log(channel: str, to: str, subject: str, body: str) -> None:
           flush=True)
 
 
-def send_email(settings, to: str, subject: str, body: str) -> None:
+def send_email(settings, to: str, subject: str, body: str) -> bool:
+    """Returnér True hvis mailen reelt blev afsendt, ellers False (kun logget)."""
     if not to:
-        return
+        return False
     if not settings["smtp_host"]:
         _log("MAIL", to, subject, body)
-        return
+        return False
     try:
         msg = MIMEText(body, "plain", "utf-8")
         msg["Subject"] = subject
@@ -85,9 +86,11 @@ def send_email(settings, to: str, subject: str, body: str) -> None:
             if settings["smtp_user"]:
                 s.login(settings["smtp_user"], settings["smtp_password"])
             s.send_message(msg)
+        return True
     except Exception as e:  # robust: en notifikation må aldrig vælte en tilmelding
         print(f"[MAIL-FEJL] {e}")
         _log("MAIL", to, subject, body)
+        return False
 
 
 def send_email_with_attachment(settings, to, subject, body, filename, content):
@@ -116,18 +119,19 @@ def send_email_with_attachment(settings, to, subject, body, filename, content):
         _log("MAIL+CSV", to, subject, f"{body}\n[vedhæftet: {filename}]")
 
 
-def send_whatsapp(settings, to: str, body: str) -> None:
-    """Send en WhatsApp-besked via en HTTP-bro/gateway.
+def send_whatsapp(settings, to: str, body: str) -> bool:
+    """Send en WhatsApp-besked via en HTTP-bro/gateway. Returnér True hvis den
+    reelt blev sendt, ellers False (ingen gateway konfigureret eller fejl).
 
     Kontrakt (konfigurér din bro derefter): POST til whatsapp_api_url med
     Authorization: Bearer <whatsapp_api_key> og JSON-body {"to": <modtager>,
     "message": <tekst>}. Modtager kan være et telefonnummer eller et gruppe-id.
     """
     if not to:
-        return
+        return False
     if not settings["whatsapp_api_url"]:
         _log("WHATSAPP", to, "(whatsapp)", body)
-        return
+        return False
     try:
         data = json.dumps({"to": to, "message": body}).encode()
         headers = {"Content-Type": "application/json"}
@@ -136,31 +140,47 @@ def send_whatsapp(settings, to: str, body: str) -> None:
         req = urllib.request.Request(
             settings["whatsapp_api_url"], data=data, headers=headers)
         urllib.request.urlopen(req, timeout=15).read()
+        return True
     except Exception as e:
         print(f"[WHATSAPP-FEJL] {e}", flush=True)
         _log("WHATSAPP", to, "(whatsapp)", body)
+        return False
+
+
+def _delivery_note(ok: bool, channel: str) -> str:
+    if ok:
+        return ""
+    if channel == "whatsapp":
+        return "  ⚠ ikke leveret (WhatsApp-gateway mangler/fejl)"
+    return "  ⚠ ikke leveret (SMTP mangler/fejl)"
 
 
 def notify_admin(conn, group, subject: str, body: str) -> None:
     """Send til gruppe-admin via de kanaler master har slået til."""
     settings = db.get_settings(conn)
     if group["mail_enabled"] and group["admin_email"]:
-        send_email(settings, group["admin_email"], subject, body)
-        db.add_log(conn, "mail", f"Mail til {group['admin_email']}: {subject}", group["slug"])
+        ok = send_email(settings, group["admin_email"], subject, body)
+        db.add_log(conn, "mail",
+                   f"Mail til {group['admin_email']}: {subject}{_delivery_note(ok, 'mail')}",
+                   group["slug"])
     if group["whatsapp_enabled"] and group["whatsapp_recipient"]:
-        send_whatsapp(settings, group["whatsapp_recipient"], f"{subject}: {body}")
+        ok = send_whatsapp(settings, group["whatsapp_recipient"], f"{subject}: {body}")
         db.add_log(conn, "whatsapp",
-                   f"WhatsApp til {group['whatsapp_recipient']}: {subject}", group["slug"])
+                   f"WhatsApp til {group['whatsapp_recipient']}: {subject}{_delivery_note(ok, 'whatsapp')}",
+                   group["slug"])
 
 
 def notify_participant(conn, group, email: str, whatsapp: str, subject: str, body: str) -> None:
     settings = db.get_settings(conn)
     if group["mail_enabled"] and email:
-        send_email(settings, email, subject, body)
-        db.add_log(conn, "mail", f"Mail til {email}: {subject}", group["slug"])
+        ok = send_email(settings, email, subject, body)
+        db.add_log(conn, "mail", f"Mail til {email}: {subject}{_delivery_note(ok, 'mail')}",
+                   group["slug"])
     if group["whatsapp_enabled"] and whatsapp:
-        send_whatsapp(settings, whatsapp, f"{subject}: {body}")
-        db.add_log(conn, "whatsapp", f"WhatsApp til {whatsapp}: {subject}", group["slug"])
+        ok = send_whatsapp(settings, whatsapp, f"{subject}: {body}")
+        db.add_log(conn, "whatsapp",
+                   f"WhatsApp til {whatsapp}: {subject}{_delivery_note(ok, 'whatsapp')}",
+                   group["slug"])
 
 
 # ---- Scheduler: påmindelse 24t før frist + CSV 2t efter frist ------------------
