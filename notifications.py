@@ -28,6 +28,9 @@ DEFAULT_TEMPLATES = {
     "reminder": ("Påmindelse: tilmeldingsfrist for {event}",
                  "Tilmeldingsfristen for '{event}' er {deadline}. "
                  "Husk at tilmelde dig eller opdatere din tilmelding."),
+    "deadline": ("Tilmeldingsfrist nået: {event}",
+                 "Tilmeldingsfristen for {event} er nået.\n"
+                 "Se deltagerlisten og hent CSV her: {link}"),
 }
 
 
@@ -194,6 +197,28 @@ def process_scheduled(now=None):
                 for r in regs:
                     notify_participant(conn, group, r["email"], r["phone"], subject, body)
                 conn.execute("UPDATE events SET reminder_sent = 1 WHERE id = ?", (ev["id"],))
+                conn.commit()
+
+        # Besked til admin når fristen er nået (med link til deltagerlisten)
+        dl_rows = conn.execute(
+            "SELECT * FROM events WHERE notify_deadline = 1 AND deadline_sent = 0 "
+            "AND signup_deadline != ''").fetchall()
+        for ev in dl_rows:
+            try:
+                deadline = datetime.fromisoformat(ev["signup_deadline"])
+            except ValueError:
+                continue
+            if now >= deadline:
+                group = conn.execute(
+                    "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
+                base = (db.get_settings(conn)["base_url"] or "").rstrip("/")
+                link = f"{base}/{group['slug']}/admin/events/{ev['id']}/list"
+                ctx = {"event": ev["name"], "date": ev["event_date"],
+                       "group": group["name"], "deadline": ev["signup_deadline"],
+                       "link": link}
+                subject, body = render_message(conn, group, "deadline", ctx)
+                notify_admin(conn, group, subject, body)
+                conn.execute("UPDATE events SET deadline_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()
 
         # CSV til admin 2 timer efter frist

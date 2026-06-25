@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS settings (
     smtp_use_tls        INTEGER DEFAULT 1,
     whatsapp_api_url    TEXT DEFAULT '',             -- URL til WhatsApp-bro/gateway
     whatsapp_api_key    TEXT DEFAULT '',             -- API-nøgle (sendes som Bearer-token)
+    base_url            TEXT DEFAULT '',             -- offentlig URL (til links i mails)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT '',             -- "ejer/repo" til opdaterings-tjek
     update_branch       TEXT DEFAULT 'main'
@@ -73,6 +74,8 @@ CREATE TABLE IF NOT EXISTS events (
     csv_after_deadline  INTEGER DEFAULT 0,         -- send CSV til admin 2t efter frist
     csv_sent            INTEGER DEFAULT 0,
     capacity_limit      INTEGER DEFAULT 0,         -- hård grænse: ingen tilmelding ud over forventet antal
+    notify_deadline     INTEGER DEFAULT 0,         -- besked til admin (m. link) når fristen er nået
+    deadline_sent       INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL,
     UNIQUE (group_id, slug)
 );

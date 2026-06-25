@@ -338,7 +338,7 @@ def master_settings():
         conn.execute(
             "UPDATE settings SET smtp_host=?, smtp_port=?, smtp_user=?, smtp_password=?, "
             "smtp_from=?, smtp_use_tls=?, whatsapp_api_url=?, whatsapp_api_key=?, "
-            "default_deadline_days=?, github_repo=?, update_branch=? WHERE id = 1",
+            "base_url=?, default_deadline_days=?, github_repo=?, update_branch=? WHERE id = 1",
             (request.form.get("smtp_host", "").strip(),
              int(request.form.get("smtp_port") or 587),
              request.form.get("smtp_user", "").strip(),
@@ -347,6 +347,7 @@ def master_settings():
              1 if request.form.get("smtp_use_tls") else 0,
              request.form.get("whatsapp_api_url", "").strip(),
              request.form.get("whatsapp_api_key", "").strip(),
+             request.form.get("base_url", "").strip(),
              int(request.form.get("default_deadline_days") or 4),
              request.form.get("github_repo", "").strip(),
              request.form.get("update_branch", "main").strip() or "main"),
@@ -525,7 +526,8 @@ def admin_settings(slug):
         labels = {"new_signup": "Ny tilmelding (til admin)",
                   "change": "Ændret tilmelding (til admin)",
                   "receipt": "Kvittering (til deltager)",
-                  "reminder": "Påmindelse før frist"}
+                  "reminder": "Påmindelse før frist",
+                  "deadline": "Frist nået (til admin, med link)"}
         for tkey in notifications.DEFAULT_TEMPLATES:
             subj, body = notifications.template_for(conn, group, tkey)
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
@@ -642,13 +644,14 @@ def _save_event(group, ev):
         1 if request.form.get("notify_reminder") else 0,
         1 if request.form.get("csv_after_deadline") else 0,
         1 if request.form.get("capacity_limit") else 0,
+        1 if request.form.get("notify_deadline") else 0,
     )
     if ev:
         conn.execute(
             "UPDATE events SET name=?, slug=?, event_date=?, start_time=?, end_time=?, "
             "description=?, expected_count=?, signup_deadline=?, notify_new_signup=?, "
             "notify_change=?, notify_receipt=?, notify_reminder=?, csv_after_deadline=?, "
-            "capacity_limit=? WHERE id = ?",
+            "capacity_limit=?, notify_deadline=? WHERE id = ?",
             vals + (ev["id"],))
         event_id = ev["id"]
         flash("Event opdateret.", "ok")
@@ -656,8 +659,8 @@ def _save_event(group, ev):
         cur = conn.execute(
             "INSERT INTO events (name, slug, event_date, start_time, end_time, description, "
             "expected_count, signup_deadline, notify_new_signup, notify_change, notify_receipt, "
-            "notify_reminder, csv_after_deadline, capacity_limit, group_id, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "notify_reminder, csv_after_deadline, capacity_limit, notify_deadline, "
+            "group_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             vals + (group["id"], db.now_iso()))
         event_id = cur.lastrowid
         db.add_log(conn, "event", f"Event '{name}' oprettet i {group['name']}", group["slug"])

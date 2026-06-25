@@ -70,6 +70,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("settings", "update_branch", "TEXT DEFAULT 'main'")
     add("settings", "whatsapp_api_url", "TEXT DEFAULT ''")
     add("settings", "whatsapp_api_key", "TEXT DEFAULT ''")
+    add("settings", "base_url", "TEXT DEFAULT ''")
     add("groups", "image_path", "TEXT DEFAULT ''")
     add("groups", "login_text", "TEXT DEFAULT ''")
     add("groups", "whatsapp_enabled", "INTEGER DEFAULT 0")
@@ -80,6 +81,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("events", "csv_after_deadline", "INTEGER DEFAULT 0")
     add("events", "csv_sent", "INTEGER DEFAULT 0")
     add("events", "capacity_limit", "INTEGER DEFAULT 0")
+    add("events", "notify_deadline", "INTEGER DEFAULT 0")
+    add("events", "deadline_sent", "INTEGER DEFAULT 0")
 
     # Flyt evt. gamle SMS-data over til WhatsApp-felterne (kun hvis de gamle kolonner
     # findes — dvs. databaser oprettet før WhatsApp-skiftet).

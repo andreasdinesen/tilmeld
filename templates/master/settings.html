@@ -31,6 +31,11 @@
     <label>API-nøgle (sendes som Bearer-token) <input type="password" name="whatsapp_api_key" value="{{ s.whatsapp_api_key }}"></label>
     <p class="muted small">Broen kaldes med <code>POST {{ '{' }}"to": "&lt;nummer eller gruppe-id&gt;", "message": "..."{{ '}' }}</code> og header <code>Authorization: Bearer &lt;nøgle&gt;</code>.</p>
 
+    <h2>Links i mails</h2>
+    <label>Offentlig URL (bruges til links i mails, fx til deltagerlisten)
+      <input type="text" name="base_url" value="{{ s.base_url }}" placeholder="https://tilmeld.nolimit.dk">
+    </label>
+
     <h2>Opdatering (GitHub)</h2>
     <label>GitHub-repo (ejer/repo) til versions-tjek
       <input type="text" name="github_repo" value="{{ s.github_repo }}" placeholder="fx kristianwind/tilmeld">

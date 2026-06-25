@@ -37,6 +37,7 @@
     <label class="chk"><input type="checkbox" name="notify_change" {{ 'checked' if ev and ev.notify_change }}> Besked til admin ved ændring</label>
     <label class="chk"><input type="checkbox" name="notify_receipt" {{ 'checked' if ev and ev.notify_receipt }}> Kvittering til deltager</label>
     <label class="chk"><input type="checkbox" name="notify_reminder" {{ 'checked' if ev and ev.notify_reminder }}> Påmindelse 24t før frist</label>
+    <label class="chk"><input type="checkbox" name="notify_deadline" {{ 'checked' if ev and ev.notify_deadline }}> Besked til admin når fristen er nået (med link til deltagerliste)</label>
     {% if mail_on %}
     <label class="chk"><input type="checkbox" name="csv_after_deadline" {{ 'checked' if ev and ev.csv_after_deadline }}> Send deltagerliste (CSV) til admin-mail 2 timer efter frist</label>
     {% endif %}
