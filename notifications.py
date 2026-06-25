@@ -168,6 +168,11 @@ def process_scheduled(now=None):
     now = now or datetime.now()
     conn = db.get_db()
     try:
+        # Opbevaring: ryd aktivitetslog ældre end 30 dage
+        cutoff = (now - timedelta(days=30)).isoformat(timespec="seconds")
+        conn.execute("DELETE FROM activity_log WHERE created_at < ?", (cutoff,))
+        conn.commit()
+
         # Påmindelse: indenfor 24t før fristen (og fristen ikke passeret)
         rows = conn.execute(
             "SELECT * FROM events WHERE notify_reminder = 1 AND reminder_sent = 0 "

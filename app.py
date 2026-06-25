@@ -314,6 +314,17 @@ def master_log():
     return render_template("master/log.html", entries=entries, category=category)
 
 
+@app.route("/master/log/clear", methods=["POST"])
+@master_required
+def master_log_clear():
+    conn = db.get_db()
+    conn.execute("DELETE FROM activity_log")
+    conn.commit()
+    conn.close()
+    flash("Aktivitetsloggen er ryddet.", "ok")
+    return redirect(url_for("master_log"))
+
+
 @app.route("/master/settings", methods=["GET", "POST"])
 @master_required
 def master_settings():

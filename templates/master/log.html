@@ -3,8 +3,17 @@
 {% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
 {% block content %}
 <div class="card">
-  <h1>Aktivitetslog</h1>
-  <p class="muted small">Oprettelser og sendte mail/WhatsApp-beskeder (nyeste øverst, op til 500).</p>
+  <div class="row">
+    <h1>Aktivitetslog</h1>
+    {% if entries %}
+    <form method="post" action="{{ url_for('master_log_clear') }}"
+          onsubmit="return confirm('Ryd hele aktivitetsloggen? Dette kan ikke fortrydes.')">
+      <button type="submit" class="danger">Ryd log</button>
+    </form>
+    {% endif %}
+  </div>
+  <p class="muted small">Oprettelser og sendte mail/WhatsApp-beskeder (nyeste øverst, op til 500).
+     Gemmes i op til 30 dage.</p>
 
   <div class="log-filters">
     {% set cats = [('', 'Alle'), ('group', 'Grupper'), ('event', 'Events'),
