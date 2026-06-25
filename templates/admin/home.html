@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Vis som bruger</a>
   <a href="{{ url_for('admin_event_new', slug=group.slug) }}">Nyt event</a>
   <a href="{{ url_for('admin_settings', slug=group.slug) }}">Opsætning</a>
   <a href="{{ url_for('admin_logout', slug=group.slug) }}">Log ud</a>
