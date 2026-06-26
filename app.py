@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import os
+import urllib.request
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -323,6 +324,36 @@ def master_log_clear():
     conn.close()
     flash("Aktivitetsloggen er ryddet.", "ok")
     return redirect(url_for("master_log"))
+
+
+@app.route("/master/whatsapp/groups")
+@master_required
+def master_whatsapp_groups():
+    """Hent WhatsApp-gruppe-id'er fra broen (GET <base>/groups med Bearer-nøgle)."""
+    conn = db.get_db()
+    s = db.get_settings(conn)
+    conn.close()
+    api = (s["whatsapp_api_url"] or "").rstrip("/")
+    if not api:
+        return render_template("master/whatsapp_groups.html",
+                               error="WhatsApp er ikke sat op endnu.", groups=None, url="")
+    base = api[:-5] if api.endswith("/send") else api.rsplit("/", 1)[0]
+    groups_url = base + "/groups"
+    req = urllib.request.Request(groups_url)
+    if s["whatsapp_api_key"]:
+        req.add_header("Authorization", "Bearer " + s["whatsapp_api_key"])
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode())
+    except Exception as e:
+        return render_template("master/whatsapp_groups.html",
+                               error=f"Kunne ikke hente grupper fra {groups_url}: {e}",
+                               groups=None, url=groups_url)
+    items = data.get("groups") if isinstance(data, dict) else data
+    groups = [{"id": str(g.get("id", "")), "name": str(g.get("name", ""))}
+              for g in (items or []) if isinstance(g, dict)]
+    return render_template("master/whatsapp_groups.html", groups=groups, error=None,
+                           url=groups_url)
 
 
 @app.route("/master/settings", methods=["GET", "POST"])

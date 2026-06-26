@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block brand %}WhatsApp-grupper{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>WhatsApp-gruppe-id'er</h1>
+  <p class="muted small">Kopiér et id og indsæt det som "WhatsApp-modtager" på en gruppe,
+     så notifikationer sendes til den WhatsApp-gruppechat.</p>
+
+  {% if error %}
+    <p class="flash error">{{ error }}</p>
+    <p class="muted small">Tjek at WhatsApp-broen kører og at den har et
+       <code>GET /groups</code>-endpoint{% if url %} (forsøgt: <code>{{ url }}</code>){% endif %}.</p>
+  {% elif not groups %}
+    <p>Ingen grupper fundet. (Broen returnerede en tom liste.)</p>
+  {% else %}
+    <table>
+      <thead><tr><th>Navn</th><th>Gruppe-id</th></tr></thead>
+      <tbody>
+        {% for g in groups %}
+        <tr>
+          <td>{{ g.name or '—' }}</td>
+          <td><code>{{ g.id }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

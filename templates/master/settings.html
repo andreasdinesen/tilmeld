@@ -54,6 +54,9 @@
     </label>
     <label>API-nøgle (sendes som Bearer-token) <input type="password" name="whatsapp_api_key" value="{{ s.whatsapp_api_key }}"></label>
     <p class="muted small">Broen kaldes med <code>POST {{ '{' }}"to": "&lt;nummer eller gruppe-id&gt;", "message": "..."{{ '}' }}</code> og header <code>Authorization: Bearer &lt;nøgle&gt;</code>.</p>
+    {% if s.whatsapp_api_url %}
+    <p><a class="btn" href="{{ url_for('master_whatsapp_groups') }}" target="_blank" rel="noopener">Hent WhatsApp-gruppe-id'er ↗</a></p>
+    {% endif %}
 
     <h2>Links i mails</h2>
     <label>Offentlig URL (bruges til links i mails, fx til deltagerlisten)
