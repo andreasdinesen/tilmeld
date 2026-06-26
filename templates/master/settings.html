@@ -23,6 +23,8 @@
     <label>Adgangskode <input type="password" name="smtp_password" value="{{ s.smtp_password }}"></label>
     <label>Afsender (From) <input type="text" name="smtp_from" value="{{ s.smtp_from }}"></label>
     <label class="chk"><input type="checkbox" name="smtp_use_tls" {{ 'checked' if s.smtp_use_tls }}> Brug STARTTLS</label>
+    <p class="muted small">Port <strong>587</strong> = STARTTLS (sæt fluebenet) — fx Gmail og Office 365.
+       Port <strong>465</strong> = SSL (vælges automatisk; fluebenet er uden betydning).</p>
 
     <h2>WhatsApp</h2>
     <label>Gateway-URL (din WhatsApp-bro, der modtager POST med JSON)

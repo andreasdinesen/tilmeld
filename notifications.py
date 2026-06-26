@@ -68,6 +68,24 @@ def _log(channel: str, to: str, subject: str, body: str) -> None:
           flush=True)
 
 
+def _smtp_send(settings, msg) -> None:
+    """Åbn forbindelse og send. Port 465 = implicit SSL (SMTPS); ellers STARTTLS
+    (587) hvis slået til. Virker med Gmail, Office 365 m.fl."""
+    port = int(settings["smtp_port"] or 587)
+    if port == 465:
+        with smtplib.SMTP_SSL(settings["smtp_host"], port, timeout=15) as s:
+            if settings["smtp_user"]:
+                s.login(settings["smtp_user"], settings["smtp_password"])
+            s.send_message(msg)
+    else:
+        with smtplib.SMTP(settings["smtp_host"], port, timeout=15) as s:
+            if settings["smtp_use_tls"]:
+                s.starttls()
+            if settings["smtp_user"]:
+                s.login(settings["smtp_user"], settings["smtp_password"])
+            s.send_message(msg)
+
+
 def send_email(settings, to: str, subject: str, body: str) -> bool:
     """Returnér True hvis mailen reelt blev afsendt, ellers False (kun logget)."""
     if not to:
@@ -80,12 +98,7 @@ def send_email(settings, to: str, subject: str, body: str) -> bool:
         msg["Subject"] = subject
         msg["From"] = settings["smtp_from"] or settings["smtp_user"]
         msg["To"] = to
-        with smtplib.SMTP(settings["smtp_host"], settings["smtp_port"], timeout=15) as s:
-            if settings["smtp_use_tls"]:
-                s.starttls()
-            if settings["smtp_user"]:
-                s.login(settings["smtp_user"], settings["smtp_password"])
-            s.send_message(msg)
+        _smtp_send(settings, msg)
         return True
     except Exception as e:  # robust: en notifikation må aldrig vælte en tilmelding
         print(f"[MAIL-FEJL] {e}")
@@ -108,12 +121,7 @@ def send_email_with_attachment(settings, to, subject, body, filename, content):
         part = MIMEText(content, "csv", "utf-8")
         part.add_header("Content-Disposition", "attachment", filename=filename)
         msg.attach(part)
-        with smtplib.SMTP(settings["smtp_host"], settings["smtp_port"], timeout=15) as s:
-            if settings["smtp_use_tls"]:
-                s.starttls()
-            if settings["smtp_user"]:
-                s.login(settings["smtp_user"], settings["smtp_password"])
-            s.send_message(msg)
+        _smtp_send(settings, msg)
     except Exception as e:
         print(f"[MAIL-FEJL] {e}", flush=True)
         _log("MAIL+CSV", to, subject, f"{body}\n[vedhæftet: {filename}]")
