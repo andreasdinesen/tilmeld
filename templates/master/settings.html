@@ -17,6 +17,28 @@
     <p class="muted small">Bruges som forudfyldt frist når en admin opretter et nyt event.</p>
 
     <h2>E-mail (SMTP)</h2>
+    <details class="help">
+      <summary>Sådan sætter du Gmail op</summary>
+      <div class="help-body">
+        <p>Udfyld felterne sådan:</p>
+        <ul>
+          <li><strong>SMTP-host:</strong> <code>smtp.gmail.com</code></li>
+          <li><strong>SMTP-port:</strong> <code>587</code></li>
+          <li><strong>Brugernavn:</strong> din fulde Gmail-adresse</li>
+          <li><strong>Adgangskode:</strong> en <strong>app-adgangskode</strong> (16 tegn, uden mellemrum) — ikke din normale adgangskode</li>
+          <li><strong>Afsender (From):</strong> samme Gmail-adresse</li>
+          <li><strong>Brug STARTTLS:</strong> sat (flueben)</li>
+        </ul>
+        <p>App-adgangskode oprettes sådan:</p>
+        <ol>
+          <li>Slå <strong>2-trins-bekræftelse</strong> til på din Google-konto (kræves).</li>
+          <li>Gå til <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a>.</li>
+          <li>Giv den et navn (fx "Tilmeld") og kopiér de 16 tegn ind i Adgangskode-feltet.</li>
+        </ol>
+        <p class="muted small">Virker også med Office 365 (<code>smtp.office365.com</code>), men kræver at en
+           administrator slår "sikkerhedsstandarder" fra og aktiverer SMTP AUTH — Gmail er enklest.</p>
+      </div>
+    </details>
     <label>SMTP-host <input type="text" name="smtp_host" value="{{ s.smtp_host }}"></label>
     <label>SMTP-port <input type="number" name="smtp_port" value="{{ s.smtp_port }}"></label>
     <label>Brugernavn <input type="text" name="smtp_user" value="{{ s.smtp_user }}"></label>

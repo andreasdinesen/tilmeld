@@ -125,6 +125,16 @@ button:disabled, .btn:disabled { opacity: .4; cursor: not-allowed; }
 .tag.cat-mail { background: #d97706; color: #fff; }
 .tag.cat-whatsapp { background: #16a34a; color: #fff; }
 
+/* Udfoldeligt hjælpe-punkt */
+details.help { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 8px;
+  background: #f8fafc; padding: 0 12px; }
+details.help summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: var(--primary); list-style: none; }
+details.help summary::before { content: "ⓘ "; }
+details.help[open] summary { border-bottom: 1px solid var(--line); }
+.help-body { padding: 6px 0 12px; font-weight: 400; }
+.help-body ul, .help-body ol { padding-left: 1.3em; margin: .4em 0; }
+.help-body li { margin: .25em 0; }
+
 /* Master: gruppe-kort */
 .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .page-head h1 { margin: 0; }
