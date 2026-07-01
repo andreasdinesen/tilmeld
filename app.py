@@ -938,8 +938,12 @@ def user_event(slug, event_slug):
     group_users = []
     if accounts and is_admin:
         group_users = conn.execute(
-            "SELECT u.id, u.username FROM users u JOIN user_groups ug ON ug.user_id = u.id "
+            "SELECT u.id, u.username, u.name FROM users u JOIN user_groups ug ON ug.user_id = u.id "
             "WHERE ug.group_id = ? ORDER BY u.username", (group["id"],)).fetchall()
+    my_name = ""
+    if accounts and my_uid and not is_admin:
+        mu = get_user(conn, my_uid)
+        my_name = (mu["name"] or mu["username"]) if mu else ""
     conn.close()
     # Med konti: brugere ser kun tilmeldings-formularen hvis de ikke allerede er tilmeldt
     show_signup = (state == "open") and (is_admin or not accounts or not has_own)
@@ -948,7 +952,7 @@ def user_event(slug, event_slug):
                            fields=parsed_fields, regs=regs, count=attending, full=full,
                            mail_on=mail_on, wa_on=wa_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
-                           group_users=group_users)
+                           group_users=group_users, my_name=my_name)
 
 
 @app.route("/<slug>/<event_slug>/signup", methods=["POST"])
@@ -992,7 +996,8 @@ def user_edit(slug, event_slug, reg_id):
     return render_template("user/signup_form.html", group=group, ev=ev,
                            fields=parsed_fields, reg=reg, current=current,
                            state=event_state(ev), mail_on=mail_on, wa_on=wa_on,
-                           accounts=bool(group["user_accounts_enabled"]))
+                           accounts=bool(group["user_accounts_enabled"]),
+                           is_admin=bool(session.get(f"admin_{group['slug']}")))
 
 
 def _handle_registration(slug, event_slug, reg_id):
@@ -1013,14 +1018,10 @@ def _handle_registration(slug, event_slug, reg_id):
         return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
 
     name = request.form.get("name", "").strip()
-    if not name:
-        conn.close()
-        flash("Navn er påkrævet.", "error")
-        return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
     email = request.form.get("email", "").strip()
     phone = request.form.get("phone", "").strip()
 
-    # Individuelle konti: knyt tilmeldingen til en bruger og hent kontakt fra profilen
+    # Individuelle konti: knyt tilmeldingen til en bruger; navn + kontakt kommer fra profilen
     accounts = bool(group["user_accounts_enabled"])
     owner_id = None
     if accounts:
@@ -1035,8 +1036,14 @@ def _handle_registration(slug, event_slug, reg_id):
             if ex and ex["user_id"] is not None:
                 owner_id = ex["user_id"]
         u = get_user(conn, owner_id)
-        if u:  # kontakt til notifikationer kommer fra brugerens profil
+        if u:  # navn + kontakt fra brugerens profil (navn skal ikke tastes)
+            name = u["name"] or u["username"]
             email, phone = u["email"], u["whatsapp"]
+
+    if not name:
+        conn.close()
+        flash("Navn er påkrævet.", "error")
+        return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
 
     fields = visible_fields(conn, group["id"], ev["id"])
 
@@ -1158,8 +1165,9 @@ def user_profile(slug):
     if request.method == "POST":
         action = request.form.get("action")
         if action == "contact":
-            conn.execute("UPDATE users SET email = ?, whatsapp = ? WHERE id = ?",
-                         (request.form.get("email", "").strip(),
+            conn.execute("UPDATE users SET name = ?, email = ?, whatsapp = ? WHERE id = ?",
+                         (request.form.get("name", "").strip(),
+                          request.form.get("email", "").strip(),
                           request.form.get("whatsapp", "").strip(), uid))
             flash("Oplysninger gemt.", "ok")
         elif action == "password":
@@ -1203,8 +1211,9 @@ def admin_users(slug):
                 flash("Brugernavnet er allerede optaget (brugernavne er unikke på hele systemet).", "error")
             else:
                 cur = conn.execute(
-                    "INSERT INTO users (username, password_hash, created_at) VALUES (?,?,?)",
-                    (username, auth.hash_password(pw), db.now_iso()))
+                    "INSERT INTO users (username, password_hash, name, created_at) VALUES (?,?,?,?)",
+                    (username, auth.hash_password(pw), request.form.get("name", "").strip(),
+                     db.now_iso()))
                 conn.execute("INSERT INTO user_groups (user_id, group_id) VALUES (?,?)",
                              (cur.lastrowid, group["id"]))
                 db.add_log(conn, "user", f"Bruger '{username}' oprettet i {group['name']}", group["slug"])

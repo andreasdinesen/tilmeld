@@ -5,9 +5,13 @@
 {% set mail_on = mail_on|default(false) %}
 {% set wa_on = wa_on|default(false) %}
 {% set accounts = accounts|default(false) %}
+{% set hide_name = hide_name|default(false) %}
+{# Med individuelle konti bruges brugerens eget navn — feltet skjules #}
+{% if not hide_name %}
 <label>Navn *
   <input type="text" name="name" value="{{ reg.name if reg else '' }}" required>
 </label>
+{% endif %}
 {# Med individuelle konti kommer kontakt fra brugerens profil #}
 {% if mail_on and not accounts %}
 <label>E-mail (til kvittering)

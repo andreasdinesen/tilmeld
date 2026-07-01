@@ -10,7 +10,8 @@ function initSignupForm(formId, opts) {
   var submitBtn = form.querySelector('button[type=submit]');
   var declines = form.querySelectorAll('input[data-decline]');
 
-  function nameOk() { return name && name.value.trim().length > 0; }
+  // Intet navnefelt (individuelle konti bruger profilens navn) => altid ok.
+  function nameOk() { return !name || name.value.trim().length > 0; }
 
   function refresh() {
     if (submitBtn) submitBtn.disabled = !nameOk();

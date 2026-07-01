@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS users (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     username            TEXT NOT NULL UNIQUE COLLATE NOCASE,
     password_hash       TEXT NOT NULL,
+    name                TEXT DEFAULT '',           -- fulde navn (bruges automatisk ved tilmelding)
     email               TEXT DEFAULT '',
     whatsapp            TEXT DEFAULT '',
     created_at          TEXT NOT NULL

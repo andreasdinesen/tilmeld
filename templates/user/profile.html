@@ -9,10 +9,12 @@
   <h1>Min profil</h1>
   <p class="muted">Logget ind som <strong>{{ u.username }}</strong></p>
 
-  <h2>Kontakt til notifikationer</h2>
-  <p class="muted small">Bruges når et event sender kvittering/påmindelse til dig.</p>
+  <h2>Mine oplysninger</h2>
+  <p class="muted small">Navnet bruges automatisk når du tilmelder dig — så du ikke skal
+     taste det hver gang. Mail/WhatsApp bruges til kvittering/påmindelse.</p>
   <form method="post">
     <input type="hidden" name="action" value="contact">
+    <label>Navn <input type="text" name="name" value="{{ u.name }}"></label>
     <label>E-mail <input type="email" name="email" value="{{ u.email }}"></label>
     <label>WhatsApp-nummer <input type="text" name="whatsapp" value="{{ u.whatsapp }}"></label>
     <button type="submit">Gem</button>

@@ -15,7 +15,7 @@
   {% for u in users %}
     <div class="row">
       <div>
-        <strong>{{ u.username }}</strong>
+        <strong>{{ u.username }}</strong>{% if u.name %} <span class="muted">({{ u.name }})</span>{% endif %}
         <div class="muted small">{{ u.email or '—' }} · {{ u.whatsapp or '—' }}</div>
       </div>
       <div class="actions">
@@ -40,6 +40,7 @@
   <form method="post">
     <input type="hidden" name="action" value="create">
     <label>Brugernavn <input type="text" name="username" required autocapitalize="none"></label>
+    <label>Navn (vises på deltagerlister) <input type="text" name="name"></label>
     <label>Adgangskode <input type="text" name="password" required></label>
     <button type="submit">Opret bruger</button>
   </form>

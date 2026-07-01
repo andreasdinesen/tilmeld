@@ -9,6 +9,7 @@
     <p class="flash error">Tilmeldingen er lukket og kan ikke ændres.</p>
   {% else %}
   <form id="edit-form" method="post">
+    {% set hide_name = accounts and not is_admin %}
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Gem ændringer</button>
   </form>

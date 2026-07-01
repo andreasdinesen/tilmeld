@@ -61,11 +61,13 @@
     {% if accounts and is_admin %}
     <label>Opret på vegne af (bruger)
       <select name="on_behalf_user">
-        <option value="">— ingen (kun i listen) —</option>
-        {% for gu in group_users %}<option value="{{ gu.id }}">{{ gu.username }}</option>{% endfor %}
+        <option value="">— ingen (skriv navn nedenfor) —</option>
+        {% for gu in group_users %}<option value="{{ gu.id }}">{{ gu.name or gu.username }}</option>{% endfor %}
       </select>
     </label>
     {% endif %}
+    {% set hide_name = accounts and not is_admin %}
+    {% if hide_name %}<p class="muted small">Du tilmeldes som <strong>{{ my_name }}</strong>.</p>{% endif %}
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Tilmeld</button>
   </form>
