@@ -31,7 +31,24 @@ CREATE TABLE IF NOT EXISTS groups (
     image_path          TEXT DEFAULT '',           -- logo/billede vist på bruger-siden
     login_text          TEXT DEFAULT '',           -- tekst vist på bruger-login-skærmen
     templates_enabled   INTEGER DEFAULT 0,         -- master tillader admin at redigere mail-skabeloner
+    user_accounts_enabled INTEGER DEFAULT 0,       -- individuelle bruger-konti (login m. brugernavn)
     created_at          TEXT NOT NULL
+);
+
+-- Individuelle brugere (globalt unikke brugernavne). Kan være med i flere grupper.
+CREATE TABLE IF NOT EXISTS users (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    username            TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash       TEXT NOT NULL,
+    email               TEXT DEFAULT '',
+    whatsapp            TEXT DEFAULT '',
+    created_at          TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_groups (
+    user_id             INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, group_id)
 );
 
 -- Tilpassede mail-skabeloner pr. gruppe (tom = brug standard fra koden)
@@ -86,6 +103,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     name                TEXT NOT NULL,
     email               TEXT DEFAULT '',
     phone               TEXT DEFAULT '',
+    user_id             INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,  -- ejer (individuel bruger)
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL
 );

@@ -2,8 +2,9 @@
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
+  {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
   <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
-  {% if group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
+  {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
 {% block content %}
 {% if group.image_path %}
@@ -34,7 +35,7 @@
         <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}</td>
         {% for item in fields %}<td>{{ r['values'].get(item.f.id, '') }}</td>{% endfor %}
         <td class="actions">
-          {% if state == 'open' %}
+          {% if state == 'open' and r.can_edit %}
           <a class="btn small" href="{{ url_for('user_edit', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}">Redigér</a>
           <form method="post" action="{{ url_for('user_delete', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}"
                 class="inline" onsubmit="return confirm('Fjern tilmeldingen for {{ r.name }}?')">
@@ -49,19 +50,29 @@
   {% endif %}
 </div>
 
-{% if state == 'open' %}
+{% if show_signup %}
 <div class="card">
-  <h2>Tilmeld dig</h2>
+  <h2>{{ 'Opret tilmelding' if is_admin and accounts else 'Tilmeld dig' }}</h2>
   {% if full %}
     <p class="flash error">Der er ikke plads til flere — du kan kun melde afbud ("deltager ikke").</p>
   {% endif %}
   {% if decline_ids %}<p class="muted small">Sæt flueben ved "deltager ikke" (efter du har skrevet dit navn) for at melde afbud med det samme.</p>{% endif %}
   <form id="signup-form" method="post" action="{{ url_for('user_signup', slug=group.slug, event_slug=ev.slug) }}">
+    {% if accounts and is_admin %}
+    <label>Opret på vegne af (bruger)
+      <select name="on_behalf_user">
+        <option value="">— ingen (kun i listen) —</option>
+        {% for gu in group_users %}<option value="{{ gu.id }}">{{ gu.username }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Tilmeld</button>
   </form>
 </div>
 <script src="{{ url_for('static', filename='forms.js') }}"></script>
 <script>initSignupForm('signup-form', { autoDecline: true });</script>
+{% elif accounts and not is_admin and state == 'open' %}
+<div class="card"><p class="muted">Du er tilmeldt dette event. Rediger eller fjern din tilmelding i listen ovenfor.</p></div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Events</a>
+  <a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>
+{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Min profil</h1>
+  <p class="muted">Logget ind som <strong>{{ u.username }}</strong></p>
+
+  <h2>Kontakt til notifikationer</h2>
+  <p class="muted small">Bruges når et event sender kvittering/påmindelse til dig.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="contact">
+    <label>E-mail <input type="email" name="email" value="{{ u.email }}"></label>
+    <label>WhatsApp-nummer <input type="text" name="whatsapp" value="{{ u.whatsapp }}"></label>
+    <button type="submit">Gem</button>
+  </form>
+
+  <h2>Skift adgangskode</h2>
+  <form method="post">
+    <input type="hidden" name="action" value="password">
+    <label>Ny adgangskode <input type="password" name="new_password" required></label>
+    <button type="submit">Skift adgangskode</button>
+  </form>
+</div>
+{% endblock %}

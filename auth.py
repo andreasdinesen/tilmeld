@@ -42,3 +42,8 @@ def is_valid_slug(slug: str) -> bool:
     if not slug or slug in RESERVED_SLUGS:
         return False
     return bool(re.fullmatch(r"[a-z0-9][a-z0-9-]*", slug))
+
+
+def is_valid_username(username: str) -> bool:
+    """Brugernavn: 3-40 tegn, bogstaver/tal/._- (bruges globalt, unikt)."""
+    return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{2,39}", username or ""))

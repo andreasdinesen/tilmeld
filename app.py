@@ -137,14 +137,37 @@ def master_required(f):
     return wrapper
 
 
+def current_user_id(group):
+    """Id på den individuelle bruger der er logget ind på gruppen (ellers None)."""
+    return session.get(f"uid_{group['slug']}")
+
+
+def get_user(conn, user_id):
+    if not user_id:
+        return None
+    return conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+
+
 def user_has_access(group):
-    """Adgang til bruger-siderne. Ikke-logget-ind kræver gruppe-password (eller åben gruppe);
-    en gruppe-admin (logget ind) slipper også ind uden bruger-password."""
+    """Adgang til bruger-siderne. Admin slipper altid ind. Med individuelle konti
+    kræves login som bruger; ellers gruppe-password (eller åben gruppe)."""
     if session.get(f"admin_{group['slug']}"):
         return True
+    if group["user_accounts_enabled"]:
+        return current_user_id(group) is not None
     if not group["user_password"]:
         return True
     return bool(session.get(f"user_{group['slug']}"))
+
+
+def can_edit_registration(group, reg):
+    """Må den nuværende besøgende redigere/fjerne denne tilmelding?"""
+    if session.get(f"admin_{group['slug']}"):
+        return True  # admin kan altid (fjerne eller oprette på vegne af)
+    if group["user_accounts_enabled"]:
+        uid = current_user_id(group)
+        return uid is not None and reg["user_id"] == uid  # kun sin egen
+    return user_has_access(group)  # delt password: betroet gruppe
 
 
 def admin_has_access(group):
@@ -246,7 +269,8 @@ def master_group_new():
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
                 "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, "
-                "templates_enabled, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "templates_enabled, user_accounts_enabled, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
@@ -254,6 +278,7 @@ def master_group_new():
                  request.form.get("admin_email", "").strip(),
                  request.form.get("whatsapp_recipient", "").strip(),
                  1 if request.form.get("templates_enabled") else 0,
+                 1 if request.form.get("user_accounts_enabled") else 0,
                  db.now_iso()),
             )
             conn.commit()
@@ -272,11 +297,12 @@ def master_group_toggle(slug):
         abort(404)
     conn = db.get_db()
     conn.execute(
-        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, templates_enabled = ? "
-        "WHERE id = ?",
+        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, templates_enabled = ?, "
+        "user_accounts_enabled = ? WHERE id = ?",
         (1 if request.form.get("mail_enabled") else 0,
          1 if request.form.get("whatsapp_enabled") else 0,
-         1 if request.form.get("templates_enabled") else 0, g["id"]),
+         1 if request.form.get("templates_enabled") else 0,
+         1 if request.form.get("user_accounts_enabled") else 0, g["id"]),
     )
     conn.commit()
     conn.close()
@@ -794,7 +820,7 @@ def _registrations_with_values(conn, event_id, fields):
             (r["id"],)).fetchall()
         out.append({
             "id": r["id"], "name": r["name"], "email": r["email"], "phone": r["phone"],
-            "created_at": r["created_at"],
+            "user_id": r["user_id"], "created_at": r["created_at"],
             "values": {v["field_id"]: v["value"] for v in vals},
         })
     return out
@@ -819,6 +845,23 @@ def user_login(slug):
     group = get_group(slug)
     if not group:
         abort(404)
+    # Individuelle bruger-konti: log ind med brugernavn + password
+    if group["user_accounts_enabled"]:
+        if request.method == "POST":
+            username = request.form.get("username", "").strip()
+            conn = db.get_db()
+            u = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+            member = u and conn.execute(
+                "SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ?",
+                (u["id"], group["id"])).fetchone()
+            conn.close()
+            if u and member and auth.verify_password(request.form.get("password", ""),
+                                                      u["password_hash"]):
+                session[f"uid_{slug}"] = u["id"]
+                return redirect(url_for("user_home", slug=slug))
+            flash("Forkert brugernavn eller adgangskode.", "error")
+        return render_template("user/login.html", group=group, accounts=True)
+    # Delt gruppe-password (eller åben gruppe)
     if not group["user_password"]:
         return redirect(url_for("user_home", slug=slug))
     if request.method == "POST":
@@ -826,12 +869,13 @@ def user_login(slug):
             session[f"user_{slug}"] = True
             return redirect(url_for("user_home", slug=slug))
         flash("Forkert password.", "error")
-    return render_template("user/login.html", group=group)
+    return render_template("user/login.html", group=group, accounts=False)
 
 
 @app.route("/<slug>/logout")
 def user_logout(slug):
     session.pop(f"user_{slug}", None)
+    session.pop(f"uid_{slug}", None)
     return redirect(url_for("user_login", slug=slug))
 
 
@@ -852,7 +896,9 @@ def user_home(slug):
         rows.append({"ev": ev, "state": state,
                      "count": count_attending(conn, group["id"], ev["id"])})
     conn.close()
-    return render_template("user/home.html", group=group, events=rows)
+    return render_template("user/home.html", group=group, events=rows,
+                           accounts=bool(group["user_accounts_enabled"]),
+                           is_admin=bool(session.get(f"admin_{group['slug']}")))
 
 
 @app.route("/<slug>/<event_slug>")
@@ -868,6 +914,7 @@ def user_event(slug, event_slug):
     if not ev:
         conn.close()
         abort(404)
+    state = event_state(ev)
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
     attending = count_attending(conn, group["id"], ev["id"])
@@ -875,11 +922,33 @@ def user_event(slug, event_slug):
                 and attending >= ev["expected_count"])
     mail_on, wa_on = group_channels(conn, group)
     decline_ids = [f["id"] for f in fields if f["is_decline"]]
+    is_admin = bool(session.get(f"admin_{group['slug']}"))
+    accounts = bool(group["user_accounts_enabled"])
+    my_uid = current_user_id(group)
+    # Markér hvilke tilmeldinger den besøgende må redigere + om egen tilmelding findes
+    has_own = False
+    for r in regs:
+        if is_admin or (not accounts) or (my_uid and r["user_id"] == my_uid):
+            r["can_edit"] = True
+        else:
+            r["can_edit"] = False
+        if accounts and my_uid and r["user_id"] == my_uid:
+            has_own = True
+    # Admin kan oprette på vegne af en gruppes brugere
+    group_users = []
+    if accounts and is_admin:
+        group_users = conn.execute(
+            "SELECT u.id, u.username FROM users u JOIN user_groups ug ON ug.user_id = u.id "
+            "WHERE ug.group_id = ? ORDER BY u.username", (group["id"],)).fetchall()
     conn.close()
+    # Med konti: brugere ser kun tilmeldings-formularen hvis de ikke allerede er tilmeldt
+    show_signup = (state == "open") and (is_admin or not accounts or not has_own)
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
-    return render_template("user/event.html", group=group, ev=ev, state=event_state(ev),
+    return render_template("user/event.html", group=group, ev=ev, state=state,
                            fields=parsed_fields, regs=regs, count=attending, full=full,
-                           mail_on=mail_on, wa_on=wa_on, decline_ids=decline_ids)
+                           mail_on=mail_on, wa_on=wa_on, decline_ids=decline_ids,
+                           accounts=accounts, is_admin=is_admin, show_signup=show_signup,
+                           group_users=group_users)
 
 
 @app.route("/<slug>/<event_slug>/signup", methods=["POST"])
@@ -905,6 +974,10 @@ def user_edit(slug, event_slug, reg_id):
     if not reg:
         conn.close()
         abort(404)
+    if not can_edit_registration(group, reg):
+        conn.close()
+        flash("Du kan kun rette din egen tilmelding.", "error")
+        return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
     fields = visible_fields(conn, group["id"], ev["id"])
     if request.method == "POST":
         conn.close()
@@ -918,7 +991,8 @@ def user_edit(slug, event_slug, reg_id):
     current = {v["field_id"]: v["value"] for v in vals}
     return render_template("user/signup_form.html", group=group, ev=ev,
                            fields=parsed_fields, reg=reg, current=current,
-                           state=event_state(ev), mail_on=mail_on, wa_on=wa_on)
+                           state=event_state(ev), mail_on=mail_on, wa_on=wa_on,
+                           accounts=bool(group["user_accounts_enabled"]))
 
 
 def _handle_registration(slug, event_slug, reg_id):
@@ -945,6 +1019,25 @@ def _handle_registration(slug, event_slug, reg_id):
         return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
     email = request.form.get("email", "").strip()
     phone = request.form.get("phone", "").strip()
+
+    # Individuelle konti: knyt tilmeldingen til en bruger og hent kontakt fra profilen
+    accounts = bool(group["user_accounts_enabled"])
+    owner_id = None
+    if accounts:
+        if session.get(f"admin_{group['slug']}"):
+            ob = request.form.get("on_behalf_user", "").strip()
+            owner_id = int(ob) if ob.isdigit() else None
+        else:
+            owner_id = current_user_id(group)
+        if reg_id:  # bevar eksisterende ejer ved redigering
+            ex = conn.execute("SELECT user_id FROM registrations WHERE id = ?",
+                              (reg_id,)).fetchone()
+            if ex and ex["user_id"] is not None:
+                owner_id = ex["user_id"]
+        u = get_user(conn, owner_id)
+        if u:  # kontakt til notifikationer kommer fra brugerens profil
+            email, phone = u["email"], u["whatsapp"]
+
     fields = visible_fields(conn, group["id"], ev["id"])
 
     # Er et "deltager ikke"-felt afkrydset? Så kræves kun navn.
@@ -983,16 +1076,16 @@ def _handle_registration(slug, event_slug, reg_id):
 
     if reg_id:
         conn.execute(
-            "UPDATE registrations SET name=?, email=?, phone=?, updated_at=? WHERE id=?",
-            (name, email, phone, db.now_iso(), reg_id))
+            "UPDATE registrations SET name=?, email=?, phone=?, user_id=?, updated_at=? WHERE id=?",
+            (name, email, phone, owner_id, db.now_iso(), reg_id))
         conn.execute("DELETE FROM registration_values WHERE registration_id = ?", (reg_id,))
         rid = reg_id
         is_new = False
     else:
         cur = conn.execute(
-            "INSERT INTO registrations (event_id, name, email, phone, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?)",
-            (ev["id"], name, email, phone, db.now_iso(), db.now_iso()))
+            "INSERT INTO registrations (event_id, name, email, phone, user_id, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (ev["id"], name, email, phone, owner_id, db.now_iso(), db.now_iso()))
         rid = cur.lastrowid
         is_new = True
     for fid, val in field_values.items():
@@ -1033,9 +1126,13 @@ def user_delete(slug, event_slug, reg_id):
     conn = db.get_db()
     ev = conn.execute("SELECT * FROM events WHERE group_id = ? AND slug = ?",
                       (group["id"], event_slug)).fetchone()
+    reg = conn.execute("SELECT * FROM registrations WHERE id = ? AND event_id = ?",
+                       (reg_id, ev["id"])).fetchone() if ev else None
+    if reg and not can_edit_registration(group, reg):
+        conn.close()
+        flash("Du kan kun fjerne din egen tilmelding.", "error")
+        return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
     if ev and event_state(ev) == "open":
-        reg = conn.execute("SELECT name FROM registrations WHERE id = ? AND event_id = ?",
-                           (reg_id, ev["id"])).fetchone()
         conn.execute("DELETE FROM registrations WHERE id = ? AND event_id = ?",
                      (reg_id, ev["id"]))
         conn.commit()
@@ -1046,6 +1143,130 @@ def user_delete(slug, event_slug, reg_id):
         flash("Kan ikke ændre en lukket tilmelding.", "error")
     conn.close()
     return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
+
+
+@app.route("/<slug>/profil", methods=["GET", "POST"])
+def user_profile(slug):
+    """Individuel bruger: skift adgangskode + sæt mail/WhatsApp til notifikationer."""
+    group = get_group(slug)
+    if not group or not group["user_accounts_enabled"]:
+        abort(404)
+    uid = current_user_id(group)
+    if not uid:
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "contact":
+            conn.execute("UPDATE users SET email = ?, whatsapp = ? WHERE id = ?",
+                         (request.form.get("email", "").strip(),
+                          request.form.get("whatsapp", "").strip(), uid))
+            flash("Oplysninger gemt.", "ok")
+        elif action == "password":
+            newpw = request.form.get("new_password", "")
+            if len(newpw) < 4:
+                flash("Adgangskoden skal være mindst 4 tegn.", "error")
+            else:
+                conn.execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                             (auth.hash_password(newpw), uid))
+                flash("Adgangskode ændret.", "ok")
+        conn.commit()
+    u = get_user(conn, uid)
+    conn.close()
+    return render_template("user/profile.html", group=group, u=u)
+
+
+# --------------------------------------------------------------------------- #
+# Gruppe-admin: individuelle brugere
+# --------------------------------------------------------------------------- #
+@app.route("/<slug>/admin/users", methods=["GET", "POST"])
+def admin_users(slug):
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        return redirect(url_for("admin_login", slug=slug))
+    if not group["user_accounts_enabled"]:
+        flash("Individuelle brugere er ikke slået til for gruppen.", "error")
+        return redirect(url_for("admin_home", slug=slug))
+    conn = db.get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "create":
+            username = request.form.get("username", "").strip()
+            pw = request.form.get("password", "")
+            if not auth.is_valid_username(username):
+                flash("Ugyldigt brugernavn (3-40 tegn: bogstaver, tal, . _ -).", "error")
+            elif len(pw) < 4:
+                flash("Adgangskoden skal være mindst 4 tegn.", "error")
+            elif conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
+                flash("Brugernavnet er allerede optaget (brugernavne er unikke på hele systemet).", "error")
+            else:
+                cur = conn.execute(
+                    "INSERT INTO users (username, password_hash, created_at) VALUES (?,?,?)",
+                    (username, auth.hash_password(pw), db.now_iso()))
+                conn.execute("INSERT INTO user_groups (user_id, group_id) VALUES (?,?)",
+                             (cur.lastrowid, group["id"]))
+                db.add_log(conn, "user", f"Bruger '{username}' oprettet i {group['name']}", group["slug"])
+                flash(f"Bruger '{username}' oprettet.", "ok")
+        elif action == "resetpw":
+            newpw = request.form.get("new_password", "")
+            if len(newpw) < 4:
+                flash("Adgangskoden skal være mindst 4 tegn.", "error")
+            else:
+                conn.execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                             (auth.hash_password(newpw), request.form.get("user_id")))
+                flash("Adgangskode nulstillet.", "ok")
+        elif action == "remove":
+            conn.execute("DELETE FROM user_groups WHERE user_id = ? AND group_id = ?",
+                         (request.form.get("user_id"), group["id"]))
+            flash("Bruger fjernet fra gruppen.", "ok")
+        conn.commit()
+    users = conn.execute(
+        "SELECT u.* FROM users u JOIN user_groups ug ON ug.user_id = u.id "
+        "WHERE ug.group_id = ? ORDER BY u.username", (group["id"],)).fetchall()
+    conn.close()
+    return render_template("admin/users.html", group=group, users=users)
+
+
+# --------------------------------------------------------------------------- #
+# Master-admin: brugere på tværs af grupper
+# --------------------------------------------------------------------------- #
+@app.route("/master/users", methods=["GET", "POST"])
+@master_required
+def master_users():
+    conn = db.get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        uid = request.form.get("user_id")
+        if action == "delete":
+            u = conn.execute("SELECT username FROM users WHERE id = ?", (uid,)).fetchone()
+            conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+            if u:
+                db.add_log(conn, "user", f"Bruger '{u['username']}' slettet")
+            flash("Bruger slettet.", "ok")
+        elif action == "add_group":
+            gid = request.form.get("group_id")
+            if uid and gid:
+                conn.execute("INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?,?)",
+                             (uid, gid))
+                flash("Bruger tilføjet til gruppen.", "ok")
+        elif action == "remove_group":
+            conn.execute("DELETE FROM user_groups WHERE user_id = ? AND group_id = ?",
+                         (uid, request.form.get("group_id")))
+            flash("Bruger fjernet fra gruppen.", "ok")
+        conn.commit()
+    rows = conn.execute("SELECT * FROM users ORDER BY username").fetchall()
+    users = []
+    for u in rows:
+        groups = conn.execute(
+            "SELECT g.id, g.name, g.slug FROM groups g JOIN user_groups ug ON ug.group_id = g.id "
+            "WHERE ug.user_id = ? ORDER BY g.name", (u["id"],)).fetchall()
+        users.append({"u": u, "groups": groups})
+    all_groups = conn.execute(
+        "SELECT id, name FROM groups WHERE user_accounts_enabled = 1 ORDER BY name").fetchall()
+    conn.close()
+    return render_template("master/users.html", users=users, all_groups=all_groups)
 
 
 # Registrér CSV-byggeren og start påmindelses-/CSV-scheduleren.

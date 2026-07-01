@@ -2,6 +2,7 @@
 {% block brand %}Master-admin{% endblock %}
 {% block nav %}
   <a href="{{ url_for('master_settings') }}">Opsætning</a>
+  <a href="{{ url_for('master_users') }}">Brugere</a>
   <a href="{{ url_for('master_log') }}">Log</a>
   <a href="{{ url_for('master_system') }}">System</a>
   <a href="{{ url_for('master_group_new') }}">Ny gruppe</a>
@@ -38,6 +39,7 @@
         <label class="chk"><input type="checkbox" name="mail_enabled" {{ 'checked' if g.mail_enabled }}> Mail</label>
         <label class="chk"><input type="checkbox" name="whatsapp_enabled" {{ 'checked' if g.whatsapp_enabled }}> WhatsApp</label>
         <label class="chk"><input type="checkbox" name="templates_enabled" {{ 'checked' if g.templates_enabled }}> Skabeloner</label>
+        <label class="chk"><input type="checkbox" name="user_accounts_enabled" {{ 'checked' if g.user_accounts_enabled }}> Brugere</label>
         <button type="submit">Gem</button>
       </form>
       <form method="post" action="{{ url_for('master_group_delete', slug=g.slug) }}"

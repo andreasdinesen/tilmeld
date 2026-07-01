@@ -17,7 +17,8 @@
 
   <div class="log-filters">
     {% set cats = [('', 'Alle'), ('group', 'Grupper'), ('event', 'Events'),
-                   ('signup', 'Tilmeldinger'), ('mail', 'Mail'), ('whatsapp', 'WhatsApp')] %}
+                   ('signup', 'Tilmeldinger'), ('user', 'Brugere'), ('mail', 'Mail'),
+                   ('whatsapp', 'WhatsApp')] %}
     {% for val, lbl in cats %}
       <a class="btn small {{ 'primary' if category == val }}"
          href="{{ url_for('master_log', category=val) if val else url_for('master_log') }}">{{ lbl }}</a>

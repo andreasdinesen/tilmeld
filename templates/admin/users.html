@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }} · admin{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Vis som bruger</a>
+  <a href="{{ url_for('admin_home', slug=group.slug) }}">Events</a>
+  <a href="{{ url_for('admin_settings', slug=group.slug) }}">Opsætning</a>
+  <a href="{{ url_for('admin_logout', slug=group.slug) }}">Log ud</a>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Brugere</h1>
+  <p class="muted small">Brugere kan logge ind med brugernavn og adgangskode og styrer selv
+     deres egne tilmeldinger. Brugernavne er unikke på hele systemet.</p>
+  {% if not users %}<p>Ingen brugere endnu.</p>{% endif %}
+  {% for u in users %}
+    <div class="row">
+      <div>
+        <strong>{{ u.username }}</strong>
+        <div class="muted small">{{ u.email or '—' }} · {{ u.whatsapp or '—' }}</div>
+      </div>
+      <div class="actions">
+        <form method="post" class="inline" onsubmit="return this.new_password.value && confirm('Nulstil adgangskode for {{ u.username }}?')">
+          <input type="hidden" name="action" value="resetpw">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <input type="password" name="new_password" placeholder="ny adgangskode" style="width:auto;display:inline-block">
+          <button>Nulstil</button>
+        </form>
+        <form method="post" class="inline" onsubmit="return confirm('Fjern {{ u.username }} fra gruppen?')">
+          <input type="hidden" name="action" value="remove">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <button class="danger">Fjern fra gruppe</button>
+        </form>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="card narrow">
+  <h2>Opret ny bruger</h2>
+  <form method="post">
+    <input type="hidden" name="action" value="create">
+    <label>Brugernavn <input type="text" name="username" required autocapitalize="none"></label>
+    <label>Adgangskode <input type="text" name="password" required></label>
+    <button type="submit">Opret bruger</button>
+  </form>
+</div>
+{% endblock %}

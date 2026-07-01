@@ -124,6 +124,7 @@ button:disabled, .btn:disabled { opacity: .4; cursor: not-allowed; }
 .tag.cat-signup { background: #0d9488; color: #fff; }
 .tag.cat-mail { background: #d97706; color: #fff; }
 .tag.cat-whatsapp { background: #16a34a; color: #fff; }
+.tag.cat-user { background: #9333ea; color: #fff; }
 
 /* Udfoldeligt hjælpe-punkt */
 details.help { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 8px;

@@ -8,9 +8,18 @@
   <h1>{{ group.name }}</h1>
   {% if group.login_text %}<div class="login-text">{{ group.login_text }}</div>{% endif %}
   <form method="post">
+    {% if accounts %}
+    <label>Brugernavn
+      <input type="text" name="username" autofocus required autocapitalize="none">
+    </label>
+    <label>Adgangskode
+      <input type="password" name="password" required>
+    </label>
+    {% else %}
     <label>Adgangskode
       <input type="password" name="password" autofocus required>
     </label>
+    {% endif %}
     <button type="submit">Log ind</button>
   </form>
 </div>

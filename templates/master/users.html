@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block brand %}Master-admin{% endblock %}
+{% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Brugere</h1>
+  <p class="muted small">Alle individuelle brugere og hvilke grupper de er tilknyttet.
+     En bruger kan tilføjes til flere grupper.</p>
+  {% if not users %}<p>Ingen brugere endnu.</p>{% endif %}
+  {% for item in users %}
+    {% set u = item.u %}
+    <div class="row">
+      <div>
+        <strong>{{ u.username }}</strong>
+        <div class="muted small">{{ u.email or '—' }} · {{ u.whatsapp or '—' }}</div>
+        <div class="small" style="margin-top:4px">
+          Grupper:
+          {% if not item.groups %}<span class="muted">ingen</span>{% endif %}
+          {% for g in item.groups %}
+            <span class="tag cat-group">{{ g.name }}
+              <form method="post" class="inline" onsubmit="return confirm('Fjern {{ u.username }} fra {{ g.name }}?')">
+                <input type="hidden" name="action" value="remove_group">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <input type="hidden" name="group_id" value="{{ g.id }}">
+                <button title="Fjern fra gruppe" style="background:none;border:none;color:#fff;cursor:pointer;padding:0 2px;margin:0">×</button>
+              </form>
+            </span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="actions">
+        <form method="post" class="inline">
+          <input type="hidden" name="action" value="add_group">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <select name="group_id">
+            {% for g in all_groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
+          </select>
+          <button {{ 'disabled' if not all_groups }}>Tilføj til gruppe</button>
+        </form>
+        <form method="post" class="inline" onsubmit="return confirm('Slet brugeren {{ u.username }} helt?')">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <button class="danger">Slet bruger</button>
+        </form>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
+  {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
   <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
-  {% if group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
+  {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
 {% block content %}
 {% if group.image_path %}
