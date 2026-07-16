@@ -22,5 +22,10 @@
     {% endif %}
     <button type="submit">Log ind</button>
   </form>
+  {% if accounts %}
+    <p class="muted small" style="margin-top:12px">
+      <a href="{{ url_for('user_forgot', slug=group.slug) }}">Glemt adgangskode?</a>
+    </p>
+  {% endif %}
 </div>
 {% endblock %}

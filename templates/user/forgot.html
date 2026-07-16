@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Glemt adgangskode</h1>
+  <p class="muted small">Skriv dit brugernavn eller din e-mail. Er der en e-mail på din
+     konto, sender vi et link hvor du kan vælge en ny adgangskode.</p>
+  <form method="post">
+    <label>Brugernavn eller e-mail
+      <input type="text" name="ident" autofocus required autocapitalize="none">
+    </label>
+    <button type="submit">Send nulstillings-link</button>
+  </form>
+  <p class="muted small" style="margin-top:14px">
+    <a href="{{ url_for('user_login', slug=group.slug) }}">Tilbage til login</a>
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Vælg ny adgangskode</h1>
+  <form method="post">
+    <label>Ny adgangskode
+      <input type="password" name="new_password" autofocus required>
+    </label>
+    <button type="submit">Gem ny adgangskode</button>
+  </form>
+</div>
+{% endblock %}

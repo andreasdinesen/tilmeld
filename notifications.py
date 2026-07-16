@@ -31,6 +31,12 @@ DEFAULT_TEMPLATES = {
     "deadline": ("Tilmeldingsfrist nået: {event}",
                  "Tilmeldingsfristen for {event} er nået.\n"
                  "Se deltagerlisten og hent CSV her: {link}"),
+    "waitlist_promoted": ("Du har fået en plads: {event}",
+                          "Hej {name}. Der er blevet en plads ledig, og du er rykket op fra "
+                          "ventelisten til {event} d. {date}. Vi ses!"),
+    "event_reminder": ("Påmindelse: {event} er i morgen",
+                       "Hej {name}. Husk at du er tilmeldt {event} d. {date}"
+                       "{start}. Vi ses!"),
 }
 
 
@@ -155,6 +161,19 @@ def send_whatsapp(settings, to: str, body: str) -> str:
         return str(e)[:300]
 
 
+def _reg_declined(conn, group_id, reg_id) -> bool:
+    """Har tilmeldingen krydset et 'deltager ikke'-felt af?"""
+    ids = [r["id"] for r in conn.execute(
+        "SELECT id FROM group_fields WHERE group_id = ? AND is_decline = 1",
+        (group_id,)).fetchall()]
+    if not ids:
+        return False
+    ph = ",".join("?" * len(ids))
+    return bool(conn.execute(
+        f"SELECT 1 FROM registration_values WHERE registration_id = ? "
+        f"AND field_id IN ({ph}) AND value = 'Ja' LIMIT 1", [reg_id] + ids).fetchone())
+
+
 def _note(err: str) -> str:
     return f"  ⚠ ikke leveret ({err})" if err else ""
 
@@ -196,6 +215,34 @@ def process_scheduled(now=None):
         cutoff = (now - timedelta(days=30)).isoformat(timespec="seconds")
         conn.execute("DELETE FROM activity_log WHERE created_at < ?", (cutoff,))
         conn.commit()
+
+        # Påmindelse 24t før SELVE eventet (til dem der er tilmeldt, ikke afbud/venteliste)
+        er_rows = conn.execute(
+            "SELECT * FROM events WHERE notify_event_reminder = 1 AND event_reminder_sent = 0"
+        ).fetchall()
+        for ev in er_rows:
+            try:
+                start = datetime.strptime(
+                    f"{ev['event_date']} {ev['start_time'] or '00:00'}", "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue
+            if now <= start <= now + timedelta(hours=24):
+                group = conn.execute(
+                    "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
+                regs = conn.execute(
+                    "SELECT * FROM registrations WHERE event_id = ? AND waitlist = 0",
+                    (ev["id"],)).fetchall()
+                for r in regs:
+                    if _reg_declined(conn, group["id"], r["id"]):
+                        continue
+                    ctx = {"event": ev["name"], "name": r["name"], "date": ev["event_date"],
+                           "group": group["name"], "deadline": ev["signup_deadline"],
+                           "start": f" kl. {ev['start_time']}" if ev["start_time"] else ""}
+                    subject, body = render_message(conn, group, "event_reminder", ctx)
+                    notify_participant(conn, group, r["email"], r["phone"], subject, body)
+                conn.execute("UPDATE events SET event_reminder_sent = 1 WHERE id = ?",
+                             (ev["id"],))
+                conn.commit()
 
         # Påmindelse: indenfor 24t før fristen (og fristen ikke passeret)
         rows = conn.execute(

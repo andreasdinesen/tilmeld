@@ -12,6 +12,11 @@
   <input type="text" name="name" value="{{ reg.name if reg else '' }}" required>
 </label>
 {% endif %}
+{% if ev is defined and ev.allow_guests %}
+<label>Antal pladser (dig + gæster)
+  <input type="number" name="seats" min="1" max="50" value="{{ reg.seats if reg else 1 }}">
+</label>
+{% endif %}
 {# Med individuelle konti kommer kontakt fra brugerens profil #}
 {% if mail_on and not accounts %}
 <label>E-mail (til kvittering)

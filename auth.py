@@ -11,6 +11,7 @@ ITERATIONS = 120_000
 RESERVED_SLUGS = {
     "master", "admin", "login", "logout", "static", "api",
     "settings", "events", "new", "edit", "delete", "export", "image",
+    "profil", "glemt", "nulstil", "kalender",
 }
 
 

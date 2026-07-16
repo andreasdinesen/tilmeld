@@ -25,6 +25,9 @@
       <a class="btn" href="{{ url_for('admin_event_list', slug=group.slug, event_id=ev.id) }}">Vis liste</a>
       <a class="btn" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
       <a class="btn" href="{{ url_for('admin_event_edit', slug=group.slug, event_id=ev.id) }}">Redigér</a>
+      <form method="post" action="{{ url_for('admin_event_copy', slug=group.slug, event_id=ev.id) }}" class="inline">
+        <button>Kopiér</button>
+      </form>
       <form method="post" action="{{ url_for('admin_event_delete', slug=group.slug, event_id=ev.id) }}"
             class="inline" onsubmit="return confirm('Slet eventet {{ ev.name }}?')">
         <button class="danger">Slet</button>

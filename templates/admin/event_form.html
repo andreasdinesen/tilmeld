@@ -17,6 +17,8 @@
        <code># overskrift</code>, <code>- punktliste</code>, <code>[link](https://...)</code>.</p>
     <label>Forventet antal deltagere <input type="number" name="expected_count" value="{{ ev.expected_count if ev else 0 }}"></label>
     <label class="chk"><input type="checkbox" name="capacity_limit" {{ 'checked' if ev and ev.capacity_limit }}> Begræns tilmeldinger til det forventede antal (luk når der er fyldt)</label>
+    <label class="chk"><input type="checkbox" name="waitlist_enabled" {{ 'checked' if ev and ev.waitlist_enabled }}> Venteliste når der er fyldt (rykker automatisk op ved afbud)</label>
+    <label class="chk"><input type="checkbox" name="allow_guests" {{ 'checked' if ev and ev.allow_guests }}> Tillad gæster (+1) — deltagere kan vælge antal pladser</label>
     <label>Tilmeldingsfrist
       <input type="datetime-local" id="signup_deadline" name="signup_deadline" value="{{ ev.signup_deadline if ev else '' }}">
     </label>
@@ -37,10 +39,27 @@
     <label class="chk"><input type="checkbox" name="notify_change" {{ 'checked' if ev and ev.notify_change }}> Besked til admin ved ændring</label>
     <label class="chk"><input type="checkbox" name="notify_receipt" {{ 'checked' if ev and ev.notify_receipt }}> Kvittering til deltager</label>
     <label class="chk"><input type="checkbox" name="notify_reminder" {{ 'checked' if ev and ev.notify_reminder }}> Påmindelse 24t før frist</label>
+    <label class="chk"><input type="checkbox" name="notify_event_reminder" {{ 'checked' if ev and ev.notify_event_reminder }}> Påmindelse til deltagere 24t før selve eventet</label>
     <label class="chk"><input type="checkbox" name="notify_deadline" {{ 'checked' if ev and ev.notify_deadline }}> Besked til admin når fristen er nået (med link til deltagerliste)</label>
     {% if mail_on %}
     <label class="chk"><input type="checkbox" name="csv_after_deadline" {{ 'checked' if ev and ev.csv_after_deadline }}> Send deltagerliste (CSV) til admin-mail 2 timer efter frist</label>
     {% endif %}
+    {% endif %}
+
+    {% if not ev %}
+    <h2>Gentag</h2>
+    <div class="grid2">
+      <label>Gentagelse
+        <select name="repeat_interval">
+          <option value="">Ingen</option>
+          <option value="weekly">Hver uge</option>
+          <option value="biweekly">Hver 14. dag</option>
+          <option value="monthly">Hver måned</option>
+        </select>
+      </label>
+      <label>Antal i alt <input type="number" name="repeat_count" min="1" max="26" value="1"></label>
+    </div>
+    <p class="muted small">Opretter flere ens events; datoer og frister rykkes automatisk.</p>
     {% endif %}
 
     <button type="submit">{{ 'Gem ændringer' if ev else 'Opret event' }}</button>

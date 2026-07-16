@@ -7,36 +7,50 @@
     <h1>{{ ev.name }} — deltagere</h1>
     <a class="btn primary" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
   </div>
-  <p class="count">Deltagere: <strong>{{ count }}</strong> / {{ ev.expected_count }} forventet{% if total > count %} <span class="muted small">({{ total - count }} afbud)</span>{% endif %}</p>
+  <p class="count">Deltagere: <strong>{{ count }}</strong> / {{ ev.expected_count }} forventet{% if total > count %} <span class="muted small">({{ total - count }} afbud/venteliste)</span>{% endif %}{% if attended_count %} · Mødt op: <strong>{{ attended_count }}</strong>{% endif %}</p>
   {% if not regs %}<p>Ingen tilmeldinger endnu.</p>{% else %}
+  <form method="post">
+  <input type="hidden" name="action" value="attendance">
   <div class="tablewrap">
   <table>
     <thead><tr>
       <th>Navn</th><th>E-mail</th><th>WhatsApp</th>
       {% for f in fields %}<th>{{ f.label }}</th>{% endfor %}
-      <th>Tilmeldt</th><th></th>
+      <th>Tilmeldt</th><th>Mødt</th><th></th>
     </tr></thead>
     <tbody>
+      {% set ns_wl = namespace(shown=false) %}
       {% for r in regs %}
+      {% if r.waitlist and not ns_wl.shown %}
+        {% set ns_wl.shown = true %}
+        <tr><td colspan="{{ fields|length + 6 }}" class="muted small" style="padding-top:14px"><strong>Venteliste</strong></td></tr>
+      {% endif %}
       {% set ns = namespace(declined=false) %}
       {% for did in decline_ids %}{% if r['values'].get(did) == 'Ja' %}{% set ns.declined = true %}{% endif %}{% endfor %}
       <tr class="{{ 'declined' if ns.declined }}">
-        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}</td>
+        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}{% if r.seats > 1 %} <span class="muted small">(+{{ r.seats - 1 }} gæst{{ '' if r.seats == 2 else 'er' }})</span>{% endif %}</td>
         <td>{{ r.email }}</td><td>{{ r.phone }}</td>
         {% for f in fields %}<td>{{ r['values'].get(f.id, '') }}</td>{% endfor %}
         <td class="muted small">{{ r.created_at|dt }}</td>
+        <td>{% if not r.waitlist and not ns.declined %}<input type="checkbox" name="att_{{ r.id }}" {{ 'checked' if r.attended }}>{% endif %}</td>
         <td class="actions">
           <a class="btn small" href="{{ url_for('user_edit', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}">Redigér</a>
-          <form method="post" action="{{ url_for('user_delete', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}"
-                class="inline" onsubmit="return confirm('Fjern {{ r.name }}?')">
-            <button class="danger small">Fjern</button>
-          </form>
+          {# form= peger på en formular udenfor tabellen — indlejrede formularer er ugyldige #}
+          <button class="danger small" form="del-{{ r.id }}"
+                  onclick="return confirm('Fjern {{ r.name }}?')">Fjern</button>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
+  <button type="submit">Gem fremmøde</button>
+  </form>
+
+  {% for r in regs %}
+    <form id="del-{{ r.id }}" method="post"
+          action="{{ url_for('user_delete', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}"></form>
+  {% endfor %}
   {% endif %}
 </div>
 {% endblock %}

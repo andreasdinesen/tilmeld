@@ -25,5 +25,18 @@
       <div class="count">{{ item.count }} / {{ ev.expected_count }} deltagere</div>
     </a>
   {% endfor %}
+
+  {% if cal_url %}
+  <details class="help" style="margin-top:16px">
+    <summary>Få events i din kalender</summary>
+    <div class="help-body">
+      <p class="muted small">Abonnér på denne adresse i Google/Outlook/Apple Kalender, så
+         dukker gruppens events op automatisk — også når de ændres.</p>
+      <input type="text" value="{{ cal_url }}" readonly onclick="this.select()">
+      <p class="muted small">Google Kalender: <em>Andre kalendere → + → Fra URL</em>.
+         Apple Kalender: <em>Arkiv → Nyt kalenderabonnement</em>.</p>
+    </div>
+  </details>
+  {% endif %}
 </div>
 {% endblock %}

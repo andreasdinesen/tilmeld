@@ -3,9 +3,19 @@ import csv
 import io
 import json
 import os
+import secrets
+import time
 import urllib.request
 from datetime import datetime, timedelta
 from functools import wraps
+
+# Tidszone: alle datoer/frister er "vægur-tid". Uden dette kører containeren i UTC,
+# så en frist kl. 12:00 ville reelt være 14:00 dansk tid. Sættes før datetime bruges.
+os.environ.setdefault("TZ", "Europe/Copenhagen")
+try:
+    time.tzset()
+except AttributeError:  # findes ikke på Windows
+    pass
 
 import bleach
 import markdown as markdown_lib
@@ -95,14 +105,30 @@ def group_channels(conn, group):
     return mail, whatsapp
 
 
+def is_declined(conn, group_id, reg_id):
+    """Har tilmeldingen sat et 'deltager ikke'-felt?"""
+    decline_ids = [f["id"] for f in all_group_fields(conn, group_id) if f["is_decline"]]
+    if not decline_ids:
+        return False
+    ph = ",".join("?" * len(decline_ids))
+    return bool(conn.execute(
+        f"SELECT 1 FROM registration_values WHERE registration_id = ? "
+        f"AND field_id IN ({ph}) AND value = 'Ja' LIMIT 1",
+        [reg_id] + decline_ids).fetchone())
+
+
 def count_attending(conn, group_id, event_id, exclude_reg_id=None):
-    """Antal tilmeldte der reelt deltager (ekskl. 'deltager ikke'-afkrydsede)."""
+    """Antal optagne pladser: summen af 'seats' for dem der reelt deltager
+    (ekskl. afbud og ekskl. venteliste)."""
     decline_ids = [f["id"] for f in all_group_fields(conn, group_id) if f["is_decline"]]
     regs = conn.execute(
-        "SELECT id FROM registrations WHERE event_id = ?", (event_id,)).fetchall()
+        "SELECT id, seats, waitlist FROM registrations WHERE event_id = ?",
+        (event_id,)).fetchall()
     n = 0
     for r in regs:
         if exclude_reg_id and r["id"] == exclude_reg_id:
+            continue
+        if r["waitlist"]:
             continue
         if decline_ids:
             ph = ",".join("?" * len(decline_ids))
@@ -112,8 +138,50 @@ def count_attending(conn, group_id, event_id, exclude_reg_id=None):
                 [r["id"]] + decline_ids).fetchone()
             if declined:
                 continue
-        n += 1
+        n += max(1, r["seats"] or 1)
     return n
+
+
+def waitlist_position(conn, event_id, reg_id):
+    """Nummer på ventelisten (1 = først)."""
+    rows = conn.execute(
+        "SELECT id FROM registrations WHERE event_id = ? AND waitlist = 1 "
+        "ORDER BY created_at, id", (event_id,)).fetchall()
+    for i, r in enumerate(rows, start=1):
+        if r["id"] == reg_id:
+            return i
+    return len(rows)
+
+
+def promote_waitlist(conn, group, ev):
+    """Ryk folk op fra ventelisten hvis der er blevet plads (FIFO). Returnér de oprykkede."""
+    if not (ev["capacity_limit"] and ev["expected_count"] and ev["waitlist_enabled"]):
+        return []
+    promoted = []
+    while True:
+        nxt = conn.execute(
+            "SELECT * FROM registrations WHERE event_id = ? AND waitlist = 1 "
+            "ORDER BY created_at, id LIMIT 1", (ev["id"],)).fetchone()
+        if not nxt:
+            break
+        taken = count_attending(conn, group["id"], ev["id"])
+        if taken + max(1, nxt["seats"] or 1) > ev["expected_count"]:
+            break  # ikke plads til den næste — bevar rækkefølgen
+        conn.execute("UPDATE registrations SET waitlist = 0 WHERE id = ?", (nxt["id"],))
+        conn.commit()
+        promoted.append(nxt)
+    return promoted
+
+
+def notify_promoted(conn, group, ev, promoted):
+    """Send besked til dem der er rykket op fra ventelisten."""
+    for r in promoted:
+        ctx = {"event": ev["name"], "name": r["name"], "date": ev["event_date"],
+               "group": group["name"], "deadline": ev["signup_deadline"]}
+        subj, body = notifications.render_message(conn, group, "waitlist_promoted", ctx)
+        notifications.notify_participant(conn, group, r["email"], r["phone"], subj, body)
+        db.add_log(conn, "signup", f"{r['name']} rykket op fra ventelisten til {ev['name']}",
+                   group["slug"])
 
 
 def hidden_field_ids(conn, event_id):
@@ -269,8 +337,8 @@ def master_group_new():
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
                 "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, "
-                "templates_enabled, user_accounts_enabled, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "templates_enabled, user_accounts_enabled, calendar_token, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
@@ -279,6 +347,7 @@ def master_group_new():
                  request.form.get("whatsapp_recipient", "").strip(),
                  1 if request.form.get("templates_enabled") else 0,
                  1 if request.form.get("user_accounts_enabled") else 0,
+                 secrets.token_urlsafe(16),
                  db.now_iso()),
             )
             conn.commit()
@@ -584,7 +653,9 @@ def admin_settings(slug):
                   "change": "Ændret tilmelding (til admin)",
                   "receipt": "Kvittering (til deltager)",
                   "reminder": "Påmindelse før frist",
-                  "deadline": "Frist nået (til admin, med link)"}
+                  "deadline": "Frist nået (til admin, med link)",
+                  "waitlist_promoted": "Rykket op fra venteliste (til deltager)",
+                  "event_reminder": "Påmindelse før eventet (til deltager)"}
         for tkey in notifications.DEFAULT_TEMPLATES:
             subj, body = notifications.template_for(conn, group, tkey)
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
@@ -702,37 +773,110 @@ def _save_event(group, ev):
         1 if request.form.get("csv_after_deadline") else 0,
         1 if request.form.get("capacity_limit") else 0,
         1 if request.form.get("notify_deadline") else 0,
+        1 if request.form.get("waitlist_enabled") else 0,
+        1 if request.form.get("allow_guests") else 0,
+        1 if request.form.get("notify_event_reminder") else 0,
     )
     if ev:
         conn.execute(
             "UPDATE events SET name=?, slug=?, event_date=?, start_time=?, end_time=?, "
             "description=?, expected_count=?, signup_deadline=?, notify_new_signup=?, "
             "notify_change=?, notify_receipt=?, notify_reminder=?, csv_after_deadline=?, "
-            "capacity_limit=?, notify_deadline=? WHERE id = ?",
+            "capacity_limit=?, notify_deadline=?, waitlist_enabled=?, allow_guests=?, "
+            "notify_event_reminder=? WHERE id = ?",
             vals + (ev["id"],))
         event_id = ev["id"]
         flash("Event opdateret.", "ok")
     else:
-        cur = conn.execute(
-            "INSERT INTO events (name, slug, event_date, start_time, end_time, description, "
-            "expected_count, signup_deadline, notify_new_signup, notify_change, notify_receipt, "
-            "notify_reminder, csv_after_deadline, capacity_limit, notify_deadline, "
-            "group_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            vals + (group["id"], db.now_iso()))
+        cur = conn.execute(EVENT_INSERT_SQL, vals + (group["id"], db.now_iso()))
         event_id = cur.lastrowid
         db.add_log(conn, "event", f"Event '{name}' oprettet i {group['name']}", group["slug"])
         flash("Event oprettet.", "ok")
 
     # Gem hvilke punkter der er skjult på dette event (ukrydsede = skjult)
-    conn.execute("DELETE FROM event_hidden_fields WHERE event_id = ?", (event_id,))
-    for f in all_group_fields(conn, group["id"]):
-        if not request.form.get(f"show_field_{f['id']}"):
-            conn.execute(
-                "INSERT OR IGNORE INTO event_hidden_fields (event_id, field_id) VALUES (?,?)",
-                (event_id, f["id"]))
+    hidden_ids = [f["id"] for f in all_group_fields(conn, group["id"])
+                  if not request.form.get(f"show_field_{f['id']}")]
+    _set_hidden_fields(conn, event_id, hidden_ids)
     conn.commit()
+
+    # Gentagne events (kun ved oprettelse)
+    if not ev:
+        extra = _create_repeats(conn, group, vals, hidden_ids,
+                                request.form.get("repeat_interval", ""),
+                                request.form.get("repeat_count") or 1)
+        if extra:
+            flash(f"Oprettede {extra} gentagelser mere.", "ok")
     conn.close()
     return redirect(url_for("admin_home", slug=group["slug"]))
+
+
+EVENT_INSERT_SQL = (
+    "INSERT INTO events (name, slug, event_date, start_time, end_time, description, "
+    "expected_count, signup_deadline, notify_new_signup, notify_change, notify_receipt, "
+    "notify_reminder, csv_after_deadline, capacity_limit, notify_deadline, "
+    "waitlist_enabled, allow_guests, notify_event_reminder, group_id, created_at) "
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+
+
+def _set_hidden_fields(conn, event_id, field_ids):
+    conn.execute("DELETE FROM event_hidden_fields WHERE event_id = ?", (event_id,))
+    for fid in field_ids:
+        conn.execute(
+            "INSERT OR IGNORE INTO event_hidden_fields (event_id, field_id) VALUES (?,?)",
+            (event_id, fid))
+
+
+def _add_months(d, n):
+    import calendar
+    y = d.year + (d.month - 1 + n) // 12
+    m = (d.month - 1 + n) % 12 + 1
+    return d.replace(year=y, month=m, day=min(d.day, calendar.monthrange(y, m)[1]))
+
+
+def _create_repeats(conn, group, vals, hidden_ids, interval, count):
+    """Opret gentagelser af et nyoprettet event (ugentligt/hver 14. dag/månedligt)."""
+    try:
+        count = int(count)
+    except (TypeError, ValueError):
+        count = 1
+    if interval not in ("weekly", "biweekly", "monthly") or count < 2:
+        return 0
+    count = min(count, 26)
+    try:
+        base_date = datetime.strptime(vals[2], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return 0
+    base_deadline = None
+    if vals[7]:
+        try:
+            base_deadline = datetime.fromisoformat(vals[7])
+        except ValueError:
+            base_deadline = None
+    made = 0
+    for i in range(1, count):
+        if interval == "weekly":
+            nd = base_date + timedelta(weeks=i)
+        elif interval == "biweekly":
+            nd = base_date + timedelta(weeks=2 * i)
+        else:
+            nd = _add_months(base_date, i)
+        delta = (nd - base_date).days
+        v = list(vals)
+        v[1] = f"{vals[1]}-{i + 1}"
+        v[2] = nd.strftime("%Y-%m-%d")
+        v[7] = ((base_deadline + timedelta(days=delta)).strftime("%Y-%m-%dT%H:%M")
+                if base_deadline else "")
+        if conn.execute("SELECT 1 FROM events WHERE group_id = ? AND slug = ?",
+                        (group["id"], v[1])).fetchone():
+            continue  # slug optaget — spring over
+        cur = conn.execute(EVENT_INSERT_SQL, tuple(v) + (group["id"], db.now_iso()))
+        _set_hidden_fields(conn, cur.lastrowid, hidden_ids)
+        made += 1
+    conn.commit()
+    if made:
+        db.add_log(conn, "event", f"{made} gentagelser af '{vals[0]}' oprettet",
+                   group["slug"])
+    return made
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/delete", methods=["POST"])
@@ -750,7 +894,42 @@ def admin_event_delete(slug, event_id):
     return redirect(url_for("admin_home", slug=slug))
 
 
-@app.route("/<slug>/admin/events/<int:event_id>/list")
+@app.route("/<slug>/admin/events/<int:event_id>/copy", methods=["POST"])
+def admin_event_copy(slug, event_id):
+    """Opret en kopi af et event (samme indstillinger) og åbn den til redigering."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        return redirect(url_for("admin_login", slug=slug))
+    conn = db.get_db()
+    ev = conn.execute("SELECT * FROM events WHERE id = ? AND group_id = ?",
+                      (event_id, group["id"])).fetchone()
+    if not ev:
+        conn.close()
+        abort(404)
+    base = f"{ev['slug']}-kopi"
+    nslug, i = base, 2
+    while conn.execute("SELECT 1 FROM events WHERE group_id = ? AND slug = ?",
+                       (group["id"], nslug)).fetchone():
+        nslug, i = f"{base}-{i}", i + 1
+    vals = (f"{ev['name']} (kopi)", nslug, ev["event_date"], ev["start_time"], ev["end_time"],
+            ev["description"], ev["expected_count"], ev["signup_deadline"],
+            ev["notify_new_signup"], ev["notify_change"], ev["notify_receipt"],
+            ev["notify_reminder"], ev["csv_after_deadline"], ev["capacity_limit"],
+            ev["notify_deadline"], ev["waitlist_enabled"], ev["allow_guests"],
+            ev["notify_event_reminder"])
+    cur = conn.execute(EVENT_INSERT_SQL, vals + (group["id"], db.now_iso()))
+    new_id = cur.lastrowid
+    _set_hidden_fields(conn, new_id, list(hidden_field_ids(conn, ev["id"])))
+    conn.commit()
+    db.add_log(conn, "event", f"Event '{ev['name']}' kopieret", group["slug"])
+    conn.close()
+    flash("Kopi oprettet — ret dato og navn her.", "ok")
+    return redirect(url_for("admin_event_edit", slug=slug, event_id=new_id))
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/list", methods=["GET", "POST"])
 def admin_event_list(slug, event_id):
     group = get_group(slug)
     if not group:
@@ -763,14 +942,24 @@ def admin_event_list(slug, event_id):
     if not ev:
         conn.close()
         abort(404)
+    if request.method == "POST" and request.form.get("action") == "attendance":
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM registrations WHERE event_id = ?", (ev["id"],)).fetchall()]
+        for rid in ids:
+            conn.execute("UPDATE registrations SET attended = ? WHERE id = ?",
+                         (1 if request.form.get(f"att_{rid}") else 0, rid))
+        conn.commit()
+        flash("Fremmøde gemt.", "ok")
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
     attending = count_attending(conn, group["id"], ev["id"])
     decline_ids = [f["id"] for f in fields if f["is_decline"]]
+    attended_count = sum(1 for r in regs if r["attended"])
     conn.close()
     return render_template("admin/event_list.html", group=group, ev=ev,
                            fields=fields, regs=regs, count=attending,
-                           total=len(regs), decline_ids=decline_ids)
+                           total=len(regs), decline_ids=decline_ids,
+                           state=event_state(ev), attended_count=attended_count)
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/export.csv")
@@ -800,19 +989,111 @@ def build_csv(conn, group, ev):
     buf = io.StringIO()
     buf.write("﻿")  # BOM så Excel viser æøå korrekt
     writer = csv.writer(buf, delimiter=";")
-    writer.writerow(["Navn", "E-mail", "WhatsApp"] + [f["label"] for f in fields] + ["Tilmeldt"])
+    writer.writerow(["Navn", "E-mail", "WhatsApp", "Pladser", "Status", "Mødt op"]
+                    + [f["label"] for f in fields] + ["Tilmeldt"])
     for r in regs:
-        row = [r["name"], r["email"], r["phone"]]
+        status = "Venteliste" if r["waitlist"] else "Deltager"
+        row = [r["name"], r["email"], r["phone"], r["seats"], status,
+               "Ja" if r["attended"] else ""]
         row += [r["values"].get(f["id"], "") for f in fields]
         row.append(r["created_at"])
         writer.writerow(row)
     return buf.getvalue()
 
 
+# --------------------------------------------------------------------------- #
+# Kalender (iCal/.ics)
+# --------------------------------------------------------------------------- #
+def _ics_escape(text):
+    return (str(text or "").replace("\\", "\\\\").replace(";", r"\;")
+            .replace(",", r"\,").replace("\r\n", "\\n").replace("\n", "\\n"))
+
+
+def _ics_fold(line):
+    """iCal-linjer må højst være 75 oktetter; fold med mellemrum."""
+    out = []
+    while len(line.encode("utf-8")) > 73:
+        cut = 73
+        while len(line[:cut].encode("utf-8")) > 73:
+            cut -= 1
+        out.append(line[:cut])
+        line = " " + line[cut:]
+    out.append(line)
+    return "\r\n".join(out)
+
+
+def _to_utc(naive):
+    """Lokal (vægur-)tid -> UTC ud fra TZ. None hvis tidszone-data mangler."""
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(os.environ.get("TZ") or "Europe/Copenhagen")
+        return naive.replace(tzinfo=tz).astimezone(ZoneInfo("UTC"))
+    except Exception:
+        return None
+
+
+def build_ics(group, events, base_url=""):
+    """Byg en iCal-fil med de givne events."""
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Tilmeld//DA//",
+           "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+           f"X-WR-CALNAME:{_ics_escape(group['name'])}"]
+    for ev in events:
+        try:
+            day = datetime.strptime(ev["event_date"], "%Y-%m-%d")
+        except (ValueError, TypeError):
+            continue
+        out.append("BEGIN:VEVENT")
+        out.append(f"UID:tilmeld-{group['slug']}-{ev['id']}@tilmeld")
+        out.append(f"DTSTAMP:{stamp}")
+        if ev["start_time"]:
+            start = datetime.strptime(f"{ev['event_date']} {ev['start_time']}",
+                                      "%Y-%m-%d %H:%M")
+            if ev["end_time"]:
+                end = datetime.strptime(f"{ev['event_date']} {ev['end_time']}",
+                                        "%Y-%m-%d %H:%M")
+                if end <= start:
+                    end = start + timedelta(hours=2)
+            else:
+                end = start + timedelta(hours=2)
+            su, eu = _to_utc(start), _to_utc(end)
+            if su and eu:
+                out.append("DTSTART:" + su.strftime("%Y%m%dT%H%M%SZ"))
+                out.append("DTEND:" + eu.strftime("%Y%m%dT%H%M%SZ"))
+            else:  # fallback: flydende lokal tid
+                out.append("DTSTART:" + start.strftime("%Y%m%dT%H%M%S"))
+                out.append("DTEND:" + end.strftime("%Y%m%dT%H%M%S"))
+        else:  # heldagsevent
+            out.append("DTSTART;VALUE=DATE:" + day.strftime("%Y%m%d"))
+            out.append("DTEND;VALUE=DATE:" + (day + timedelta(days=1)).strftime("%Y%m%d"))
+        out.append(f"SUMMARY:{_ics_escape(ev['name'])}")
+        desc = ev["description"] or ""
+        if base_url:
+            link = f"{base_url.rstrip('/')}/{group['slug']}/{ev['slug']}"
+            out.append(f"URL:{link}")
+            desc = (desc + "\n\n" + link).strip()
+        if desc:
+            out.append(f"DESCRIPTION:{_ics_escape(desc)}")
+        out.append("END:VEVENT")
+    out.append("END:VCALENDAR")
+    return "\r\n".join(_ics_fold(line) for line in out) + "\r\n"
+
+
+def ensure_calendar_token(conn, group):
+    """Sørg for at gruppen har en kalender-token (til .ics-abonnement)."""
+    if group["calendar_token"]:
+        return group["calendar_token"]
+    token = secrets.token_urlsafe(16)
+    conn.execute("UPDATE groups SET calendar_token = ? WHERE id = ?", (token, group["id"]))
+    conn.commit()
+    return token
+
+
 def _registrations_with_values(conn, event_id, fields):
+    # Deltagere først, derefter ventelisten (i den rækkefølge de skrev sig på)
     regs = conn.execute(
-        "SELECT * FROM registrations WHERE event_id = ? ORDER BY created_at", (event_id,)
-    ).fetchall()
+        "SELECT * FROM registrations WHERE event_id = ? ORDER BY waitlist, created_at, id",
+        (event_id,)).fetchall()
     out = []
     for r in regs:
         vals = conn.execute(
@@ -821,6 +1102,8 @@ def _registrations_with_values(conn, event_id, fields):
         out.append({
             "id": r["id"], "name": r["name"], "email": r["email"], "phone": r["phone"],
             "user_id": r["user_id"], "created_at": r["created_at"],
+            "seats": max(1, r["seats"] or 1), "waitlist": r["waitlist"],
+            "attended": r["attended"],
             "values": {v["field_id"]: v["value"] for v in vals},
         })
     return out
@@ -879,6 +1162,47 @@ def user_logout(slug):
     return redirect(url_for("user_login", slug=slug))
 
 
+@app.route("/<slug>/kalender.ics")
+def group_calendar_ics(slug):
+    """Abonnements-feed til Google/Outlook/Apple Kalender. Adgang via hemmelig token
+    (kalender-apps sender ikke cookies) — eller almindelig login i browseren."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    token = request.args.get("token", "")
+    if not (group["calendar_token"] and token == group["calendar_token"]):
+        if not user_has_access(group):
+            abort(404)
+    conn = db.get_db()
+    since = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
+    events = conn.execute(
+        "SELECT * FROM events WHERE group_id = ? AND event_date >= ? ORDER BY event_date",
+        (group["id"], since)).fetchall()
+    base = db.get_settings(conn)["base_url"]
+    conn.close()
+    return Response(build_ics(group, events, base), mimetype="text/calendar; charset=utf-8")
+
+
+@app.route("/<slug>/<event_slug>/event.ics")
+def user_event_ics(slug, event_slug):
+    """Enkelt event som .ics ("Tilføj til kalender")."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    ev = conn.execute("SELECT * FROM events WHERE group_id = ? AND slug = ?",
+                      (group["id"], event_slug)).fetchone()
+    base = db.get_settings(conn)["base_url"]
+    conn.close()
+    if not ev:
+        abort(404)
+    return Response(
+        build_ics(group, [ev], base), mimetype="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={ev['slug']}.ics"})
+
+
 @app.route("/<slug>")
 def user_home(slug):
     group = get_group(slug)
@@ -895,8 +1219,10 @@ def user_home(slug):
             continue  # afsluttede events skjules for brugere
         rows.append({"ev": ev, "state": state,
                      "count": count_attending(conn, group["id"], ev["id"])})
+    cal_url = url_for("group_calendar_ics", slug=group["slug"],
+                      token=ensure_calendar_token(conn, group), _external=True)
     conn.close()
-    return render_template("user/home.html", group=group, events=rows,
+    return render_template("user/home.html", group=group, events=rows, cal_url=cal_url,
                            accounts=bool(group["user_accounts_enabled"]),
                            is_admin=bool(session.get(f"admin_{group['slug']}")))
 
@@ -1051,18 +1377,39 @@ def _handle_registration(slug, event_slug, reg_id):
     declining = any(
         f["is_decline"] and request.form.get(f"field_{f['id']}") for f in fields)
 
-    # Kapacitetsgrænse: afvis hvis der ikke er plads (decline-tilmeldinger tæller ikke med)
-    if ev["capacity_limit"] and ev["expected_count"] and not declining:
+    # Antal pladser (dig + gæster)
+    seats = 1
+    if ev["allow_guests"]:
+        try:
+            seats = max(1, min(50, int(request.form.get("seats") or 1)))
+        except ValueError:
+            seats = 1
+    if declining:
+        seats = 1  # afbud optager ingen plads alligevel
+
+    # Er tilmeldingen allerede på venteliste? (bevares ved redigering)
+    waitlist_flag = 0
+    if reg_id:
+        exw = conn.execute("SELECT waitlist FROM registrations WHERE id = ?",
+                           (reg_id,)).fetchone()
+        waitlist_flag = exw["waitlist"] if exw else 0
+
+    # Kapacitetsgrænse: afbud og venteliste optager ikke pladser
+    if (ev["capacity_limit"] and ev["expected_count"] and not declining
+            and not waitlist_flag):
         taken = count_attending(conn, group["id"], ev["id"], exclude_reg_id=reg_id)
-        if taken >= ev["expected_count"]:
-            conn.close()
-            if reg_id:
-                flash("Listen er fyldt op — du kan ikke fjerne fluebenet ved "
-                      "'deltager ikke', da der ikke er plads til flere.", "error")
-                return redirect(url_for("user_edit", slug=slug, event_slug=event_slug,
-                                        reg_id=reg_id))
-            flash("Der er desværre ikke plads til flere på dette event.", "error")
-            return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
+        if taken + seats > ev["expected_count"]:
+            if not reg_id and ev["waitlist_enabled"]:
+                waitlist_flag = 1  # ny tilmelding ryger på venteliste
+            else:
+                conn.close()
+                if reg_id:
+                    flash("Listen er fyldt op — der er ikke plads til ændringen "
+                          "(fx at fjerne 'deltager ikke' eller tilføje gæster).", "error")
+                    return redirect(url_for("user_edit", slug=slug, event_slug=event_slug,
+                                            reg_id=reg_id))
+                flash("Der er desværre ikke plads til flere på dette event.", "error")
+                return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
 
     # Læs og valider punkter
     field_values = {}
@@ -1083,16 +1430,18 @@ def _handle_registration(slug, event_slug, reg_id):
 
     if reg_id:
         conn.execute(
-            "UPDATE registrations SET name=?, email=?, phone=?, user_id=?, updated_at=? WHERE id=?",
-            (name, email, phone, owner_id, db.now_iso(), reg_id))
+            "UPDATE registrations SET name=?, email=?, phone=?, user_id=?, seats=?, "
+            "waitlist=?, updated_at=? WHERE id=?",
+            (name, email, phone, owner_id, seats, waitlist_flag, db.now_iso(), reg_id))
         conn.execute("DELETE FROM registration_values WHERE registration_id = ?", (reg_id,))
         rid = reg_id
         is_new = False
     else:
         cur = conn.execute(
-            "INSERT INTO registrations (event_id, name, email, phone, user_id, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (ev["id"], name, email, phone, owner_id, db.now_iso(), db.now_iso()))
+            "INSERT INTO registrations (event_id, name, email, phone, user_id, seats, "
+            "waitlist, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (ev["id"], name, email, phone, owner_id, seats, waitlist_flag,
+             db.now_iso(), db.now_iso()))
         rid = cur.lastrowid
         is_new = True
     for fid, val in field_values.items():
@@ -1101,7 +1450,7 @@ def _handle_registration(slug, event_slug, reg_id):
             (rid, fid, val))
     conn.commit()
     if is_new:
-        suffix = " (afbud)" if declining else ""
+        suffix = " (afbud)" if declining else (" (venteliste)" if waitlist_flag else "")
         db.add_log(conn, "signup", f"{name} tilmeldt {ev['name']}{suffix}", group["slug"])
     else:
         db.add_log(conn, "signup", f"{name} ændrede tilmelding til {ev['name']}", group["slug"])
@@ -1115,11 +1464,20 @@ def _handle_registration(slug, event_slug, reg_id):
     if not is_new and ev["notify_change"]:
         subj, body = notifications.render_message(conn, group, "change", ctx)
         notifications.notify_admin(conn, group, subj, body)
-    if is_new and ev["notify_receipt"]:
+    if is_new and ev["notify_receipt"] and not waitlist_flag:
         subj, body = notifications.render_message(conn, group, "receipt", ctx)
         notifications.notify_participant(conn, group, email, phone, subj, body)
+
+    if waitlist_flag:
+        pos = waitlist_position(conn, ev["id"], rid)
+        flash(f"Der er fyldt op — du er skrevet på ventelisten som nr. {pos}. "
+              "Du får besked hvis der bliver en plads.", "ok")
+    else:
+        flash("Tilmelding gemt." if is_new else "Tilmelding opdateret.", "ok")
+
+    # Blev der frigjort pladser (fx afbud eller færre gæster)? Ryk ventelisten op.
+    notify_promoted(conn, group, ev, promote_waitlist(conn, group, ev))
     conn.close()
-    flash("Tilmelding gemt." if is_new else "Tilmelding opdateret.", "ok")
     return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
 
 
@@ -1146,6 +1504,8 @@ def user_delete(slug, event_slug, reg_id):
         if reg:
             db.add_log(conn, "signup", f"{reg['name']} fjernet fra {ev['name']}", group["slug"])
         flash("Tilmelding fjernet.", "ok")
+        # Der blev en plads ledig — ryk ventelisten op
+        notify_promoted(conn, group, ev, promote_waitlist(conn, group, ev))
     else:
         flash("Kan ikke ændre en lukket tilmelding.", "error")
     conn.close()
@@ -1180,8 +1540,88 @@ def user_profile(slug):
                 flash("Adgangskode ændret.", "ok")
         conn.commit()
     u = get_user(conn, uid)
+    # "Mine tilmeldinger": kommende events på tværs af ALLE brugerens grupper
+    mine = conn.execute(
+        "SELECT r.seats, r.waitlist, e.name AS ev_name, e.slug AS ev_slug, "
+        "e.event_date, e.start_time, g.slug AS g_slug, g.name AS g_name "
+        "FROM registrations r JOIN events e ON e.id = r.event_id "
+        "JOIN groups g ON g.id = e.group_id "
+        "JOIN user_groups ug ON ug.group_id = g.id AND ug.user_id = r.user_id "
+        "WHERE r.user_id = ? AND e.event_date >= ? ORDER BY e.event_date, e.start_time",
+        (uid, datetime.now().strftime("%Y-%m-%d"))).fetchall()
     conn.close()
-    return render_template("user/profile.html", group=group, u=u)
+    return render_template("user/profile.html", group=group, u=u, mine=mine)
+
+
+@app.route("/<slug>/glemt", methods=["GET", "POST"])
+def user_forgot(slug):
+    """Glemt adgangskode: send nulstillings-link på mail (kræver SMTP + mail på profilen)."""
+    group = get_group(slug)
+    if not group or not group["user_accounts_enabled"]:
+        abort(404)
+    if request.method == "POST":
+        ident = request.form.get("ident", "").strip()
+        conn = db.get_db()
+        u = conn.execute(
+            "SELECT u.* FROM users u JOIN user_groups ug ON ug.user_id = u.id "
+            "WHERE ug.group_id = ? AND (u.username = ? OR u.email = ?)",
+            (group["id"], ident, ident)).fetchone()
+        settings = db.get_settings(conn)
+        if u and u["email"] and settings["smtp_host"]:
+            token = secrets.token_urlsafe(24)
+            expires = (datetime.now() + timedelta(hours=1)).isoformat(timespec="seconds")
+            conn.execute("UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?",
+                         (token, expires, u["id"]))
+            conn.commit()
+            base = (settings["base_url"] or "").rstrip("/")
+            link = (f"{base}{url_for('user_reset', slug=slug, token=token)}" if base
+                    else url_for("user_reset", slug=slug, token=token, _external=True))
+            notifications.send_email(
+                settings, u["email"], f"Nulstil adgangskode – {group['name']}",
+                f"Hej {u['name'] or u['username']}.\n\nKlik her for at vælge en ny "
+                f"adgangskode (linket udløber om 1 time):\n{link}\n\n"
+                "Har du ikke bedt om det, kan du ignorere denne mail.")
+            db.add_log(conn, "user", f"Nulstillings-link sendt til {u['username']}",
+                       group["slug"])
+        conn.close()
+        # Afslør ikke om brugeren findes
+        flash("Hvis kontoen findes og har en e-mail, er der sendt et nulstillings-link.", "ok")
+        return redirect(url_for("user_login", slug=slug))
+    return render_template("user/forgot.html", group=group)
+
+
+@app.route("/<slug>/nulstil/<token>", methods=["GET", "POST"])
+def user_reset(slug, token):
+    group = get_group(slug)
+    if not group or not group["user_accounts_enabled"]:
+        abort(404)
+    conn = db.get_db()
+    u = conn.execute("SELECT * FROM users WHERE reset_token = ? AND reset_token != ''",
+                     (token,)).fetchone()
+    valid = False
+    if u and u["reset_expires"]:
+        try:
+            valid = datetime.now() <= datetime.fromisoformat(u["reset_expires"])
+        except ValueError:
+            valid = False
+    if not valid:
+        conn.close()
+        flash("Linket er udløbet eller ugyldigt. Prøv igen.", "error")
+        return redirect(url_for("user_forgot", slug=slug))
+    if request.method == "POST":
+        newpw = request.form.get("new_password", "")
+        if len(newpw) < 4:
+            flash("Adgangskoden skal være mindst 4 tegn.", "error")
+        else:
+            conn.execute(
+                "UPDATE users SET password_hash = ?, reset_token = '', reset_expires = '' "
+                "WHERE id = ?", (auth.hash_password(newpw), u["id"]))
+            conn.commit()
+            conn.close()
+            flash("Adgangskoden er ændret — log ind med den nye.", "ok")
+            return redirect(url_for("user_login", slug=slug))
+    conn.close()
+    return render_template("user/reset.html", group=group, token=token)
 
 
 # --------------------------------------------------------------------------- #

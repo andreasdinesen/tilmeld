@@ -27,4 +27,26 @@
     <button type="submit">Skift adgangskode</button>
   </form>
 </div>
+
+<div class="card narrow">
+  <h2>Mine tilmeldinger</h2>
+  <p class="muted small">Kommende events du er tilmeldt — på tværs af dine grupper.</p>
+  {% if not mine %}
+    <p>Du er ikke tilmeldt nogen kommende events.</p>
+  {% else %}
+    {% for m in mine %}
+      <a class="event-card link {{ 'state-locked' if m.waitlist }}"
+         href="{{ url_for('user_event', slug=m.g_slug, event_slug=m.ev_slug) }}">
+        <div>
+          <strong>{{ m.ev_name }}</strong>
+          {% if m.waitlist %}<span class="tag locked">Venteliste</span>{% endif %}
+          <div class="muted small">
+            {{ m.event_date|d }}{% if m.start_time %} kl. {{ m.start_time }}{% endif %}
+            · {{ m.g_name }}{% if m.seats > 1 %} · {{ m.seats }} pladser{% endif %}
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  {% endif %}
+</div>
 {% endblock %}

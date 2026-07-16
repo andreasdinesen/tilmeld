@@ -20,6 +20,9 @@
   <div class="count big">{{ count }} / {{ ev.expected_count }} deltagere
     {% if full %}<span class="tag locked">FULDT</span>{% endif %}</div>
   {% if ev.description %}<div class="description">{{ ev.description | md }}</div>{% endif %}
+  <p style="margin-top:12px">
+    <a class="btn" href="{{ url_for('user_event_ics', slug=group.slug, event_slug=ev.slug) }}">📅 Tilføj til kalender</a>
+  </p>
 </div>
 
 <div class="card">
@@ -28,11 +31,17 @@
   <table>
     <thead><tr><th>Navn</th>{% for item in fields %}<th>{{ item.f.label }}</th>{% endfor %}<th></th></tr></thead>
     <tbody>
+      {% set ns_wl = namespace(shown=false) %}
       {% for r in regs %}
+      {% if r.waitlist and not ns_wl.shown %}
+        {% set ns_wl.shown = true %}
+        <tr><td colspan="{{ fields|length + 2 }}" class="muted small"
+                style="padding-top:14px"><strong>Venteliste</strong></td></tr>
+      {% endif %}
       {% set ns = namespace(declined=false) %}
       {% for did in decline_ids %}{% if r['values'].get(did) == 'Ja' %}{% set ns.declined = true %}{% endif %}{% endfor %}
       <tr class="{{ 'declined' if ns.declined }}">
-        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}</td>
+        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}{% if r.seats > 1 %} <span class="muted small">(+{{ r.seats - 1 }})</span>{% endif %}</td>
         {% for item in fields %}<td>{{ r['values'].get(item.f.id, '') }}</td>{% endfor %}
         <td class="actions">
           {% if state == 'open' and r.can_edit %}
@@ -53,7 +62,10 @@
 {% if show_signup %}
 <div class="card">
   <h2>{{ 'Opret tilmelding' if is_admin and accounts else 'Tilmeld dig' }}</h2>
-  {% if full %}
+  {% if full and ev.waitlist_enabled %}
+    <p class="flash">Der er fyldt op — tilmelder du dig nu, kommer du på <strong>ventelisten</strong>
+       og får besked, hvis der bliver en plads.</p>
+  {% elif full %}
     <p class="flash error">Der er ikke plads til flere — du kan kun melde afbud ("deltager ikke").</p>
   {% endif %}
   {% if decline_ids %}<p class="muted small">Sæt flueben ved "deltager ikke" (efter du har skrevet dit navn) for at melde afbud med det samme.</p>{% endif %}

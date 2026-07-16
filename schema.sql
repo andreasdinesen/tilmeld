@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS groups (
     login_text          TEXT DEFAULT '',           -- tekst vist på bruger-login-skærmen
     templates_enabled   INTEGER DEFAULT 0,         -- master tillader admin at redigere mail-skabeloner
     user_accounts_enabled INTEGER DEFAULT 0,       -- individuelle bruger-konti (login m. brugernavn)
+    calendar_token      TEXT DEFAULT '',           -- hemmelig token til .ics-abonnement
     created_at          TEXT NOT NULL
 );
 
@@ -43,6 +44,8 @@ CREATE TABLE IF NOT EXISTS users (
     name                TEXT DEFAULT '',           -- fulde navn (bruges automatisk ved tilmelding)
     email               TEXT DEFAULT '',
     whatsapp            TEXT DEFAULT '',
+    reset_token         TEXT DEFAULT '',           -- "glemt adgangskode"-token
+    reset_expires       TEXT DEFAULT '',
     created_at          TEXT NOT NULL
 );
 
@@ -94,6 +97,10 @@ CREATE TABLE IF NOT EXISTS events (
     capacity_limit      INTEGER DEFAULT 0,         -- hård grænse: ingen tilmelding ud over forventet antal
     notify_deadline     INTEGER DEFAULT 0,         -- besked til admin (m. link) når fristen er nået
     deadline_sent       INTEGER DEFAULT 0,
+    waitlist_enabled    INTEGER DEFAULT 0,         -- venteliste når kapaciteten er fyldt
+    allow_guests        INTEGER DEFAULT 0,         -- tilmelding kan omfatte flere pladser (+1)
+    notify_event_reminder INTEGER DEFAULT 0,       -- påmindelse 24t før selve eventet
+    event_reminder_sent INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL,
     UNIQUE (group_id, slug)
 );
@@ -105,6 +112,9 @@ CREATE TABLE IF NOT EXISTS registrations (
     email               TEXT DEFAULT '',
     phone               TEXT DEFAULT '',
     user_id             INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,  -- ejer (individuel bruger)
+    seats               INTEGER DEFAULT 1,         -- antal pladser (dig + gæster)
+    waitlist            INTEGER DEFAULT 0,         -- 1 = står på venteliste
+    attended            INTEGER DEFAULT 0,         -- fremmøde markeret af admin
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL
 );
