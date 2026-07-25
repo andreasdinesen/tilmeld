@@ -79,6 +79,10 @@ def init_db() -> None:
         conn.execute("UPDATE settings SET secret_key = ? WHERE id = 1",
                      (os.environ.get("SECRET_KEY") or secrets.token_hex(32),))
         conn.commit()
+
+    # Peg opdaterings-tjekket på det rigtige repo hvis feltet er tomt
+    conn.execute("UPDATE settings SET github_repo = 'andreasdinesen/tilmeld' "
+                 "WHERE id = 1 AND (github_repo IS NULL OR github_repo = '')")
     conn.commit()
     conn.close()
 

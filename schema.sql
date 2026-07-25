@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS settings (
     whatsapp_api_key    TEXT DEFAULT '',             -- API-nøgle (sendes som Bearer-token)
     base_url            TEXT DEFAULT '',             -- offentlig URL (til links i mails)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
-    github_repo         TEXT DEFAULT '',             -- "ejer/repo" til opdaterings-tjek
+    github_repo         TEXT DEFAULT 'andreasdinesen/tilmeld',  -- "ejer/repo" til opdaterings-tjek
     update_branch       TEXT DEFAULT 'main'
 );
 

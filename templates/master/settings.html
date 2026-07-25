@@ -60,12 +60,12 @@
 
     <h2>Links i mails</h2>
     <label>Offentlig URL (bruges til links i mails, fx til deltagerlisten)
-      <input type="text" name="base_url" value="{{ s.base_url }}" placeholder="https://tilmeld.nolimit.dk">
+      <input type="text" name="base_url" value="{{ s.base_url }}" placeholder="https://tilmeld.eksempel.dk">
     </label>
 
     <h2>Opdatering (GitHub)</h2>
     <label>GitHub-repo (ejer/repo) til versions-tjek
-      <input type="text" name="github_repo" value="{{ s.github_repo }}" placeholder="fx kristianwind/tilmeld">
+      <input type="text" name="github_repo" value="{{ s.github_repo }}" placeholder="andreasdinesen/tilmeld">
     </label>
     <label>Branch <input type="text" name="update_branch" value="{{ s.update_branch }}"></label>
     <p class="muted small">Bruges på <a href="{{ url_for('master_system') }}">System-siden</a> til at tjekke og hente nye versioner.</p>
