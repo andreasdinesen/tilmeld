@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister og CSV-eksport."
   author: "andreasdinesen"
-  version: 5
+  version: 6
   icon: "app"
 
   docker:
@@ -21,10 +21,14 @@ gameskill:
 
   variables:
     - key: MASTER_PASSWORD
-      name: "Master-admin password (sættes ved første opstart)"
+      name: "Master-password (KUN ved allerførste opstart — skift derefter i appen under master → Opsætning)"
       type: string
       default: "skift-mig"
       required: true
+    - key: MASTER_PASSWORD_RESET
+      name: "Nulstil master-password: skriv et nyt her, genstart, log ind — og TØM feltet igen"
+      type: string
+      default: ""
     - key: TZ
       name: "Tidszone (bruges til datoer og frister)"
       type: string

@@ -45,6 +45,19 @@ def init_db() -> None:
             print(" Log ind på /master og skift det med det samme.")
             print("=" * 64)
 
+    # Nulstil master-password hvis MASTER_PASSWORD_RESET er sat (engangs-redning når man
+    # har glemt/rodet med koden). Sæt variablen i runen, genstart, log ind — og TØM den
+    # bagefter, så den ikke nulstiller igen ved næste genstart.
+    reset_pw = (os.environ.get("MASTER_PASSWORD_RESET") or "").strip()
+    if reset_pw:
+        conn.execute("UPDATE settings SET master_password_hash = ? WHERE id = 1",
+                     (auth.hash_password(reset_pw),))
+        conn.commit()
+        print("=" * 64)
+        print(" MASTER_PASSWORD_RESET brugt: master-passwordet er nulstillet.")
+        print(" TØM MASTER_PASSWORD_RESET i opsætningen igen for at undgå gentagelse.")
+        print("=" * 64, flush=True)
+
     # Reparér en tom secret_key (fx databaser oprettet mens SECRET_KEY="" blev sendt
     # som env) — ellers fejler login med 500, fordi Flask-sessioner kræver en nøgle.
     cur = conn.execute("SELECT secret_key FROM settings WHERE id = 1").fetchone()
