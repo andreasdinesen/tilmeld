@@ -280,6 +280,14 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    # Servér vores kalender-ikon på standard-stien, så browsere (og evt. en proxy
+    # der ellers viser et andet ikon) får det rigtige favicon.
+    return send_file(os.path.join(app.static_folder, "favicon.svg"),
+                     mimetype="image/svg+xml")
+
+
 # --------------------------------------------------------------------------- #
 # Master-admin
 # --------------------------------------------------------------------------- #
