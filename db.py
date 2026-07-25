@@ -45,17 +45,31 @@ def init_db() -> None:
             print(" Log ind på /master og skift det med det samme.")
             print("=" * 64)
 
-    # Nulstil master-password hvis MASTER_PASSWORD_RESET er sat (engangs-redning når man
-    # har glemt/rodet med koden). Sæt variablen i runen, genstart, log ind — og TØM den
-    # bagefter, så den ikke nulstiller igen ved næste genstart.
+    # Nulstil master-password — to veje (engangs-redning når man har glemt koden):
+    #  A) env-variabel MASTER_PASSWORD_RESET (kræver Settings-fanen i runen), eller
+    #  B) en fil ved navn RESET_MASTER_PASSWORD i data-mappen med det nye password som
+    #     indhold (opret den via yggdrasils "Files"-fane). Filen slettes automatisk bagefter.
     reset_pw = (os.environ.get("MASTER_PASSWORD_RESET") or "").strip()
+    reset_file = os.path.join(DATA_DIR, "RESET_MASTER_PASSWORD")
+    if not reset_pw and os.path.exists(reset_file):
+        try:
+            with open(reset_file, encoding="utf-8") as f:
+                reset_pw = f.read().strip()
+        except OSError:
+            reset_pw = ""
     if reset_pw:
         conn.execute("UPDATE settings SET master_password_hash = ? WHERE id = 1",
                      (auth.hash_password(reset_pw),))
         conn.commit()
+        # Fjern kilden så nulstillingen ikke gentages ved næste genstart
+        try:
+            if os.path.exists(reset_file):
+                os.remove(reset_file)
+        except OSError:
+            pass
         print("=" * 64)
-        print(" MASTER_PASSWORD_RESET brugt: master-passwordet er nulstillet.")
-        print(" TØM MASTER_PASSWORD_RESET i opsætningen igen for at undgå gentagelse.")
+        print(" Master-passwordet er nulstillet.")
+        print(" Husk at TØMME MASTER_PASSWORD_RESET (eller filen er allerede slettet).")
         print("=" * 64, flush=True)
 
     # Reparér en tom secret_key (fx databaser oprettet mens SECRET_KEY="" blev sendt
