@@ -2,3 +2,4 @@ Flask>=2.3,<4
 waitress>=2.1
 Markdown>=3.5
 bleach>=6.1
+webauthn>=2.0,<3          # passkeys (WebAuthn) — trækker cryptography ind

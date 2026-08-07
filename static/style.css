@@ -1,151 +1,394 @@
+/* Tilmeld — fælles design-system (samme tokens som Bogreolen, Kokkeri, Beanledger, Muldbog).
+   Mørke variabler står BEVIDST to steder: i [data-theme="dark"] (aktivt valg) og i
+   prefers-color-scheme-blokken (Auto). Ret altid begge. */
+
 :root {
-  --bg: #f4f6f8;
-  --card: #ffffff;
-  --ink: #1f2933;
-  --muted: #6b7280;
-  --line: #e2e8f0;
-  --primary: #2563eb;
-  --primary-ink: #ffffff;
-  --danger: #dc2626;
-  --locked-bg: #fff7ed;
-  --locked-line: #f59e0b;
-  --finished-bg: #f1f5f9;
+  color-scheme: light;
+  --bg: #f9f9f7;
+  --card: #fcfcfb;
+  --sunken: #f1f0ec;
+  --ink: #0b0b0b;
+  --ink2: #52514e;
+  --muted: #898781;
+  --line: #e1e0d9;
+  --hairline: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3eefb;
+  --accent-deep: #1c5cab;
+  --good: #0ca30c;
+  --good-soft: #e2f3e2;
+  --good-ink: #006300;
+  --warn-soft: #fdf3dc;
+  --warn-ink: #7a5200;
+  --warn-line: #e0a020;
+  --danger: #d03b3b;
+  --danger-soft: #fdecec;
+  --danger-ink: #9b1c1c;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.05);
+  --cat-group-soft: #e8e8fb;   --cat-group-ink: #4338ca;
+  --cat-event-soft: #e3eefb;   --cat-event-ink: #1c5cab;
+  --cat-signup-soft: #ddf2ef;  --cat-signup-ink: #0f6b62;
+  --cat-mail-soft: #fdf3dc;    --cat-mail-ink: #7a5200;
+  --cat-whatsapp-soft: #e2f3e2; --cat-whatsapp-ink: #006300;
+  --cat-user-soft: #f2e6fb;    --cat-user-ink: #6b21a8;
 }
-* { box-sizing: border-box; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --card: #1a1a19;
+  --sunken: #141413;
+  --ink: #ffffff;
+  --ink2: #c3c2b7;
+  --muted: #898781;
+  --line: #2c2c2a;
+  --hairline: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --accent-ink: #ffffff;
+  --accent-soft: #16283d;
+  --accent-deep: #86b6ef;
+  --good: #0ca30c;
+  --good-soft: #12290f;
+  --good-ink: #4fc44f;
+  --warn-soft: #2e2410;
+  --warn-ink: #e5b95c;
+  --warn-line: #8a6b1f;
+  --danger: #e66767;
+  --danger-soft: #331616;
+  --danger-ink: #f09a9a;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --cat-group-soft: #1e1e3d;   --cat-group-ink: #a5a4f0;
+  --cat-event-soft: #16283d;   --cat-event-ink: #86b6ef;
+  --cat-signup-soft: #0f2b28;  --cat-signup-ink: #5ec9bd;
+  --cat-mail-soft: #2e2410;    --cat-mail-ink: #e5b95c;
+  --cat-whatsapp-soft: #12290f; --cat-whatsapp-ink: #4fc44f;
+  --cat-user-soft: #2a1638;    --cat-user-ink: #cb9bf0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0d0d0d;
+    --card: #1a1a19;
+    --sunken: #141413;
+    --ink: #ffffff;
+    --ink2: #c3c2b7;
+    --muted: #898781;
+    --line: #2c2c2a;
+    --hairline: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-ink: #ffffff;
+    --accent-soft: #16283d;
+    --accent-deep: #86b6ef;
+    --good: #0ca30c;
+    --good-soft: #12290f;
+    --good-ink: #4fc44f;
+    --warn-soft: #2e2410;
+    --warn-ink: #e5b95c;
+    --warn-line: #8a6b1f;
+    --danger: #e66767;
+    --danger-soft: #331616;
+    --danger-ink: #f09a9a;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --cat-group-soft: #1e1e3d;   --cat-group-ink: #a5a4f0;
+    --cat-event-soft: #16283d;   --cat-event-ink: #86b6ef;
+    --cat-signup-soft: #0f2b28;  --cat-signup-ink: #5ec9bd;
+    --cat-mail-soft: #2e2410;    --cat-mail-ink: #e5b95c;
+    --cat-whatsapp-soft: #12290f; --cat-whatsapp-ink: #4fc44f;
+    --cat-user-soft: #2a1638;    --cat-user-ink: #cb9bf0;
+  }
+}
+
+/* --- Basis ------------------------------------------------------------- */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }   /* ellers vinder display:flex over hidden */
+html, body { margin: 0; padding: 0; }
 body {
-  margin: 0; background: var(--bg); color: var(--ink);
-  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px; line-height: 1.45;
+  overflow-wrap: break-word;   /* lange ubrudte ord må ikke kunne scrolle siden sidelæns */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
+h1 { margin: 0 0 4px; font-size: 1.35rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; margin: 1.3rem 0 0.5rem; }
+a { color: var(--accent); }
 .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
-.topbar { background: var(--ink); color: #fff; padding: 12px 0; margin-bottom: 24px; }
-.topbar .wrap { display: flex; justify-content: space-between; align-items: center; }
-.brand { font-weight: 700; }
-.topbar nav a { color: #cbd5e1; text-decoration: none; margin-left: 16px; }
-.topbar nav a:hover { color: #fff; }
+.muted { color: var(--muted); }
+.small { font-size: 0.84rem; }
+.nowrap { white-space: nowrap; }
+.inline { display: inline; }
+hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+code {
+  background: var(--accent-soft); color: var(--accent-deep);
+  padding: 1px 6px; border-radius: 6px; font-size: 0.9em;
+}
+
+/* --- Topbar + temavælger ----------------------------------------------- */
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--card); border-bottom: 1px solid var(--line);
+  padding: 10px 0 calc(10px); margin-bottom: 22px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+}
+.topbar .wrap { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+.brand { font-weight: 800; letter-spacing: -0.01em; }
+.topbar-right { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.topbar nav { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+.topbar nav a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+.topbar nav a:hover { text-decoration: underline; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); color: var(--ink2);
+  border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 0.8rem; font-weight: 600;
+  white-space: nowrap; cursor: pointer; margin: 0;
+}
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.themepick .lbl { margin-left: 4px; }
+
+/* --- Kort og rækker ----------------------------------------------------- */
 
 .card {
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-  padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  background: var(--card); border: 1px solid var(--hairline); border-radius: 14px;
+  padding: 18px 20px; margin-bottom: 14px; box-shadow: var(--shadow);
 }
 .card.narrow { max-width: 520px; }
-h1 { margin-top: 0; font-size: 1.5rem; }
-h2 { font-size: 1.15rem; margin-top: 1.5em; }
-.muted { color: var(--muted); }
-.small { font-size: .85rem; }
-code { background: #eef2ff; padding: 1px 6px; border-radius: 4px; font-size: .9em; }
+.card.state-locked { border-left: 5px solid var(--warn-line); background: var(--warn-soft); }
 
-label { display: block; margin: 12px 0; font-weight: 600; font-size: .92rem; }
-label.chk { font-weight: 400; display: flex; align-items: center; gap: 8px; }
-input, select, textarea {
-  display: block; width: 100%; margin-top: 4px; padding: 9px 11px;
-  border: 1px solid var(--line); border-radius: 8px; font: inherit; font-weight: 400;
+.row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
 }
+.row:last-child { border-bottom: none; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+/* knappernes margin-top hører til under en formular — i en handlingsrække giver den
+   kun høje tabelrækker, når knapperne ombrydes */
+.actions button, .actions .btn { margin-top: 0; }
+/* Små formularer i en handlingsrække (fx "vælg gruppe + tilføj"): felterne skal
+   stå ved siden af knappen, ikke fylde hele bredden som i en almindelig formular. */
+.actions .inline { display: flex; align-items: center; gap: 6px; }
+.actions input, .actions select { width: auto; }
+/* I en tabelcelle må .actions IKKE være en flex-container: så holder cellen op med
+   at være en table-cell, og dens nederste kant tegnes i knappernes højde i stedet
+   for rækkens. Inline-knapper + nowrap giver samme række uden at bryde tabellen —
+   og cellens min-bredde bliver begge knapper, så rækken ikke bliver dobbelt høj.
+   Tabellen ligger i .tablewrap og kan scrolles vandret på en smal skærm. */
+td.actions {
+  display: table-cell; text-align: right; white-space: nowrap; vertical-align: middle;
+}
+td.actions button, td.actions .btn { margin: 0 0 0 6px; }
+.page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.page-head h1 { margin: 0; }
+
+/* --- Formularer --------------------------------------------------------- */
+
+label { display: block; margin: 12px 0 4px; font-size: 0.82rem; color: var(--ink2); font-weight: 600; }
+label.chk { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 0.9rem; color: var(--ink); margin: 10px 0; }
+input, select, textarea {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; font: inherit; font-weight: 400;
+  color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+/* appearance:none fjerner også selectens pil — uden den ligner en dropdown et tekstfelt.
+   Grå (--muted) er læsbar på både lys og mørk baggrund. */
+select {
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23898781' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 11px 8px;
+}
+/* appearance:none ovenfor fjerner selve fluebenet — afkrydsning/radio skal have det native udseende
+   tilbage. flex:none, så en flex-forælder ikke klemmer dem sammen til 0 px. */
+input[type=checkbox], input[type=radio] {
+  -webkit-appearance: auto; appearance: auto;
+  width: auto; display: inline-block; flex: none;
+  padding: 0; border: none; background: none; border-radius: 0;
+  accent-color: var(--accent);
+}
+input[type=file] { -webkit-appearance: auto; appearance: auto; font-size: 0.88rem; }
 label.chk input { width: auto; margin: 0; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-button, .btn {
-  display: inline-block; padding: 9px 16px; border: 1px solid var(--line);
-  border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer;
-  font: inherit; text-decoration: none; margin-top: 8px;
-}
-button:hover, .btn:hover { background: #f8fafc; }
-.primary, button[type=submit] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
-.primary:hover, button[type=submit]:hover { filter: brightness(1.06); background: var(--primary); }
-.danger { color: var(--danger); border-color: #fecaca; background: #fff; }
-.danger:hover { background: #fef2f2; }
-.btn.small, button.small { padding: 4px 10px; font-size: .85rem; }
-.inline { display: inline; }
+/* --- Knapper ------------------------------------------------------------ */
 
-.row { display: flex; justify-content: space-between; align-items: center; gap: 12px;
-       padding: 12px 0; border-bottom: 1px solid var(--line); }
-.row:last-child { border-bottom: none; }
-.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+button, .btn {
+  display: inline-block; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer;
+  padding: 10px 16px; border-radius: 10px; margin-top: 8px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+}
+button:hover, .btn:hover { border-color: var(--muted); }
+.primary, button[type=submit] {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700;
+}
+.primary:hover, button[type=submit]:hover { filter: brightness(1.07); border-color: var(--accent); }
+.danger, button.danger { background: var(--card); color: var(--danger); border-color: var(--line); }
+.danger:hover, button.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+.btn.small, button.small { padding: 5px 11px; font-size: 0.82rem; border-radius: 8px; }
+button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.chip:hover { border-color: var(--muted); }
+.chip.on:hover { border-color: var(--accent); }
+
+/* --- Event-kort --------------------------------------------------------- */
 
 .event-card {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  border: 1px solid var(--line); border-left: 5px solid var(--primary);
-  border-radius: 10px; padding: 14px 16px; margin: 10px 0; background: #fff;
+  background: var(--card); border: 1px solid var(--hairline); border-left: 5px solid var(--accent);
+  border-radius: 12px; padding: 13px 16px; margin: 10px 0; box-shadow: var(--shadow);
 }
 .event-card.link { text-decoration: none; color: inherit; }
-.event-card.link:hover { background: #f8fafc; }
-.event-card.state-locked { border-left-color: var(--locked-line); background: var(--locked-bg); }
-.event-card.state-finished { border-left-color: #94a3b8; background: var(--finished-bg); }
-.card.state-locked { border-left: 6px solid var(--locked-line); background: var(--locked-bg); }
+.event-card.link:hover { border-color: var(--muted); border-left-color: var(--accent); }
+.event-card.state-locked { border-left-color: var(--warn-line); background: var(--warn-soft); }
+.event-card.state-locked.link:hover { border-left-color: var(--warn-line); }
+.event-card.state-finished { border-left-color: var(--muted); background: var(--sunken); }
+.event-card.state-finished.link:hover { border-left-color: var(--muted); }
+.count { color: var(--ink2); font-size: 0.9rem; white-space: nowrap; }
+.count.big { font-size: 1.05rem; font-weight: 600; margin: 10px 0; white-space: normal; }
 
-.count { color: var(--muted); }
-.count.big { font-size: 1.1rem; margin: 10px 0; }
+/* --- Mærkater ----------------------------------------------------------- */
+
+.tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.01em;
+  padding: 2px 9px; border-radius: 999px;
+  background: var(--sunken); color: var(--ink2);
+}
+.tag.locked { background: var(--warn-soft); color: var(--warn-ink); border: 1px solid var(--warn-line); }
+.tag.finished { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
+.tag.big { display: block; padding: 9px 13px; border-radius: 10px; margin: 10px 0; font-size: 0.86rem; }
+.tag.cat-group { background: var(--cat-group-soft); color: var(--cat-group-ink); }
+.tag.cat-event { background: var(--cat-event-soft); color: var(--cat-event-ink); }
+.tag.cat-signup { background: var(--cat-signup-soft); color: var(--cat-signup-ink); }
+.tag.cat-mail { background: var(--cat-mail-soft); color: var(--cat-mail-ink); }
+.tag.cat-whatsapp { background: var(--cat-whatsapp-soft); color: var(--cat-whatsapp-ink); }
+.tag.cat-user { background: var(--cat-user-soft); color: var(--cat-user-ink); }
+/* × inde i et mærkat: skal arve mærkatets tekstfarve, ikke være hvid */
+.tag .x { background: none; border: none; color: inherit; cursor: pointer; padding: 0 2px; margin: 0; font: inherit; }
+.tag .x:hover { border: none; opacity: 0.7; }
+
+/* --- Tabeller ----------------------------------------------------------- */
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 700; }
+tr:last-child td { border-bottom: none; }
+/* Deltagerlisten kan have mange kolonner (navn + e-mail + WhatsApp + ét pr. tilmeldings-
+   punkt + tilmeldt + mødt + handlinger). Med width:100% alene klemmes hver kolonne ned
+   til sit længste ord — ét ord pr. linje, og rækker på ti linjers højde.
+   min-width:max-content lader tabellen få den plads, indholdet kræver, og .tablewrap
+   scroller den vandret. Afvejningen er bevidst: en tabel med lang fritekst scroller et
+   stykke inde i kortet, men alt er læsbart. En min-bredde pr. celle blev prøvet i stedet
+   og gav den gamle sammenklemning tilbage på admin-listen.
+   max-width holder en enkelt lang bemærkning fra at trække tabellen i det uendelige. */
+.tablewrap { overflow-x: auto; }
+.tablewrap > table { min-width: max-content; }
+.tablewrap > table td { max-width: 22rem; }
+tr.declined { opacity: 0.6; }
+tr.declined td:first-child { text-decoration: line-through; }
+
+/* --- Beskeder ----------------------------------------------------------- */
+
+.flash { padding: 11px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 0.9rem; font-weight: 600; }
+.flash.ok { background: var(--good-soft); color: var(--good-ink); }
+.flash.error { background: var(--danger-soft); color: var(--danger-ink); }
+/* Statuslinje under en knap (fx passkey-flowet). Holder sin plads, så knappen ikke hopper. */
+.formnote { font-size: 0.86rem; color: var(--ink2); margin-top: 8px; min-height: 1.2em; }
+.formnote.bad { color: var(--danger); }
+/* "eller"-skillelinje mellem to login-veje */
+.divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.78rem; margin: 16px 0 10px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.pk-login span { margin-right: 6px; }   /* emoji klistrer ellers til teksten */
+ul.tight { margin: 0.4em 0; padding-left: 1.3em; }
+ul.tight li { margin: 0.2em 0; }
+
+/* --- Beskrivelse (renderet Markdown) ------------------------------------ */
+
 .description { margin-top: 14px; }
 .description > :first-child { margin-top: 0; }
 .description > :last-child { margin-bottom: 0; }
-.description h1, .description h2, .description h3, .description h4 { margin: .6em 0 .3em; line-height: 1.25; }
-.description h1 { font-size: 1.4rem; }
-.description h2 { font-size: 1.2rem; }
-.description h3 { font-size: 1.05rem; }
-.description p { margin: .5em 0; }
-.description ul, .description ol { margin: .5em 0; padding-left: 1.4em; }
-.description li { margin: .2em 0; }
-.description a { color: var(--primary); }
-.description blockquote { margin: .6em 0; padding: .2em 0 .2em 12px; border-left: 3px solid var(--line); color: var(--muted); }
-.description code { background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
-.description pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+.description h1, .description h2, .description h3, .description h4 { margin: 0.6em 0 0.3em; line-height: 1.25; }
+.description h1 { font-size: 1.25rem; }
+.description h2 { font-size: 1.1rem; }
+.description h3 { font-size: 1rem; }
+.description p { margin: 0.5em 0; }
+.description ul, .description ol { margin: 0.5em 0; padding-left: 1.4em; }
+.description li { margin: 0.2em 0; }
+.description a { color: var(--accent); }
+.description blockquote {
+  margin: 0.6em 0; padding: 0.2em 0 0.2em 12px;
+  border-left: 3px solid var(--line); color: var(--ink2);
+}
+.description code { background: var(--accent-soft); color: var(--accent-deep); padding: 1px 5px; border-radius: 6px; }
+.description pre {
+  background: var(--sunken); color: var(--ink); border: 1px solid var(--line);
+  padding: 12px; border-radius: 10px; overflow-x: auto;
+}
 .description pre code { background: none; padding: 0; color: inherit; }
 .description table { border-collapse: collapse; }
 .description th, .description td { border: 1px solid var(--line); padding: 6px 10px; }
 
-.tag { display: inline-block; font-size: .72rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
-.tag.locked { background: var(--locked-line); color: #fff; }
-.tag.finished { background: #94a3b8; color: #fff; }
-.tag.big { display: block; padding: 8px 12px; border-radius: 8px; margin: 10px 0; }
+/* --- Gruppebillede og login-tekst --------------------------------------- */
 
-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
-th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
-.tablewrap { overflow-x: auto; }
+.group-image {
+  display: block; max-width: 100%; max-height: 160px; margin: 0 auto 14px;
+  border-radius: 12px; object-fit: contain;
+}
+.login-text { white-space: pre-wrap; margin-bottom: 14px; color: var(--ink2); }
 
-.group-image { display: block; max-width: 100%; max-height: 160px; margin: 0 auto 14px;
-  border-radius: 10px; object-fit: contain; }
-.login-text { white-space: pre-wrap; margin-bottom: 14px; color: var(--muted); }
+/* --- Aktivitetslog ------------------------------------------------------ */
 
-.flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
-.flash.ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-.flash.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
-.log { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px;
-  font-size: .82rem; white-space: pre-wrap; overflow-x: auto; }
-tr.declined { opacity: .6; }
-tr.declined td:first-child { text-decoration: line-through; }
-button:disabled, .btn:disabled { opacity: .4; cursor: not-allowed; }
-
-/* Aktivitetslog */
+.log {
+  background: var(--sunken); color: var(--ink); border: 1px solid var(--line);
+  padding: 12px; border-radius: 10px; font-size: 0.8rem;
+  white-space: pre-wrap; overflow-x: auto;
+}
 .log-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
-.nowrap { white-space: nowrap; }
-.tag.cat-group { background: #6366f1; color: #fff; }
-.tag.cat-event { background: #2563eb; color: #fff; }
-.tag.cat-signup { background: #0d9488; color: #fff; }
-.tag.cat-mail { background: #d97706; color: #fff; }
-.tag.cat-whatsapp { background: #16a34a; color: #fff; }
-.tag.cat-user { background: #9333ea; color: #fff; }
+.log-filters .btn { margin-top: 0; }
 
-/* Udfoldeligt hjælpe-punkt */
-details.help { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 8px;
-  background: #f8fafc; padding: 0 12px; }
-details.help summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: var(--primary); list-style: none; }
+/* --- Udfoldeligt hjælpe-punkt ------------------------------------------- */
+
+details.help { margin: 10px 0 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunken); padding: 0 14px; }
+details.help summary { cursor: pointer; padding: 11px 0; font-weight: 700; font-size: 0.9rem; color: var(--accent); list-style: none; }
+details.help summary::-webkit-details-marker { display: none; }
 details.help summary::before { content: "ⓘ "; }
 details.help[open] summary { border-bottom: 1px solid var(--line); }
-.help-body { padding: 6px 0 12px; font-weight: 400; }
-.help-body ul, .help-body ol { padding-left: 1.3em; margin: .4em 0; }
-.help-body li { margin: .25em 0; }
+.help-body { padding: 8px 0 12px; font-weight: 400; font-size: 0.9rem; color: var(--ink2); }
+.help-body ul, .help-body ol { padding-left: 1.3em; margin: 0.4em 0; }
+.help-body li { margin: 0.25em 0; }
 
-/* Master: gruppe-kort */
-.page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.page-head h1 { margin: 0; }
+/* --- Master: gruppe-kort ------------------------------------------------ */
+
 .group-card { padding: 16px 20px; }
 .group-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.group-name { font-weight: 700; font-size: 1.1rem; }
-.group-links { display: flex; gap: 8px; flex-shrink: 0; }
+.group-name { font-weight: 700; font-size: 1.05rem; }
+.group-links { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .group-links .btn { margin-top: 0; }
-.group-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-.toggle-form { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.group-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.toggle-form { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; }
+.toggle-form label.chk { margin: 0; }
 .toggle-form button { margin-top: 0; }
 .group-foot > form button { margin-top: 0; }
+
+/* --- Mobil -------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  /* net under mobilgrænsen: layoutbrud forbliver synlige på desktop */
+  html, body { overflow-x: hidden; }
+  .wrap { padding: 0 12px; }
+  .card { padding: 15px 14px; border-radius: 12px; }
+  .grid2 { grid-template-columns: 1fr; }
+  .topbar { margin-bottom: 16px; }
+  .topbar .wrap { gap: 8px; }
+  .topbar-right { width: 100%; justify-content: space-between; }
+  .themepick .lbl { display: none; }   /* kun ikonet på små skærme */
+  .event-card { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .count { white-space: normal; }
+  .row { flex-direction: column; align-items: flex-start; }
+  th, td { padding: 7px 8px; }
+}

@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS settings (
     base_url            TEXT DEFAULT '',             -- offentlig URL (til links i mails)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT 'andreasdinesen/tilmeld',  -- "ejer/repo" til opdaterings-tjek
-    update_branch       TEXT DEFAULT 'main'
+    update_branch       TEXT DEFAULT 'main',
+    default_group       TEXT DEFAULT ''              -- slug: forsiden "/" sender videre hertil
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -133,6 +134,21 @@ CREATE TABLE IF NOT EXISTS activity_log (
     category            TEXT NOT NULL,             -- group | event | signup | mail | whatsapp
     group_slug          TEXT DEFAULT '',
     message             TEXT NOT NULL
+);
+
+-- Passkeys (WebAuthn). Én række pr. registreret nøgle.
+-- scope = 'master' (group_id/user_id NULL) | 'admin' (group_id sat) | 'user' (user_id sat).
+CREATE TABLE IF NOT EXISTS credentials (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope               TEXT NOT NULL CHECK (scope IN ('master','admin','user')),
+    group_id            INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+    user_id             INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    credential_id       TEXT NOT NULL UNIQUE,        -- base64url
+    public_key          TEXT NOT NULL,               -- base64url (COSE)
+    sign_count          INTEGER DEFAULT 0,
+    name                TEXT DEFAULT '',             -- brugerens eget navn på nøglen
+    created_at          TEXT NOT NULL,
+    last_used           TEXT DEFAULT ''
 );
 
 -- Punkter der er skjult på et bestemt event (default: alle vises)

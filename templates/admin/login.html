@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_passkeys.html" as pk %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block content %}
 <div class="card narrow">
@@ -10,5 +11,6 @@
     </label>
     <button type="submit">Log ind</button>
   </form>
+  {% if passkey_on %}{{ pk.login_button('admin', group.slug, 'Log ind med passkey') }}{% endif %}
 </div>
 {% endblock %}

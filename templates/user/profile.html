@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_passkeys.html" as pk %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Events</a>
@@ -26,6 +27,8 @@
     <label>Ny adgangskode <input type="password" name="new_password" required></label>
     <button type="submit">Skift adgangskode</button>
   </form>
+
+  {{ pk.manage('user', group.slug, creds, passkey_blocked) }}
 </div>
 
 <div class="card narrow">

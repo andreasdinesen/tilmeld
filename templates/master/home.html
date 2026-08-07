@@ -14,6 +14,24 @@
   <a class="btn primary" href="{{ url_for('master_group_new') }}">+ Ny gruppe</a>
 </div>
 
+<div class="card">
+  <p>Event-tilmeldingssystem.</p>
+  <ul class="tight">
+    <li>Bruger-side: <code>/gruppenavn</code></li>
+    <li>Gruppe-admin: <code>/gruppenavn/admin</code></li>
+    <li>Master-admin: <a href="{{ url_for('master_home') }}">/master</a></li>
+  </ul>
+  <p class="muted small">
+    {% if start_group %}
+      Forsiden <code>/</code> sender videre til <strong>{{ start_group.name }}</strong>
+      (<code>/{{ start_group.slug }}</code>).
+    {% else %}
+      Forsiden <code>/</code> viser oversigten. Vælg en startside-gruppe under
+      <a href="{{ url_for('master_settings') }}">Opsætning</a>.
+    {% endif %}
+  </p>
+</div>
+
 {% if not groups %}
   <div class="card"><p>Ingen grupper endnu. <a href="{{ url_for('master_group_new') }}">Opret den første.</a></p></div>
 {% endif %}

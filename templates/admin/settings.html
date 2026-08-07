@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_passkeys.html" as pk %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Vis som bruger</a>
@@ -130,4 +131,8 @@
   </form>
 </div>
 {% endif %}
+
+<div class="card narrow">
+  {{ pk.manage('admin', group.slug, creds, passkey_blocked) }}
+</div>
 {% endblock %}

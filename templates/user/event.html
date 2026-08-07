@@ -28,6 +28,7 @@
 <div class="card">
   <h2>Deltagere</h2>
   {% if not regs %}<p>Ingen tilmeldte endnu.</p>{% else %}
+  <div class="tablewrap">
   <table>
     <thead><tr><th>Navn</th>{% for item in fields %}<th>{{ item.f.label }}</th>{% endfor %}<th></th></tr></thead>
     <tbody>
@@ -56,6 +57,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
 </div>
 

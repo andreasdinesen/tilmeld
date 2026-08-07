@@ -9,7 +9,7 @@ ITERATIONS = 120_000
 # Navne der ikke må bruges som gruppe- eller event-slug, så de aldrig kolliderer
 # med /master eller /<gruppe>/admin osv.
 RESERVED_SLUGS = {
-    "master", "admin", "login", "logout", "static", "api",
+    "master", "admin", "login", "logout", "static", "api", "webauthn",
     "settings", "events", "new", "edit", "delete", "export", "image",
     "profil", "glemt", "nulstil", "kalender",
 }

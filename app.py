@@ -27,6 +27,7 @@ from werkzeug.utils import secure_filename
 import auth
 import db
 import notifications
+import passkeys
 import system_info
 
 # Tilladte HTML-tags i renderet Markdown (alt andet fjernes, så en beskrivelse
@@ -40,6 +41,9 @@ _MD_ATTRS = {"a": ["href", "title"]}
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 app = Flask(__name__)
+# SameSite=Lax er browsernes standard i forvejen, men sæt den eksplicit: sammen med
+# kravet om Content-Type: application/json på webauthn-endpointsene er den CSRF-spærren.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 db.init_db()
 _conn = db.get_db()
@@ -242,6 +246,13 @@ def admin_has_access(group):
     return bool(session.get(f"admin_{group['slug']}"))
 
 
+@app.context_processor
+def inject_app_version():
+    # Bruges som cache-bust på style.css: Cloudflare edge-cacher .css i timevis og
+    # ignorerer Cache-Control, så en ny udgivelse skal have en ny URL.
+    return {"app_version": system_info.app_version()}
+
+
 @app.template_filter("dt")
 def fmt_dt(value):
     if not value:
@@ -277,6 +288,15 @@ def render_markdown(text):
 # --------------------------------------------------------------------------- #
 @app.route("/")
 def index():
+    # Master kan pege forsiden på én gruppe, så et rent domæne (fx kalender.hjorten.eu)
+    # lander direkte på den gruppe i stedet for en teknisk oversigt.
+    conn = db.get_db()
+    slug = (db.get_settings(conn)["default_group"] or "").strip()
+    exists = bool(slug) and bool(
+        conn.execute("SELECT 1 FROM groups WHERE slug = ?", (slug,)).fetchone())
+    conn.close()
+    if exists:
+        return redirect(url_for("user_home", slug=slug))
     return render_template("index.html")
 
 
@@ -301,7 +321,11 @@ def master_login():
             session["master"] = True
             return redirect(url_for("master_home"))
         flash("Forkert master-password.", "error")
-    return render_template("master/login.html")
+    conn = db.get_db()
+    has_keys = bool(passkeys.list_credentials(conn, "master"))
+    conn.close()
+    return render_template("master/login.html",
+                           passkey_on=has_keys and passkeys.is_secure_origin(request))
 
 
 @app.route("/master/logout")
@@ -321,8 +345,10 @@ def master_home():
             "SELECT COUNT(*) AS c FROM events WHERE group_id = ?", (g["id"],)
         ).fetchone()["c"]
         data.append({"g": g, "events": ev_count})
+    start_slug = (db.get_settings(conn)["default_group"] or "").strip()
+    start_group = next((g for g in groups if g["slug"] == start_slug), None)
     conn.close()
-    return render_template("master/home.html", groups=data)
+    return render_template("master/home.html", groups=data, start_group=start_group)
 
 
 @app.route("/master/groups/new", methods=["GET", "POST"])
@@ -486,11 +512,21 @@ def master_settings():
              request.form.get("github_repo", "").strip(),
              request.form.get("update_branch", "main").strip() or "main"),
         )
+        # Startside-gruppe gemmes kun hvis slug'en findes — ellers ville forsiden pege
+        # på en slettet gruppe og give 404.
+        start = request.form.get("default_group", "").strip()
+        if start and not conn.execute(
+                "SELECT 1 FROM groups WHERE slug = ?", (start,)).fetchone():
+            start = ""
+        conn.execute("UPDATE settings SET default_group = ? WHERE id = 1", (start,))
         conn.commit()
         flash("Indstillinger gemt.", "ok")
     s = db.get_settings(conn)
+    groups = conn.execute("SELECT slug, name FROM groups ORDER BY name").fetchall()
+    creds = passkeys.list_credentials(conn, "master")
     conn.close()
-    return render_template("master/settings.html", s=s)
+    return render_template("master/settings.html", s=s, groups=groups, creds=creds,
+                           passkey_blocked=passkeys.blocked_reason(request))
 
 
 @app.route("/master/system", methods=["GET", "POST"])
@@ -517,6 +553,153 @@ def master_system():
 
 
 # --------------------------------------------------------------------------- #
+# Passkeys (WebAuthn) — se passkeys.py. Altid et TILLÆG til adgangskoden.
+#
+# Alle endpoints er JSON og kræver Content-Type: application/json. Det er samtidig
+# CSRF-spærren oven på SameSite=Lax: en formular fra et fremmed site kan ikke sætte
+# den content-type uden et preflight, som CORS afviser.
+# --------------------------------------------------------------------------- #
+def _passkey_target(conn, data, require_login):
+    """Slå scope + gruppe/bruger op ud fra JSON-body → (ctx, fejltekst).
+
+    require_login gælder registrering og sletning: man skal allerede være logget ind
+    på præcis det scope, man vil lægge en nøgle på. Ved login er svaret nej — det er
+    jo dét, nøglen skal bevise.
+    """
+    if not passkeys.AVAILABLE:
+        return None, "Passkeys er ikke tilgængelige på denne installation."
+    scope = (data.get("scope") or "").strip()
+    slug = (data.get("slug") or "").strip()
+
+    if scope == "master":
+        if require_login and not session.get("master"):
+            return None, "Ikke logget ind som master."
+        return {"scope": "master", "group": None, "group_id": None, "user_id": None,
+                "label": "Master-admin"}, ""
+
+    group = get_group(slug) if slug else None
+    if not group:
+        return None, "Ukendt gruppe."
+
+    if scope == "admin":
+        if require_login and not admin_has_access(group):
+            return None, "Ikke logget ind som admin."
+        return {"scope": "admin", "group": group, "group_id": group["id"], "user_id": None,
+                "label": f"{group['name']} · admin"}, ""
+
+    if scope == "user":
+        if not group["user_accounts_enabled"]:
+            return None, "Gruppen bruger ikke individuelle brugerkonti."
+        uid = session.get(f"uid_{group['slug']}")
+        if require_login and not uid:
+            return None, "Ikke logget ind."
+        label = ""
+        if uid:
+            u = conn.execute("SELECT username FROM users WHERE id = ?", (uid,)).fetchone()
+            if not u:
+                return None, "Ukendt bruger."
+            label = u["username"]
+        return {"scope": "user", "group": group, "group_id": None, "user_id": uid,
+                "label": label}, ""
+
+    return None, "Ukendt scope."
+
+
+@app.route("/webauthn/register/options", methods=["POST"])
+def webauthn_register_options():
+    conn = db.get_db()
+    ctx, err = _passkey_target(conn, request.get_json(silent=True) or {}, require_login=True)
+    if err:
+        conn.close()
+        return {"error": err}, 403
+    opts = passkeys.registration_options(
+        conn, request, session, ctx["scope"], ctx["label"],
+        group_id=ctx["group_id"], user_id=ctx["user_id"])
+    conn.close()
+    return Response(opts, mimetype="application/json")
+
+
+@app.route("/webauthn/register/verify", methods=["POST"])
+def webauthn_register_verify():
+    data = request.get_json(silent=True) or {}
+    conn = db.get_db()
+    ctx, err = _passkey_target(conn, data, require_login=True)
+    if err:
+        conn.close()
+        return {"error": err}, 403
+    err = passkeys.registration_verify(
+        conn, request, session, data.get("credential") or {}, data.get("name", ""),
+        ctx["scope"], group_id=ctx["group_id"], user_id=ctx["user_id"])
+    if not err:
+        db.add_log(conn, "user", f"Passkey tilføjet ({ctx['label']})",
+                   ctx["group"]["slug"] if ctx["group"] else "")
+    conn.close()
+    return ({"error": err}, 400) if err else {"ok": True}
+
+
+@app.route("/webauthn/delete", methods=["POST"])
+def webauthn_delete():
+    data = request.get_json(silent=True) or {}
+    conn = db.get_db()
+    ctx, err = _passkey_target(conn, data, require_login=True)
+    if err:
+        conn.close()
+        return {"error": err}, 403
+    ok = passkeys.delete_credential(conn, int(data.get("id") or 0), ctx["scope"],
+                                    group_id=ctx["group_id"], user_id=ctx["user_id"])
+    conn.close()
+    return {"ok": True} if ok else ({"error": "Nøglen blev ikke fundet."}, 404)
+
+
+@app.route("/webauthn/login/options", methods=["POST"])
+def webauthn_login_options():
+    conn = db.get_db()
+    ctx, err = _passkey_target(conn, request.get_json(silent=True) or {}, require_login=False)
+    if err:
+        conn.close()
+        return {"error": err}, 400
+    opts = passkeys.authentication_options(conn, request, session)
+    conn.close()
+    return Response(opts, mimetype="application/json")
+
+
+@app.route("/webauthn/login/verify", methods=["POST"])
+def webauthn_login_verify():
+    data = request.get_json(silent=True) or {}
+    conn = db.get_db()
+    ctx, err = _passkey_target(conn, data, require_login=False)
+    if err:
+        conn.close()
+        return {"error": err}, 400
+
+    row, err = passkeys.authentication_verify(
+        conn, request, session, data.get("credential") or {},
+        ctx["scope"], group_id=ctx["group_id"])
+    if err:
+        conn.close()
+        return {"error": err}, 403
+
+    if ctx["scope"] == "master":
+        session["master"] = True
+        target = url_for("master_home")
+    elif ctx["scope"] == "admin":
+        session[f"admin_{ctx['group']['slug']}"] = True
+        target = url_for("admin_home", slug=ctx["group"]["slug"])
+    else:
+        # Nøglen hører til en bruger — men brugeren skal også være med i DENNE gruppe.
+        member = conn.execute(
+            "SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ?",
+            (row["user_id"], ctx["group"]["id"])).fetchone()
+        if not member:
+            conn.close()
+            return {"error": "Din bruger er ikke med i denne gruppe."}, 403
+        session[f"uid_{ctx['group']['slug']}"] = row["user_id"]
+        target = url_for("user_home", slug=ctx["group"]["slug"])
+    conn.close()
+    return {"ok": True, "redirect": target}
+
+
+# --------------------------------------------------------------------------- #
 # Gruppe-admin
 # --------------------------------------------------------------------------- #
 @app.route("/<slug>/admin/login", methods=["GET", "POST"])
@@ -529,7 +712,11 @@ def admin_login(slug):
             session[f"admin_{slug}"] = True
             return redirect(url_for("admin_home", slug=slug))
         flash("Forkert admin-password.", "error")
-    return render_template("admin/login.html", group=group)
+    conn = db.get_db()
+    has_keys = bool(passkeys.list_credentials(conn, "admin", group_id=group["id"]))
+    conn.close()
+    return render_template("admin/login.html", group=group,
+                           passkey_on=has_keys and passkeys.is_secure_origin(request))
 
 
 @app.route("/<slug>/admin/logout")
@@ -668,10 +855,12 @@ def admin_settings(slug):
             subj, body = notifications.template_for(conn, group, tkey)
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
                               "subject": subj, "body": body})
+    creds = passkeys.list_credentials(conn, "admin", group_id=group["id"])
     conn.close()
     parsed = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("admin/settings.html", group=group, fields=parsed,
-                           mail_on=mail_on, wa_on=wa_on, templates=templates)
+                           mail_on=mail_on, wa_on=wa_on, templates=templates,
+                           creds=creds, passkey_blocked=passkeys.blocked_reason(request))
 
 
 def _move_field(conn, group_id, field_id, direction):
@@ -1151,7 +1340,14 @@ def user_login(slug):
                 session[f"uid_{slug}"] = u["id"]
                 return redirect(url_for("user_home", slug=slug))
             flash("Forkert brugernavn eller adgangskode.", "error")
-        return render_template("user/login.html", group=group, accounts=True)
+        conn = db.get_db()
+        # Vis kun passkey-knappen hvis nogen i gruppen faktisk har registreret en.
+        has_keys = bool(conn.execute(
+            "SELECT 1 FROM credentials c JOIN user_groups ug ON ug.user_id = c.user_id "
+            "WHERE c.scope = 'user' AND ug.group_id = ?", (group["id"],)).fetchone())
+        conn.close()
+        return render_template("user/login.html", group=group, accounts=True,
+                               passkey_on=has_keys and passkeys.is_secure_origin(request))
     # Delt gruppe-password (eller åben gruppe)
     if not group["user_password"]:
         return redirect(url_for("user_home", slug=slug))
@@ -1160,7 +1356,7 @@ def user_login(slug):
             session[f"user_{slug}"] = True
             return redirect(url_for("user_home", slug=slug))
         flash("Forkert password.", "error")
-    return render_template("user/login.html", group=group, accounts=False)
+    return render_template("user/login.html", group=group, accounts=False, passkey_on=False)
 
 
 @app.route("/<slug>/logout")
@@ -1557,8 +1753,10 @@ def user_profile(slug):
         "JOIN user_groups ug ON ug.group_id = g.id AND ug.user_id = r.user_id "
         "WHERE r.user_id = ? AND e.event_date >= ? ORDER BY e.event_date, e.start_time",
         (uid, datetime.now().strftime("%Y-%m-%d"))).fetchall()
+    creds = passkeys.list_credentials(conn, "user", user_id=uid)
     conn.close()
-    return render_template("user/profile.html", group=group, u=u, mine=mine)
+    return render_template("user/profile.html", group=group, u=u, mine=mine, creds=creds,
+                           passkey_blocked=passkeys.blocked_reason(request))
 
 
 @app.route("/<slug>/glemt", methods=["GET", "POST"])

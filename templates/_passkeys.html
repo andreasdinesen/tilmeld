@@ -1,0 +1,79 @@
+{# Genbrugelige passkey-stykker. `scope` er 'master' | 'admin' | 'user';
+   `slug` er gruppens slug (tom ved master). #}
+
+{% macro login_button(scope, slug, label) %}
+  {# Vises kun når browseren kan WebAuthn (skjult indtil passkey.js afslører det),
+     og kun når der faktisk ER registreret en nøgle for dette login. #}
+  <div data-passkey hidden>
+    <div class="divider">eller</div>
+    <button type="button" class="btn pk-login"><span aria-hidden="true">🔑</span>{{ label }}</button>
+  </div>
+  <div class="formnote pk-status"></div>
+  <script src="{{ url_for('static', filename='passkey.js') }}?v={{ app_version }}"></script>
+  <script>
+    Passkey.reveal();
+    document.querySelector('.pk-login')?.addEventListener('click', function () {
+      Passkey.login({{ scope|tojson }}, {{ slug|tojson }}, document.querySelector('.pk-status'));
+    });
+  </script>
+{% endmacro %}
+
+
+{% macro manage(scope, slug, creds, blocked) %}
+  <h2>Passkeys</h2>
+  <p class="muted small">Log ind med fingeraftryk, ansigt eller skærmlås i stedet for at taste
+     adgangskoden. En passkey er et <strong>tillæg</strong> — adgangskoden virker uændret, så
+     du aldrig kan låse dig ude.</p>
+
+  {% if blocked %}<div class="flash error">{{ blocked }}</div>{% endif %}
+
+  {% if creds %}
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Navn</th><th>Oprettet</th><th>Sidst brugt</th><th></th></tr></thead>
+        <tbody>
+          {% for c in creds %}
+            <tr>
+              <td>{{ c.name }}</td>
+              <td class="muted small nowrap">{{ c.created_at|dt }}</td>
+              <td class="muted small nowrap">{{ c.last_used|dt or '—' }}</td>
+              <td class="actions">
+                <button type="button" class="danger small pk-del" data-id="{{ c.id }}"
+                        data-name="{{ c.name }}">Slet</button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted small">Ingen passkeys registreret endnu.</p>
+  {% endif %}
+
+  <div data-passkey hidden>
+    <label>Navn på nøglen
+      <input type="text" class="pk-name" placeholder="fx iPhone eller Mac" maxlength="60">
+    </label>
+    <button type="button" class="primary pk-add">Tilføj passkey</button>
+  </div>
+  <div class="formnote pk-status"></div>
+
+  <script src="{{ url_for('static', filename='passkey.js') }}?v={{ app_version }}"></script>
+  <script>
+    (function () {
+      var scope = {{ scope|tojson }}, slug = {{ slug|tojson }};
+      var status = document.querySelector('.pk-status');
+      Passkey.reveal();
+      document.querySelector('.pk-add')?.addEventListener('click', function () {
+        var el = document.querySelector('.pk-name');
+        Passkey.register(scope, slug, (el && el.value) || '', status);
+      });
+      document.querySelectorAll('.pk-del').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('Slet passkeyen "' + b.dataset.name + '"?')) return;
+          Passkey.remove(scope, slug, b.dataset.id, status);
+        });
+      });
+    })();
+  </script>
+{% endmacro %}
