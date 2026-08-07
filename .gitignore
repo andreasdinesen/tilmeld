@@ -2,3 +2,6 @@
 data/
 __pycache__/
 *.pyc
+
+# Intern handover-/kontekstfil til Claude Code — skal ikke på GitHub
+CLAUDE.md
