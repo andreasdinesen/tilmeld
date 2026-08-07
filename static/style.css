@@ -304,6 +304,14 @@ tr.declined td:first-child { text-decoration: line-through; }
 ul.tight { margin: 0.4em 0; padding-left: 1.3em; }
 ul.tight li { margin: 0.2em 0; }
 
+/* Versionsnummer på System-siden — appens vigtigste ene tal, så det må gerne fylde */
+.versionbox { background: var(--sunken); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 4px 0 16px; }
+.versionbox .l { font-size: 0.78rem; color: var(--ink2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.versionbox .v { display: inline-block; font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.versionbox a.v { color: var(--accent); text-decoration: none; }
+.versionbox a.v:hover { text-decoration: underline; }
+.versionbox p { margin: 4px 0 0; }
+
 /* --- Beskrivelse (renderet Markdown) ------------------------------------ */
 
 .description { margin-top: 14px; }

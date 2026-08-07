@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 8
+  version: 9
   icon: "app"
 
   docker:

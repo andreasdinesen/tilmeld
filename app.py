@@ -248,9 +248,10 @@ def admin_has_access(group):
 
 @app.context_processor
 def inject_app_version():
-    # Bruges som cache-bust på style.css: Cloudflare edge-cacher .css i timevis og
-    # ignorerer Cache-Control, så en ny udgivelse skal have en ny URL.
-    return {"app_version": system_info.app_version()}
+    # Bruges som cache-bust på style.css/passkey.js: Cloudflare edge-cacher statiske
+    # filer i timevis og ignorerer Cache-Control, så en ny udgivelse skal have en ny URL.
+    # Runens version bumpes ved hver udgivelse og er derfor det rigtige tal.
+    return {"app_version": system_info.rune_version()}
 
 
 @app.template_filter("dt")
@@ -536,20 +537,16 @@ def master_system():
     s = db.get_settings(conn)
     conn.close()
     update_log = None
-    check = None
-    if request.method == "POST":
-        action = request.form.get("action")
-        if action == "check":
-            check = system_info.check_latest(s["github_repo"], s["update_branch"])
-        elif action == "update_app":
-            update_log = system_info.update_app(s["update_branch"])
-        elif action == "update_deps":
-            update_log = system_info.update_dependencies()
+    if request.method == "POST" and request.form.get("action") == "update_deps":
+        update_log = system_info.update_dependencies()
+    version = system_info.rune_version()
     return render_template(
         "master/system.html", s=s,
         components=system_info.component_versions(),
-        is_git=system_info.is_git_repo(),
-        check=check, update_log=update_log)
+        version=version,
+        changelog_url=system_info.changelog_url(
+            s["github_repo"], s["update_branch"], version),
+        update_log=update_log)
 
 
 # --------------------------------------------------------------------------- #

@@ -20,10 +20,9 @@ Cloudflare Tunnel uden konfiguration (samme greb som i de øvrige runer).
 import base64
 from datetime import datetime
 
-# webauthn-pakken er en ekstra afhængighed. Mangler den (fx efter en selv-opdatering,
-# hvor 'git pull' lykkedes men pip-trinnet ikke blev kørt), skal appen stadig starte —
-# uden passkeys, men med adgangskode-login i behold. AVAILABLE styrer både endpoints
-# og hvad UI'et viser.
+# webauthn-pakken er en ekstra afhængighed. Mangler den (fx i en git clone-installation
+# hvor requirements ikke er kørt igennem), skal appen stadig starte — uden passkeys, men
+# med adgangskode-login i behold. AVAILABLE styrer både endpoints og hvad UI'et viser.
 try:
     from webauthn import (generate_authentication_options, generate_registration_options,
                           options_to_json, verify_authentication_response,

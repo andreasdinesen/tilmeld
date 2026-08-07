@@ -78,12 +78,14 @@
       <input type="text" name="base_url" value="{{ s.base_url }}" placeholder="https://tilmeld.eksempel.dk">
     </label>
 
-    <h2>Opdatering (GitHub)</h2>
-    <label>GitHub-repo (ejer/repo) til versions-tjek
+    <h2>Versionslog (GitHub)</h2>
+    <label>GitHub-repo (ejer/repo)
       <input type="text" name="github_repo" value="{{ s.github_repo }}" placeholder="andreasdinesen/tilmeld">
     </label>
     <label>Branch <input type="text" name="update_branch" value="{{ s.update_branch }}"></label>
-    <p class="muted small">Bruges på <a href="{{ url_for('master_system') }}">System-siden</a> til at tjekke og hente nye versioner.</p>
+    <p class="muted small">Bruges til at linke versionsnummeret på
+       <a href="{{ url_for('master_system') }}">System-siden</a> til repoets
+       <code>CHANGELOG.md</code>. Selve opdateringen sker i Yggdrasil-panelet.</p>
 
     <p class="muted small">Uden konfiguration logges notifikationer blot i serverens konsol — fint til test.</p>
     <button type="submit">Gem indstillinger</button>

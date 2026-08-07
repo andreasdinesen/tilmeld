@@ -101,35 +101,17 @@ Installér via yggdrasils **"Browse runes on GitHub"**:
 
 Sæt `MASTER_PASSWORD` ved oprettelsen. Port 8080 eksponeres.
 
-## Opdatering fra master-admin
+## Version og opdatering
 
-Under **master → Opsætning** kan du sætte GitHub-repo (`andreasdinesen/tilmeld`)
-og branch. Master → **System** viser app-versionen, kan tjekke GitHub for en nyere
-version (læser `VERSION`-filen) og køre `git pull` + opdatering, når appen er
-installeret via `git clone`.
+Der er **ét versionsnummer**: runens `version:` i `runes/tilmeld.yaml`. Det er det tal,
+Yggdrasil-panelet viser, og det står under **master → System** som et link til
+[versionsloggen](CHANGELOG.md).
 
-Kører du appen som rune, opdateres den i stedet ved at geninstallere serveren i panelet
-(**Settings → Update/Reinstall**), som henter det nye Docker-image. `/data` overlever.
+Opdatering sker i panelet — ikke inde i appen:
 
-## Versionshistorik
+1. **Runes → Browse GitHub → Reload** henter den nye rune-definition.
+2. **Serveren → Settings → Update/Reinstall** henter det nye Docker-image.
 
-Appens version står i `VERSION`; runens `version:` i `runes/tilmeld.yaml` bumpes ved
-hver udgivelse, så panelet kan se, at definitionen er ny.
+`/data` (database og uploads) overlever begge trin.
 
-### 1.2.0 (rune 8)
-
-- **Nyt design** — samme udtryk som de øvrige runer (Bogreolen, Kokkeri, Beanledger,
-  Muldbog): rolig papirfarvet palet, kort med bløde kanter, pilleformede mærkater.
-- **Lyst/mørkt tema** med Auto/Lys/Mørk i topbaren, gemt i browseren.
-- **Startside-gruppe**: forsiden `/` kan sende videre til en valgt gruppe.
-- **Passkeys** (WebAuthn) til master-, gruppe-admin- og bruger-login. Kræver https;
-  adgangskoden virker uændret.
-- Deltagerlisten kan scrolles vandret i stedet for at klemme kolonnerne sammen, og
-  info-teksten om adresserne er flyttet til master-forsiden.
-- Ny afhængighed: `webauthn` (py_webauthn). Opdaterer du en `git clone`-installation,
-  skal `pip install -r requirements.txt` køres — ellers starter appen uden passkeys.
-
-### 1.1.0 (rune 7)
-
-- Individuelle brugerkonti, venteliste, gæstepladser, fremmøde, iCal-feed,
-  WhatsApp-notifikationer og fil-baseret nulstilling af master-password.
+GitHub-repoet sættes under **master → Opsætning** og bruges til at slå versionsloggen op.
