@@ -304,6 +304,31 @@ tr.declined td:first-child { text-decoration: line-through; }
 ul.tight { margin: 0.4em 0; padding-left: 1.3em; }
 ul.tight li { margin: 0.2em 0; }
 
+/* Springer man til et afsnit via #anker, ville den faste topbar dække overskriften. */
+h2[id], h3[id] { scroll-margin-top: 80px; }
+
+/* Tilmeldings-punkt med udfoldelig redigér-formular. Skillelinjen flyttes fra .row
+   ud på hele punktet, så stregen ikke lander mellem punktet og dets egen formular. */
+.fielditem { border-bottom: 1px solid var(--line); }
+.fielditem:last-of-type { border-bottom: none; }
+.fielditem > .row { border-bottom: none; padding-bottom: 4px; }
+/* ▲ ▼ Slet skal blive på én linje — ellers vokser rækken, når punktets navn er langt.
+   Under mobilgrænsen bliver .row alligevel til en kolonne, så der er plads. */
+.fielditem .actions { flex-wrap: nowrap; }
+.fieldedit { padding-bottom: 10px; }
+.fieldedit summary {
+  display: inline-block; cursor: pointer; list-style: none;
+  font-size: 0.82rem; font-weight: 700; color: var(--accent); padding: 4px 0;
+}
+.fieldedit summary::-webkit-details-marker { display: none; }
+.fieldedit summary::before { content: "✎ "; }
+.fieldedit[open] summary::before { content: "✕ "; }
+.fieldedit[open] summary { color: var(--ink2); }
+.fieldedit form {
+  background: var(--sunken); border: 1px solid var(--line);
+  border-radius: 12px; padding: 4px 14px 14px; margin-top: 4px;
+}
+
 /* Versionsnummer på System-siden — appens vigtigste ene tal, så det må gerne fylde */
 .versionbox { background: var(--sunken); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 4px 0 16px; }
 .versionbox .l { font-size: 0.78rem; color: var(--ink2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }

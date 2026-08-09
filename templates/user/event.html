@@ -23,6 +23,11 @@
   <p style="margin-top:12px">
     <a class="btn" href="{{ url_for('user_event_ics', slug=group.slug, event_slug=ev.slug) }}">📅 Tilføj til kalender</a>
   </p>
+  <p class="muted small">Lægger <strong>kun dette event</strong> i din kalender som en kopi —
+     ændrer vi dato eller tidspunkt bagefter, opdateres den ikke.
+     <a href="{{ url_for('user_home', slug=group.slug) }}#kalender">Abonnér på {{ group.name }}s
+     kalender</a> i stedet, så kommer <strong>alle</strong> events automatisk ind — og følger
+     med, når noget ændrer sig.</p>
 </div>
 
 <div class="card">

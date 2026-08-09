@@ -13,6 +13,56 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 10
+
+**Tilmeldings-punkter kan rettes — og siden bliver, hvor du er.**
+
+- **Redigér et tilmeldings-punkt** i stedet for at slette og oprette det forfra. Under
+  gruppe-admin → Opsætning har hvert punkt nu en »Redigér«, der folder en udfyldt
+  formular ud: navn, type, dropdown-valg, påkrævet og »deltager ikke«.
+  Punktets id bevares, så eksisterende svar i tilmeldingerne følger med.
+- Formularen viser, hvor mange tilmeldinger punktet allerede er udfyldt i, og efter
+  gemning advares der konkret, hvis ændringen rører ved gamle svar — fx hvis et
+  dropdown-valg, nogen har brugt, ikke længere findes. Ændringen blokeres aldrig; en
+  tastefejl i navnet skal kunne rettes uden videre.
+- **Siden hopper ikke længere til toppen**, når du flytter et punkt op/ned, sletter
+  eller gemmer. Opsætnings-siden svarer nu med et redirect tilbage til det afsnit, du
+  arbejdede i, så du kan flytte flere punkter i træk. Det gør også F5 uskadelig — før
+  gensendte browseren den sidste handling.
+- ▲/▼/Slet bliver på én linje, også når punktets navn er langt.
+- Dropdown-valg gemmes kun på dropdowns. Skiftede man type, kunne den gamle liste
+  ellers blive stående og dukke op igen som en spøgelses-liste under punktet.
+- **Tilmeldingsfristen følger nu med, når du flytter et events dato.** Fristen beholder
+  sin afstand til eventets start: har et event frist 7 dage før, har det stadig frist
+  7 dage før på den nye dato. Det gør især en **kopi** brugbar — kopien arver
+  originalens frist, som hører til den gamle dato, så et kopieret event var lukket for
+  tilmelding fra det øjeblik, det blev oprettet. Sætter du selv en frist, bevares din
+  afstand; rydder du feltet, falder den tilbage til master-standarden.
+- Gemmer du alligevel et event, hvor fristen er passeret (eller ligger efter eventets
+  start), siger appen det nu tydeligt i stedet for at lade det gå ubemærket hen.
+- **Linket til eventet står nu øverst i kalender-postens beskrivelse** i stedet for
+  nederst — i en kalender-app er beskrivelsen et lille notefelt, og et link efter en
+  lang tekst skal man scrolle efter. Linket ligger både i iCal-feltet `URL` (som Apple
+  Kalender viser som en klikbar række) og i beskrivelsen, fordi bl.a. Google ignorerer
+  `URL`-feltet.
+  Som hidtil kræver det, at »Offentlig URL« er udfyldt under master → Opsætning.
+  Adressen udledes **bevidst ikke** af forespørgslen: appen kan nås på flere adresser,
+  og et link havner permanent i folks kalender — et forkert link er værre end intet.
+- **Ændringer slår nu igennem i folks kalender.** Hvert event får `SEQUENCE` og
+  `LAST-MODIFIED`, som fortæller kalenderen, at det er en *nyere udgave* af et event,
+  den allerede kender — så en `.ics`-fil, der hentes igen efter en ændring, opdaterer
+  eventet i stedet for at blive en dublet. Revisionen tælles kun op, når noget
+  kalender-relevant ændres (navn, dato, tidspunkter, beskrivelse) — ikke når du
+  retter et notifikations-flueben eller forventet antal.
+- **Ved »Tilføj til kalender« står der nu, hvad knappen faktisk gør**: den lægger kun
+  dét ene event ind som en kopi, der ikke opdateres. Ved siden af er der et link til
+  gruppens kalender-abonnement, som giver alle events automatisk — og følger med, når
+  noget ændrer sig. Abonnements-boksen folder sig ud, når man kommer fra linket, og
+  forklarer nu også, at kalender-apps selv bestemmer, hvor tit de henter nyt (Google op
+  til et døgn, Apple ofte kun én gang om ugen som standard).
+- Kalender-feedet sendte `Content-Type: text/calendar; charset=utf-8; charset=utf-8`
+  — charset stod der to gange. Rettet.
+
 ## Version 9
 
 **Systemsiden viser nu ét versionsnummer.**

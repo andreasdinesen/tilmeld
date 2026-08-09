@@ -776,29 +776,40 @@ def admin_settings(slug):
                              (request.form.get("whatsapp_recipient", "").strip(), group["id"]))
             flash("Kontaktoplysninger gemt.", "ok")
         elif action == "add_field":
-            is_decline = 1 if request.form.get("is_decline") else 0
-            opts = [o.strip() for o in request.form.get("options", "").split(",") if o.strip()]
-            chosen = request.form.get("field_type", "text")
-            # "Notefelt" gemmes som flerlinjet tekst; "deltager ikke" er altid en checkbox
-            multiline = 1 if chosen == "note" else 0
-            if is_decline:
-                ftype = "checkbox"
-            elif chosen == "note":
-                ftype = "text"
+            f = _field_from_form(request.form)
+            if not f["label"]:
+                flash("Punktet skal have et navn.", "error")
             else:
-                ftype = chosen
-            # "Deltager ikke" er aldrig påkrævet; ellers respekteres fluebenet
-            required = 0 if is_decline else (1 if request.form.get("required") else 0)
-            nxt = (conn.execute(
-                "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM group_fields WHERE group_id = ?",
-                (group["id"],)).fetchone()["n"])
-            conn.execute(
-                "INSERT INTO group_fields (group_id, label, field_type, options, required, "
-                "is_decline, multiline, sort_order) VALUES (?,?,?,?,?,?,?,?)",
-                (group["id"], request.form.get("label", "").strip(), ftype,
-                 json.dumps(opts), required, is_decline, multiline, nxt),
-            )
-            flash("Punkt tilføjet.", "ok")
+                nxt = (conn.execute(
+                    "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM group_fields "
+                    "WHERE group_id = ?", (group["id"],)).fetchone()["n"])
+                conn.execute(
+                    "INSERT INTO group_fields (group_id, label, field_type, options, required, "
+                    "is_decline, multiline, sort_order) VALUES (?,?,?,?,?,?,?,?)",
+                    (group["id"], f["label"], f["field_type"], f["options"], f["required"],
+                     f["is_decline"], f["multiline"], nxt),
+                )
+                flash("Punkt tilføjet.", "ok")
+        elif action == "edit_field":
+            fid = request.form.get("field_id")
+            old = conn.execute("SELECT * FROM group_fields WHERE id = ? AND group_id = ?",
+                               (fid, group["id"])).fetchone()
+            f = _field_from_form(request.form)
+            if not old:
+                flash("Punktet findes ikke.", "error")
+            elif not f["label"]:
+                flash("Punktet skal have et navn.", "error")
+            else:
+                conn.execute(
+                    "UPDATE group_fields SET label = ?, field_type = ?, options = ?, "
+                    "required = ?, is_decline = ?, multiline = ? WHERE id = ? AND group_id = ?",
+                    (f["label"], f["field_type"], f["options"], f["required"],
+                     f["is_decline"], f["multiline"], fid, group["id"]))
+                flash(f"Punktet »{f['label']}« er opdateret.", "ok")
+                # Selve ændringen blokeres aldrig — en tastefejl skal kunne rettes — men
+                # admin skal vide, hvis den rører ved svar, der allerede er gemt.
+                for w in _field_edit_warnings(conn, old, f, fid):
+                    flash(w, "error")
         elif action == "delete_field":
             conn.execute("DELETE FROM group_fields WHERE id = ? AND group_id = ?",
                          (request.form.get("field_id"), group["id"]))
@@ -836,7 +847,12 @@ def admin_settings(slug):
                      request.form.get(f"body_{tkey}", "").strip()))
             flash("Mail-skabeloner gemt.", "ok")
         conn.commit()
-        group = get_group(slug)
+        conn.close()
+        # POST → Redirect → GET, med anker til det afsnit man arbejdede i. Uden det
+        # gentegnes siden fra toppen ved hvert klik, og man skal scrolle ned igen for
+        # at flytte det næste punkt. Ankeret gør også F5 uskadelig.
+        return redirect(url_for("admin_settings", slug=slug)
+                        + _SETTINGS_ANCHOR.get(action, ""))
     fields = all_group_fields(conn, group["id"])
     mail_on, wa_on = group_channels(conn, group)
     templates = []
@@ -853,11 +869,90 @@ def admin_settings(slug):
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
                               "subject": subj, "body": body})
     creds = passkeys.list_credentials(conn, "admin", group_id=group["id"])
+    # Hvor mange tilmeldinger har allerede et svar på hvert punkt — vises i redigér-
+    # formularen, så man kan se konsekvensen FØR man ændrer type eller dropdown-valg.
+    used = {r["field_id"]: r["n"] for r in conn.execute(
+        "SELECT field_id, COUNT(*) AS n FROM registration_values "
+        "WHERE value != '' GROUP BY field_id").fetchall()}
     conn.close()
-    parsed = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
+    parsed = [{"f": f, "options": json.loads(f["options"] or "[]"),
+               "used": used.get(f["id"], 0)} for f in fields]
     return render_template("admin/settings.html", group=group, fields=parsed,
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request))
+
+
+# Hvilket afsnit på opsætnings-siden hører en handling til. Bruges til ankeret i
+# redirect'et efter POST, så man lander samme sted, som man klikkede.
+_SETTINGS_ANCHOR = {
+    "password": "#adgang", "delete_password": "#adgang",
+    "contact": "#kontakt",
+    "add_field": "#punkter", "edit_field": "#punkter",
+    "delete_field": "#punkter", "move_field": "#punkter",
+    "branding": "#udseende",
+    "templates": "#skabeloner",
+}
+
+
+def _field_from_form(form) -> dict:
+    """Læs et tilmeldings-punkt fra formularen og normalisér det.
+
+    Bruges af BÅDE »tilføj« og »redigér«, så de to ikke kan drifte fra hinanden:
+    reglerne (notefelt = flerlinjet tekst, »deltager ikke« = checkbox og aldrig
+    påkrævet) skal gælde begge steder.
+    """
+    is_decline = 1 if form.get("is_decline") else 0
+    chosen = form.get("field_type", "text")
+    multiline = 1 if chosen == "note" else 0
+    if is_decline:
+        ftype = "checkbox"
+    elif chosen == "note":
+        ftype = "text"
+    else:
+        ftype = chosen
+    # Valgmuligheder giver kun mening på en dropdown. Gemmer man dem på andre typer,
+    # dukker de op igen som en spøgelses-liste under punktet.
+    opts = []
+    if ftype == "dropdown":
+        opts = [o.strip() for o in form.get("options", "").split(",") if o.strip()]
+    return {"label": form.get("label", "").strip(),
+            "field_type": ftype,
+            "options": json.dumps(opts),
+            "required": 0 if is_decline else (1 if form.get("required") else 0),
+            "is_decline": is_decline,
+            "multiline": multiline}
+
+
+def _field_edit_warnings(conn, old, new, field_id) -> list:
+    """Advarsler når en rettelse rører ved svar, der allerede er gemt.
+
+    Et punkt kan være udfyldt i eksisterende tilmeldinger, og `registration_values`
+    gemmer svaret som ren tekst. Ændrer man type eller fjerner et dropdown-valg,
+    bliver de gamle svar stående — men de passer ikke længere til feltet.
+    """
+    rows = conn.execute(
+        "SELECT value, COUNT(*) AS n FROM registration_values "
+        "WHERE field_id = ? AND value != '' GROUP BY value", (field_id,)).fetchall()
+    if not rows:
+        return []
+    used = sum(r["n"] for r in rows)
+    out = []
+
+    if new["field_type"] == "dropdown":
+        allowed = set(json.loads(new["options"]))
+        orphan = [r for r in rows if r["value"] not in allowed]
+        if orphan:
+            liste = ", ".join(f"»{r['value']}« ({r['n']})" for r in orphan)
+            out.append(f"Bemærk: {liste} står i eksisterende tilmeldinger, men er ikke "
+                       "længere et valg. Svarene vises som de er, men bliver overskrevet, "
+                       "hvis tilmeldingen rettes.")
+    if old["field_type"] != new["field_type"]:
+        out.append(f"Bemærk: typen er ændret, og punktet er udfyldt i {used} tilmelding(er). "
+                   "De gamle svar står uændret som tekst.")
+    if old["is_decline"] != new["is_decline"]:
+        out.append("Bemærk: »deltager ikke«-status er ændret på et punkt, der er i brug — "
+                   "det kan have flyttet på, hvem der tæller som afbud.")
+    return out
 
 
 def _move_field(conn, group_id, field_id, direction):
@@ -931,6 +1026,31 @@ def _default_deadline(conn, event_date, start_time):
         return ""
 
 
+def _deadline_warning(event_date, start_time, deadline) -> str:
+    """Advarsel når fristen ikke giver mening i forhold til datoen.
+
+    Net under JS'en i formularen: en kopi arver originalens frist, og redigerer man
+    datoen uden JS (eller sætter fristen i hånden), kan man ende med et event i
+    fremtiden, hvor tilmeldingen er lukket fra start. Vi retter ikke — en frist er
+    admins valg — men det skal siges højt.
+    """
+    if not deadline or not event_date:
+        return ""
+    try:
+        dl = datetime.fromisoformat(deadline)
+        start = datetime.strptime(f"{event_date} {start_time or '23:59'}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return ""
+    if dl > start:
+        return ("Bemærk: tilmeldingsfristen ligger EFTER eventets start — "
+                "tilmelding er åben helt frem til, at det er i gang.")
+    if start >= datetime.now() > dl:
+        return ("Bemærk: tilmeldingsfristen er allerede passeret, selvom eventet ligger "
+                "i fremtiden — tilmelding er lukket fra start. Ret fristen, hvis eventet "
+                "skal være åbent.")
+    return ""
+
+
 def _save_event(group, ev):
     name = request.form.get("name", "").strip()
     slug = auth.slugify(request.form.get("slug", "") or name)
@@ -954,6 +1074,7 @@ def _save_event(group, ev):
     deadline = request.form.get("signup_deadline", "")
     if not deadline:  # fald tilbage til standard: X dage før start
         deadline = _default_deadline(conn, event_date, start_time)
+    frist_advarsel = _deadline_warning(event_date, start_time, deadline)
 
     vals = (
         name, slug, event_date, start_time, request.form.get("end_time", ""),
@@ -972,20 +1093,30 @@ def _save_event(group, ev):
         1 if request.form.get("notify_event_reminder") else 0,
     )
     if ev:
+        # Tæl kun revisionen op, hvis noget kalender-relevant er ændret — så bliver
+        # abonnenternes kalender ikke "opdateret" af et flueben, de ikke kan se.
+        ics_ændret = any((ev[k] or "") != (vals[i] or "")
+                         for i, k in enumerate(_ICS_FIELDS))
         conn.execute(
             "UPDATE events SET name=?, slug=?, event_date=?, start_time=?, end_time=?, "
             "description=?, expected_count=?, signup_deadline=?, notify_new_signup=?, "
             "notify_change=?, notify_receipt=?, notify_reminder=?, csv_after_deadline=?, "
             "capacity_limit=?, notify_deadline=?, waitlist_enabled=?, allow_guests=?, "
-            "notify_event_reminder=? WHERE id = ?",
-            vals + (ev["id"],))
+            "notify_event_reminder=?, updated_at=?, revision=? WHERE id = ?",
+            vals + (db.now_iso() if ics_ændret else (ev["updated_at"] or ev["created_at"]),
+                    (ev["revision"] or 0) + (1 if ics_ændret else 0),
+                    ev["id"]))
         event_id = ev["id"]
         flash("Event opdateret.", "ok")
+        if frist_advarsel:
+            flash(frist_advarsel, "error")
     else:
         cur = conn.execute(EVENT_INSERT_SQL, vals + (group["id"], db.now_iso()))
         event_id = cur.lastrowid
         db.add_log(conn, "event", f"Event '{name}' oprettet i {group['name']}", group["slug"])
         flash("Event oprettet.", "ok")
+        if frist_advarsel:
+            flash(frist_advarsel, "error")
 
     # Gem hvilke punkter der er skjult på dette event (ukrydsede = skjult)
     hidden_ids = [f["id"] for f in all_group_fields(conn, group["id"])
@@ -1226,6 +1357,23 @@ def _to_utc(naive):
         return None
 
 
+def _row(row, key, default=None):
+    """Læs en kolonne der måske ikke er med i det SELECT, rækken kom fra.
+
+    sqlite3.Row kaster IndexError på ukendte nøgler — build_ics skal ikke vælte et
+    kalender-feed, fordi en kalder har hentet færre kolonner.
+    """
+    try:
+        return row[key]
+    except (IndexError, KeyError):
+        return default
+
+
+# De felter der faktisk ender i .ics-filen. Kun ændringer i DEM skal tælle en ny
+# revision op — flueben for notifikationer og forventet antal ses ikke i en kalender.
+_ICS_FIELDS = ("name", "slug", "event_date", "start_time", "end_time", "description")
+
+
 def build_ics(group, events, base_url=""):
     """Byg en iCal-fil med de givne events."""
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
@@ -1240,6 +1388,17 @@ def build_ics(group, events, base_url=""):
         out.append("BEGIN:VEVENT")
         out.append(f"UID:tilmeld-{group['slug']}-{ev['id']}@tilmeld")
         out.append(f"DTSTAMP:{stamp}")
+        # SEQUENCE + LAST-MODIFIED fortæller kalenderen, at det her er en NYERE udgave
+        # af et event, den allerede kender. Uden dem kan en .ics-fil, der hentes igen
+        # efter en ændring, ende som en dublet i stedet for en opdatering.
+        out.append(f"SEQUENCE:{_row(ev, 'revision') or 0}")
+        modified = _row(ev, "updated_at") or _row(ev, "created_at") or ""
+        try:
+            mu = _to_utc(datetime.fromisoformat(modified))
+            if mu:
+                out.append("LAST-MODIFIED:" + mu.strftime("%Y%m%dT%H%M%SZ"))
+        except ValueError:
+            pass
         if ev["start_time"]:
             start = datetime.strptime(f"{ev['event_date']} {ev['start_time']}",
                                       "%Y-%m-%d %H:%M")
@@ -1264,13 +1423,31 @@ def build_ics(group, events, base_url=""):
         desc = ev["description"] or ""
         if base_url:
             link = f"{base_url.rstrip('/')}/{group['slug']}/{ev['slug']}"
+            # URL-feltet vises som et klikbart link i Apple Kalender, men ignoreres af
+            # bl.a. Google — derfor står linket OGSÅ i beskrivelsen, hvor alle
+            # kalender-apps viser det og gør det klikbart.
             out.append(f"URL:{link}")
-            desc = (desc + "\n\n" + link).strip()
+            # Linket står ØVERST: i en kalender-app er beskrivelsen et lille notefelt,
+            # og et link nederst i en lang beskrivelse kræver, at man scroller for at
+            # finde det.
+            desc = (f"Tilmelding og detaljer:\n{link}\n\n" + desc).strip()
         if desc:
             out.append(f"DESCRIPTION:{_ics_escape(desc)}")
         out.append("END:VEVENT")
     out.append("END:VCALENDAR")
     return "\r\n".join(_ics_fold(line) for line in out) + "\r\n"
+
+
+def public_base_url(conn) -> str:
+    """Appens offentlige adresse — til links i kalender-feeds og mails.
+
+    Kun master-indstillingen »Offentlig URL«. **Udled den ikke af requesten**, selvom
+    det er fristende: appen kan nås på flere adresser (localhost, LAN-IP, tunnel-domæne),
+    og et link havner PERMANENT i folks kalender. Hentes feedet én gang over LAN-IP'en,
+    står der et link, der ikke virker uden for huset — og det opdager man aldrig selv.
+    Er indstillingen tom, tilføjes der intet link. Det er bedre end et forkert et.
+    """
+    return (db.get_settings(conn)["base_url"] or "").strip()
 
 
 def ensure_calendar_token(conn, group):
@@ -1379,9 +1556,9 @@ def group_calendar_ics(slug):
     events = conn.execute(
         "SELECT * FROM events WHERE group_id = ? AND event_date >= ? ORDER BY event_date",
         (group["id"], since)).fetchall()
-    base = db.get_settings(conn)["base_url"]
+    base = public_base_url(conn)
     conn.close()
-    return Response(build_ics(group, events, base), mimetype="text/calendar; charset=utf-8")
+    return Response(build_ics(group, events, base), content_type="text/calendar; charset=utf-8")
 
 
 @app.route("/<slug>/<event_slug>/event.ics")
@@ -1395,12 +1572,12 @@ def user_event_ics(slug, event_slug):
     conn = db.get_db()
     ev = conn.execute("SELECT * FROM events WHERE group_id = ? AND slug = ?",
                       (group["id"], event_slug)).fetchone()
-    base = db.get_settings(conn)["base_url"]
+    base = public_base_url(conn)
     conn.close()
     if not ev:
         abort(404)
     return Response(
-        build_ics(group, [ev], base), mimetype="text/calendar; charset=utf-8",
+        build_ics(group, [ev], base), content_type="text/calendar; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={ev['slug']}.ics"})
 
 

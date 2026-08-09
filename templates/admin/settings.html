@@ -1,5 +1,30 @@
 {% extends "base.html" %}
 {% import "_passkeys.html" as pk %}
+
+{# Felterne i et tilmeldings-punkt. Samme makro bruges til BÅDE tilføj og redigér,
+   så de to formularer ikke kan komme til at tilbyde forskellige muligheder. #}
+{% macro field_fields(f=None, options=None) %}
+  {% set cur = 'note' if f and f.multiline else (f.field_type if f else 'text') %}
+  <label>Navn på punkt
+    <input type="text" name="label" value="{{ f.label if f else '' }}" required>
+  </label>
+  <label>Type
+    <select name="field_type">
+      <option value="text" {{ 'selected' if cur == 'text' }}>Tekstfelt</option>
+      <option value="note" {{ 'selected' if cur == 'note' }}>Notefelt (flere linjer — alle kan se den)</option>
+      <option value="dropdown" {{ 'selected' if cur == 'dropdown' }}>Dropdown</option>
+      <option value="checkbox" {{ 'selected' if cur == 'checkbox' }}>Checkbox</option>
+    </select>
+  </label>
+  <label>Dropdown-valg (kommasepareret, kun ved dropdown)
+    <input type="text" name="options" value="{{ options|join(', ') if options else '' }}"
+           placeholder="fx Kød, Vegetar, Vegansk">
+  </label>
+  <label class="chk"><input type="checkbox" name="required" {{ 'checked' if f and f.required }}>
+    Skal udfyldes</label>
+  <label class="chk"><input type="checkbox" name="is_decline" {{ 'checked' if f and f.is_decline }}>
+    "Deltager ikke"-felt (checkbox — hvis afkrydset ved tilmelding kræves kun navn)</label>
+{% endmacro %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Vis som bruger</a>
@@ -11,7 +36,7 @@
 <div class="card narrow">
   <h1>Gruppe-opsætning</h1>
 
-  <h2>Gruppe-password</h2>
+  <h2 id="adgang">Gruppe-password</h2>
   <p class="muted small">Adgangskode til bruger-siden <code>/{{ group.slug }}</code>.
      Tomt password = åben adgang uden login.</p>
   <form method="post">
@@ -27,7 +52,7 @@
   </form>
 
   {% if group.mail_enabled or group.whatsapp_enabled %}
-  <h2>Kontakt for notifikationer</h2>
+  <h2 id="kontakt">Kontakt for notifikationer</h2>
   <p class="muted small">Modtagere som master admin satte ved oprettelsen — du kan rette dem her.</p>
   <form method="post">
     <input type="hidden" name="action" value="contact">
@@ -39,63 +64,67 @@
 </div>
 
 <div class="card narrow">
-  <h2>Tilmeldings-punkter</h2>
+  <h2 id="punkter">Tilmeldings-punkter</h2>
   <p class="muted small">Punkter som vises på alle gruppens events ved tilmelding.</p>
   {% if not fields %}<p>Ingen punkter endnu.</p>{% endif %}
   {% for item in fields %}
-    <div class="row">
-      <div>
-        {% set typelabel = 'notefelt' if item.f.multiline else ('deltager ikke' if item.f.is_decline else item.f.field_type) %}
-        <strong>{{ loop.index }}. {{ item.f.label }}</strong>
-        <span class="muted">({{ typelabel }}{% if item.f.required %}, påkrævet{% endif %})</span>
-        {% if item.options %}<div class="muted small">Valg: {{ item.options|join(', ') }}</div>{% endif %}
+    <div class="fielditem">
+      <div class="row">
+        <div>
+          {% set typelabel = 'notefelt' if item.f.multiline else ('deltager ikke' if item.f.is_decline else item.f.field_type) %}
+          <strong>{{ loop.index }}. {{ item.f.label }}</strong>
+          <span class="muted">({{ typelabel }}{% if item.f.required %}, påkrævet{% endif %})</span>
+          {% if item.options %}<div class="muted small">Valg: {{ item.options|join(', ') }}</div>{% endif %}
+        </div>
+        <div class="actions">
+          <form method="post" class="inline">
+            <input type="hidden" name="action" value="move_field">
+            <input type="hidden" name="field_id" value="{{ item.f.id }}">
+            <input type="hidden" name="direction" value="up">
+            <button {{ 'disabled' if loop.first }} title="Flyt op">▲</button>
+          </form>
+          <form method="post" class="inline">
+            <input type="hidden" name="action" value="move_field">
+            <input type="hidden" name="field_id" value="{{ item.f.id }}">
+            <input type="hidden" name="direction" value="down">
+            <button {{ 'disabled' if loop.last }} title="Flyt ned">▼</button>
+          </form>
+          <form method="post" class="inline" onsubmit="return confirm('Slet punktet »{{ item.f.label }}«?')">
+            <input type="hidden" name="action" value="delete_field">
+            <input type="hidden" name="field_id" value="{{ item.f.id }}">
+            <button class="danger">Slet</button>
+          </form>
+        </div>
       </div>
-      <div class="actions">
-        <form method="post" class="inline">
-          <input type="hidden" name="action" value="move_field">
+      <details class="fieldedit">
+        <summary>Redigér</summary>
+        <form method="post">
+          <input type="hidden" name="action" value="edit_field">
           <input type="hidden" name="field_id" value="{{ item.f.id }}">
-          <input type="hidden" name="direction" value="up">
-          <button {{ 'disabled' if loop.first }} title="Flyt op">▲</button>
+          {{ field_fields(item.f, item.options) }}
+          {% if item.used %}
+            <p class="muted small">Punktet er udfyldt i <strong>{{ item.used }}</strong>
+               tilmelding(er). Navnet kan trygt rettes. Ændrer du typen eller fjerner et
+               dropdown-valg, bliver de gamle svar stående som tekst — de passer bare ikke
+               længere til feltet.</p>
+          {% endif %}
+          <button type="submit" class="primary">Gem ændringer</button>
         </form>
-        <form method="post" class="inline">
-          <input type="hidden" name="action" value="move_field">
-          <input type="hidden" name="field_id" value="{{ item.f.id }}">
-          <input type="hidden" name="direction" value="down">
-          <button {{ 'disabled' if loop.last }} title="Flyt ned">▼</button>
-        </form>
-        <form method="post" class="inline" onsubmit="return confirm('Slet punktet?')">
-          <input type="hidden" name="action" value="delete_field">
-          <input type="hidden" name="field_id" value="{{ item.f.id }}">
-          <button class="danger">Slet</button>
-        </form>
-      </div>
+      </details>
     </div>
   {% endfor %}
 
   <h3>Tilføj punkt</h3>
   <form method="post">
     <input type="hidden" name="action" value="add_field">
-    <label>Navn på punkt <input type="text" name="label" required></label>
-    <label>Type
-      <select name="field_type">
-        <option value="text">Tekstfelt</option>
-        <option value="note">Notefelt (flere linjer — alle kan se den)</option>
-        <option value="dropdown">Dropdown</option>
-        <option value="checkbox">Checkbox</option>
-      </select>
-    </label>
-    <label>Dropdown-valg (kommasepareret, kun ved dropdown)
-      <input type="text" name="options" placeholder="fx Kød, Vegetar, Vegansk">
-    </label>
+    {{ field_fields() }}
     <p class="muted small">Nye punkter placeres nederst — brug ▲/▼ ovenfor til at flytte dem.</p>
-    <label class="chk"><input type="checkbox" name="required"> Skal udfyldes</label>
-    <label class="chk"><input type="checkbox" name="is_decline"> "Deltager ikke"-felt (checkbox — hvis afkrydset ved tilmelding kræves kun navn)</label>
     <button type="submit">Tilføj punkt</button>
   </form>
 </div>
 
 <div class="card narrow">
-  <h2>Bruger-sidens udseende</h2>
+  <h2 id="udseende">Bruger-sidens udseende</h2>
   <p class="muted small">Billede vises på login-skærmen og i toppen af bruger-siden.
      Teksten vises på login-skærmen.</p>
   <form method="post" enctype="multipart/form-data">
@@ -116,7 +145,7 @@
 
 {% if templates %}
 <div class="card narrow">
-  <h2>Mail-skabeloner</h2>
+  <h2 id="skabeloner">Mail-skabeloner</h2>
   <p class="muted small">Teksten der bruges når der sendes mails. Pladsholdere du kan bruge:
      <code>{event}</code>, <code>{name}</code>, <code>{date}</code>,
      <code>{deadline}</code>, <code>{group}</code>, <code>{link}</code> (kun i "Frist nået").</p>

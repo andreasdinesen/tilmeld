@@ -66,23 +66,47 @@
   </form>
 </div>
 <script>
-  // Forudfyld tilmeldingsfrist til N dage før event-start, hvis feltet er tomt.
+  // Tilmeldingsfristen holder sin afstand til eventets start: flytter man datoen,
+  // flytter fristen med. Samme regel som gentagelser bruger server-side.
+  //
+  // Det er dét, der gør en KOPI brugbar: kopien arver originalens frist, som er
+  // knyttet til den gamle dato. Tidligere blev feltet kun udfyldt, hvis det var tomt,
+  // så en kopi beholdt en frist, der allerede var udløbet — og eventet var lukket
+  // fra det øjeblik, det blev oprettet.
   (function () {
     var days = {{ default_deadline_days }};
     var dateEl = document.querySelector('input[name=event_date]');
     var timeEl = document.querySelector('input[name=start_time]');
     var dl = document.getElementById('signup_deadline');
-    function update() {
-      if (!dateEl.value || dl.value) return;
-      var t = timeEl.value || '12:00';
-      var d = new Date(dateEl.value + 'T' + t);
-      d.setDate(d.getDate() - days);
-      var pad = function (n) { return String(n).padStart(2, '0'); };
-      dl.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-                 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    if (!dateEl || !dl) return;
+
+    function start() {
+      if (!dateEl.value) return null;
+      return new Date(dateEl.value + 'T' + ((timeEl && timeEl.value) || '12:00'));
     }
-    dateEl.addEventListener('change', update);
-    timeEl.addEventListener('change', update);
+    function fmt(d) {
+      var pad = function (n) { return String(n).padStart(2, '0'); };
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+             'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    // Afstanden mellem start og frist i millisekunder. Måles ved indlæsning og hver
+    // gang admin selv retter fristen — så en håndsat frist bevarer SIN afstand.
+    var offset = days * 86400000;
+    function measure() {
+      if (!dl.value) { offset = days * 86400000; return; }   // tomt = tilbage til standard
+      var s = start();
+      if (s) offset = s - new Date(dl.value);
+    }
+    function apply() {
+      var s = start();
+      if (s) dl.value = fmt(new Date(s.getTime() - offset));
+    }
+
+    measure();
+    dateEl.addEventListener('change', apply);
+    if (timeEl) timeEl.addEventListener('change', apply);
+    dl.addEventListener('change', measure);
   })();
 </script>
 {% endblock %}

@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS events (
     notify_event_reminder INTEGER DEFAULT 0,       -- påmindelse 24t før selve eventet
     event_reminder_sent INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL,
+    updated_at          TEXT DEFAULT '',           -- iCal LAST-MODIFIED
+    revision            INTEGER DEFAULT 0,         -- iCal SEQUENCE: tælles op når noget
+                                                   -- kalender-relevant ændres
     UNIQUE (group_id, slug)
 );
 

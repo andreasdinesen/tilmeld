@@ -128,6 +128,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("events", "capacity_limit", "INTEGER DEFAULT 0")
     add("events", "notify_deadline", "INTEGER DEFAULT 0")
     add("events", "deadline_sent", "INTEGER DEFAULT 0")
+    add("events", "updated_at", "TEXT DEFAULT ''")
+    add("events", "revision", "INTEGER DEFAULT 0")
 
     # Flyt evt. gamle SMS-data over til WhatsApp-felterne (kun hvis de gamle kolonner
     # findes — dvs. databaser oprettet før WhatsApp-skiftet).
