@@ -4,16 +4,16 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 11
+  version: 12
   icon: "app"
 
   docker:
-    image: "ghcr.io/andreasdinesen/tilmeld:latest"
+    image: "ghcr.io/andreasdinesen/tilmeld:{{IMAGE_TAG}}"
     user: "0:0"
     data_path: "/data"
 
   install:
-    image: "ghcr.io/andreasdinesen/tilmeld:latest"
+    image: "ghcr.io/andreasdinesen/tilmeld:{{IMAGE_TAG}}"
     script: |
       mkdir -p /data
       echo "Tilmeld-image hentet. Tryk Start."
@@ -27,7 +27,7 @@ gameskill:
   # her (til forskel fra payload-baserede runer, der skal "rm -rf app" foerst).
   # /data - database og uploads - skal netop IKKE roeres.
   update:
-    image: "ghcr.io/andreasdinesen/tilmeld:latest"
+    image: "ghcr.io/andreasdinesen/tilmeld:{{IMAGE_TAG}}"
     label: "Opdater Tilmeld"
     script: |
       set -eu
@@ -37,6 +37,21 @@ gameskill:
       echo "Databasen i /data er uroert; skemaaendringer koeres naar appen starter."
 
   variables:
+    # Gør app-versionen til et felt i panelet: "latest" følger med hver udgivelse,
+    # "v12" laaser installationen til netop den version. Det er vejen tilbage, hvis
+    # en udgivelse driller — uden at vente paa en ny.
+    # NB: versions-taggene begynder ved v12; aeldre udgivelser findes kun som latest.
+    #
+    # Kun tagget er et felt, ikke hele image-adressen (til forskel fra {{NODE_IMAGE}}
+    # i de oevrige runer, hvor man med rette skal kunne skifte selve runtime-imaget).
+    # Her er imaget vores eget, og der er ingen grund til at kunne pege appen paa et
+    # vilkaarligt image — moenstret tillader kun "latest" eller "v<tal>".
+    - key: IMAGE_TAG
+      name: "App-version: latest (foelger nyeste) eller fx v12 for at laase/rulle tilbage"
+      type: string
+      default: "latest"
+      pattern: '^(latest|v[0-9]+)$'
+      hint: "Skriv latest eller et versionsnummer som v12 - se versionsloggen i CHANGELOG.md"
     - key: MASTER_PASSWORD
       name: "Master-password (KUN ved allerførste opstart — skift derefter i appen under master → Opsætning)"
       type: string

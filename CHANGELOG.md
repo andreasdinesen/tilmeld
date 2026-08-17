@@ -13,6 +13,27 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 12
+
+**Hver udgivelse får sit eget image-tag — og du kan rulle tilbage.**
+
+- Hver udgivelse bygges nu også som `ghcr.io/andreasdinesen/tilmeld:v<version>` ved
+  siden af `:latest`. Versionsnummeret læses direkte af rune-filen i build'et, så de
+  to aldrig kan komme ud af trit.
+- Runen har fået feltet **»App-version«** (`IMAGE_TAG`) i panelets indstillinger.
+  `latest` følger nyeste udgivelse — og skriver du fx `v12`, låses installationen til
+  netop den version. **Det er vejen tilbage, hvis en udgivelse driller:** sæt feltet,
+  tryk »Opdater Tilmeld«, og du kører den gamle version igen uden at vente på en
+  rettelse. Databasen i `/data` er upåvirket.
+- Feltet accepterer kun `latest` eller `v<tal>` — modsat de øvrige runer, hvor hele
+  runtime-imaget er et felt. Her er imaget vores eget, og der er ingen grund til at
+  kunne pege appen på et vilkårligt image.
+
+**Versions-taggene begynder ved v12.** Tidligere udgivelser findes kun som `:latest`,
+så man kan ikke rulle længere tilbage end hertil.
+
+Selve appen er uændret; det er rune-definitionen og build'et, der har ændret sig.
+
 ## Version 11
 
 **Egen »Opdater Tilmeld«-knap i panelet.**
