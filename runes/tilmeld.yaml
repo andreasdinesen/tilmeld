@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 10
+  version: 11
   icon: "app"
 
   docker:
@@ -17,6 +17,24 @@ gameskill:
     script: |
       mkdir -p /data
       echo "Tilmeld-image hentet. Tryk Start."
+
+  # Egen "Opdater app"-knap, saa man ikke skal geninstallere serveren for at faa en
+  # ny version. Panelet stopper appen, henter imaget FRISKT (docker pull), koerer
+  # dette script i en midlertidig container og gen-skaber derefter app-containeren
+  # fra det nye image - det er selve pull'et og gen-skabelsen, der opdaterer appen.
+  #
+  # App-koden ligger i imaget, ikke i datamappen, saa der er ingen filer at pakke ud
+  # her (til forskel fra payload-baserede runer, der skal "rm -rf app" foerst).
+  # /data - database og uploads - skal netop IKKE roeres.
+  update:
+    image: "ghcr.io/andreasdinesen/tilmeld:latest"
+    label: "Opdater Tilmeld"
+    script: |
+      set -eu
+      mkdir -p /data
+      ver=$(sed -n 's/^  version: *//p' /app/runes/tilmeld.yaml 2>/dev/null || true)
+      echo "Tilmeld version ${ver:-ukendt} hentet."
+      echo "Databasen i /data er uroert; skemaaendringer koeres naar appen starter."
 
   variables:
     - key: MASTER_PASSWORD

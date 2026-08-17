@@ -13,6 +13,23 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 11
+
+**Egen »Opdater Tilmeld«-knap i panelet.**
+
+- Runen har fået en `update:`-blok, så serveren får sin egen **»Opdater Tilmeld«**-knap
+  ved siden af Start/Stop. Før skulle man geninstallere serveren under
+  *Settings → Update/Reinstall* for at få en ny version — det virkede, men lyder
+  farligere end det er, og knappen siger nu direkte, hvad den gør.
+- Panelet stopper appen, henter imaget forfra, kører rune-scriptet og starter appen
+  igen på det nye image. **Databasen og uploads i `/data` røres ikke** — skemaændringer
+  kører automatisk, når appen starter.
+- Opdaterings-loggen viser hvilken version, der blev hentet.
+
+Selve appen er uændret i denne version; det er kun rune-definitionen, der har fået
+den nye knap. Første gang skal den stadig hentes med **Runes → Reload** og derefter
+én *Update/Reinstall* — derefter er knappen der.
+
 ## Version 10
 
 **Tilmeldings-punkter kan rettes — og siden bliver, hvor du er.**
