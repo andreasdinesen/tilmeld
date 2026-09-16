@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 13
+  version: 14
   icon: "app"
 
   docker:
@@ -72,6 +72,37 @@ gameskill:
 
   ports:
     - { name: web, default: 8080, protocol: tcp }
+
+  # Standard-overvaagning (Kvasir-watchers). Laegges ind ved oprettelse og ved
+  # Reinstall - en eksisterende server faar dem foerst efter en Reinstall.
+  watchers:
+    # notifications.py og db.py skriver [MAIL-FEJL], [WHATSAPP-FEJL],
+    # [SCHEDULER-FEJL] og [LOG-FEJL]. Hver linje er en besked, der ikke kom ud,
+    # eller en paamindelsesrunde, der fejlede.
+    - name: "Notifikationer eller baggrundsjob fejler"
+      pattern: '\[[A-Z]+-FEJL\]'
+      threshold: 1
+      window_secs: 300
+    # Flask logger en uhaandteret undtagelse som
+    # "[tid] ERROR in app: Exception on /sti [GET]" + traceback - brugeren fik 500.
+    - name: "Serverfejl (500)"
+      pattern: 'ERROR in app: Exception on '
+      threshold: 1
+      window_secs: 300
+
+  # Wipe = start forfra med en TOM database. Kun tilmeld.db og dens sidefiler
+  # slettes. Appen koerer med SQLites standard-journal, saa den, der kan findes,
+  # er -journal (efter et nedbrud hoerer en efterladt journal til den GAMLE
+  # database og skal vaek sammen med den); -wal/-shm er med, hvis WAL slaas til.
+  # Vaek er: alle grupper, events, tilmeldinger, brugere, passkeys og opsaetning
+  # (SMTP, WhatsApp). Ved naeste start oprettes databasen igen, og
+  # MASTER_PASSWORD gaelder paa ny (det er "allerfoerste opstart" igen).
+  # uploads/ (brugernes billeder) roeres IKKE - de ligger tilbage uden noget,
+  # der peger paa dem, og kan slettes under Files. Tag en backup foerst;
+  # backup_first er dokumentation - panelet spoerger selv ved hver wipe.
+  wipe:
+    paths: ["tilmeld.db", "tilmeld.db-journal", "tilmeld.db-wal", "tilmeld.db-shm"]
+    backup_first: true
 
   backup:
     include: ["."]

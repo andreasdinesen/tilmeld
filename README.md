@@ -101,6 +101,14 @@ Installér via yggdrasils **"Browse runes on GitHub"**:
 
 Sæt `MASTER_PASSWORD` ved oprettelsen. Port 8080 eksponeres.
 
+**Overvågning:** runen giver to log-watchers, der sender en notifikation i panelet —
+én for `[MAIL-FEJL]`/`[WHATSAPP-FEJL]`/`[SCHEDULER-FEJL]`/`[LOG-FEJL]` og én for
+uhåndterede serverfejl (HTTP 500). En eksisterende server får dem ved næste Reinstall.
+
+**Wipe** starter forfra med en tom database: `tilmeld.db` (og dens journal-filer)
+slettes, og ved næste start gælder `MASTER_PASSWORD` igen. `uploads/` røres ikke.
+Panelet tilbyder en backup først.
+
 ## Version og opdatering
 
 Der er **ét versionsnummer**: runens `version:` i `runes/tilmeld.yaml`. Det er det tal,
@@ -112,6 +120,8 @@ Opdatering sker i panelet — ikke inde i appen:
 1. **Runes → Browse GitHub → Reload** henter den nye rune-definition.
 2. **Serveren → Settings → Update/Reinstall** henter det nye Docker-image.
 
-`/data` (database og uploads) overlever begge trin.
+`/data` (database og uploads) overlever begge trin. Panelet henter også imaget igen
+ved hver **Restart**, så med `IMAGE_TAG=latest` er en Restart også en opdatering;
+`IMAGE_TAG=v12` (eller en anden version) låser installationen.
 
 GitHub-repoet sættes under **master → Opsætning** og bruges til at slå versionsloggen op.
