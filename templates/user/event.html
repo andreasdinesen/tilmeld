@@ -91,7 +91,7 @@
     <button type="submit" class="primary">Tilmeld</button>
   </form>
 </div>
-<script src="{{ url_for('static', filename='forms.js') }}"></script>
+<script src="{{ url_for('static', filename='forms.js') }}?v={{ app_version }}"></script>
 <script>initSignupForm('signup-form', { autoDecline: true });</script>
 {% elif accounts and not is_admin and state == 'open' %}
 <div class="card"><p class="muted">Du er tilmeldt dette event. Rediger eller fjern din tilmelding i listen ovenfor.</p></div>

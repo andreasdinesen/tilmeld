@@ -13,7 +13,7 @@
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Gem ændringer</button>
   </form>
-  <script src="{{ url_for('static', filename='forms.js') }}"></script>
+  <script src="{{ url_for('static', filename='forms.js') }}?v={{ app_version }}"></script>
   <script>initSignupForm('edit-form', { autoDecline: false });</script>
   {% endif %}
 </div>
