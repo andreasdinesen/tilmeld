@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 14
+  version: 15
   icon: "app"
 
   docker:
@@ -46,9 +46,23 @@ gameskill:
     # i de oevrige runer, hvor man med rette skal kunne skifte selve runtime-imaget).
     # Her er imaget vores eget, og der er ingen grund til at kunne pege appen paa et
     # vilkaarligt image — moenstret tillader kun "latest" eller "v<tal>".
+    #
+    # Feltet maa ALDRIG staa tomt - panelet bruger IKKE default for en tom vaerdi
+    # (yggdrasil @ddcf9d2; rune-schema.md:348/:388 lover det, koden goer det ikke):
+    #  1. validateVar returnerer ok paa "" (internal/api/env_validate.go:61-63)
+    #     FOER type- og pattern-tjekket (:65-113), saa moenstret afviser aldrig "".
+    #  2. `required` haandhaeves ikke server-side (samme fil :57-60); det giver kun
+    #     stjernen i formularen (web/src/components/VarForm.svelte:41).
+    #  3. "" gemmes og vinder over default (create: handlers_servers.go:324-327,
+    #     start/install: handlers_query_rcon.go:50-51), saa imaget bliver "...:"
+    #     og pull/create fejler (handlers_servers.go:828-887, install.go:150-198).
+    #     Install-scriptet koerer i samme image og naar aldrig at melde fejlen.
+    # Derfor required (stjerne) og "aldrig tomt" i feltnavnet. Staar feltet tomt:
+    # skriv latest, gem og tryk Restart.
     - key: IMAGE_TAG
-      name: "App-version: latest (foelger nyeste) eller fx v12 for at laase/rulle tilbage"
+      name: "App-version: latest (foelger nyeste) eller fx v12 for at laase/rulle tilbage - aldrig tomt, skriv latest hvis i tvivl"
       type: string
+      required: true
       default: "latest"
       pattern: '^(latest|v[0-9]+)$'
       hint: "Skriv latest eller et versionsnummer som v12 - se versionsloggen i CHANGELOG.md"

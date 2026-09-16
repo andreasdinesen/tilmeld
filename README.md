@@ -124,4 +124,8 @@ Opdatering sker i panelet — ikke inde i appen:
 ved hver **Restart**, så med `IMAGE_TAG=latest` er en Restart også en opdatering;
 `IMAGE_TAG=v12` (eller en anden version) låser installationen.
 
+**Tomt felt:** `IMAGE_TAG` må aldrig stå tomt. Panelet bruger ikke standardværdien for et
+tomt felt, men gemmer det tomme, så image-adressen ender på `:` og hverken install eller
+Start kan hente imaget. Står feltet tomt, så skriv `latest`, gem og tryk Restart.
+
 GitHub-repoet sættes under **master → Opsætning** og bruges til at slå versionsloggen op.
