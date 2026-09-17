@@ -13,6 +13,39 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 16
+
+**Notifikationsliste: giv besked om nye events — også til folk der ikke er tilmeldt.**
+
+Gruppe-admin har fået siden **Notifikationsliste** (`/<gruppe>/admin/notifikationer`).
+Her står de modtagere, der skal høre om et nyt event, før de tilmelder sig noget.
+
+- **Mail og/eller mobilnummer**, afhængigt af hvad master har slået til for gruppen.
+  Er kun mail aktiveret, vises nummer-feltet slet ikke — og omvendt.
+- **Kører gruppen med individuelle bruger-konti, henter listen brugerne selv.** Deres
+  mail og mobilnummer kommer direkte fra profilen, så de ikke skal vedligeholdes to
+  steder; retter en bruger sin mail, følger listen med. Admin kan stadig tilføje folk
+  i hånden — fx dem der endnu ikke har en konto. Dubletter (samme mail eller samme
+  nummer) sendes der kun til én gang.
+- **Automatisk varsling:** vælg hvor mange dage før et event, listen skal have besked
+  (standard 14). Oprettes et event tættere på end det, sendes varslingen med det samme.
+  Hvert event har et flueben under *Notifikationer*, så enkelte events kan holdes ude.
+- **Send nu:** en knap der sender varslingen om et valgt event, og et felt til en helt
+  fri besked til hele listen. `{name}` bliver modtagerens navn, `{group}` gruppens.
+- Modtagere kan sættes **på pause** i stedet for at blive slettet.
+- Teksten er en **mail-skabelon** (»Nyt event«) som alle de andre, og kan rettes under
+  Opsætning, hvis master har givet gruppen lov.
+
+Listen sender kun gennem de kanaler, master har aktiveret for gruppen. Er hverken mail
+eller WhatsApp sat op, er siden helt skjult — den ville alligevel ikke kunne sende noget.
+
+Databasen udvides automatisk ved opstart (ny tabel + nye kolonner); intet går tabt.
+
+## Version 13, 14 og 15
+
+Rune-definitionen, ikke appen: cache-bust på `forms.js`, log-watchers og »Wipe« i
+panelet, og en advarsel om at `IMAGE_TAG` aldrig må stå tomt.
+
 ## Version 12
 
 **Hver udgivelse får sit eget image-tag — og du kan rulle tilbage.**

@@ -75,6 +75,27 @@ Tilmeld kalder den med `POST <gateway-url>` og JSON-body `{"to": "<nummer eller 
 "message": "..."}` samt header `Authorization: Bearer <api-nøgle>`. Konfigurér din bro
 til at acceptere det format (eller sæt en lille adapter foran).
 
+## Notifikationsliste
+
+Gruppe-admin kan under **Notifikationsliste** samle de modtagere, der skal høre om et nyt
+event — også dem, der ikke er tilmeldt noget endnu. Modtagerne kan have en mailadresse,
+et mobilnummer eller begge dele; kun de kanaler, master har slået til for gruppen, vises.
+
+Kører gruppen med individuelle bruger-konti, hentes brugernes mail og mobilnummer
+**direkte fra deres profil** — de skal ikke skrives ind på listen. Admin kan tilføje
+ekstra modtagere i hånden, og dubletter sendes der kun til én gang.
+
+Listen bruges to steder:
+
+- **Automatisk**, når der er et valgt antal dage (standard 14) til et events start. Et
+  event oprettet tættere på end det varsles med det samme. Hvert event kan holdes ude
+  med fluebenet under *Notifikationer* i event-formularen.
+- **Manuelt**, med »Send nu«: enten varslingen om et valgt event eller en helt fri besked.
+  `{name}` bliver modtagerens navn og `{group}` gruppens.
+
+Teksten er en mail-skabelon (»Nyt event«) og kan rettes under **Opsætning**, hvis master
+har givet gruppen lov til at redigere skabeloner.
+
 ## Data
 
 SQLite-filen ligger i `data/tilmeld.db`. Slet mappen for at nulstille alt.

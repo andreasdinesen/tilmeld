@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS groups (
     templates_enabled   INTEGER DEFAULT 0,         -- master tillader admin at redigere mail-skabeloner
     user_accounts_enabled INTEGER DEFAULT 0,       -- individuelle bruger-konti (login m. brugernavn)
     calendar_token      TEXT DEFAULT '',           -- hemmelig token til .ics-abonnement
+    notify_list_enabled INTEGER DEFAULT 0,         -- notifikationsliste: varsling om nye events
+    notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
+    notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
     created_at          TEXT NOT NULL
 );
 
@@ -102,6 +105,8 @@ CREATE TABLE IF NOT EXISTS events (
     allow_guests        INTEGER DEFAULT 0,         -- tilmelding kan omfatte flere pladser (+1)
     notify_event_reminder INTEGER DEFAULT 0,       -- påmindelse 24t før selve eventet
     event_reminder_sent INTEGER DEFAULT 0,
+    notify_list         INTEGER DEFAULT 0,         -- varsl notifikationslisten om dette event
+    notify_list_sent    INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL,
     updated_at          TEXT DEFAULT '',           -- iCal LAST-MODIFIED
     revision            INTEGER DEFAULT 0,         -- iCal SEQUENCE: tælles op når noget
@@ -152,6 +157,19 @@ CREATE TABLE IF NOT EXISTS credentials (
     name                TEXT DEFAULT '',             -- brugerens eget navn på nøglen
     created_at          TEXT NOT NULL,
     last_used           TEXT DEFAULT ''
+);
+
+-- Notifikationsliste pr. gruppe: modtagere der varsles om nye events.
+-- Gruppens egne brugere hentes direkte fra users/user_groups og står IKKE her --
+-- denne tabel er kun til dem, der ikke har en konto.
+CREATE TABLE IF NOT EXISTS notify_recipients (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    name                TEXT DEFAULT '',
+    email               TEXT DEFAULT '',
+    whatsapp            TEXT DEFAULT '',           -- mobilnummer til WhatsApp-broen
+    active              INTEGER DEFAULT 1,         -- sat på pause uden at blive slettet
+    created_at          TEXT NOT NULL
 );
 
 -- Punkter der er skjult på et bestemt event (default: alle vises)

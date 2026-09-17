@@ -37,6 +37,9 @@ DEFAULT_TEMPLATES = {
     "event_reminder": ("Påmindelse: {event} er i morgen",
                        "Hej {name}. Husk at du er tilmeldt {event} d. {date}"
                        "{start}. Vi ses!"),
+    "event_announce": ("Nyt event i {group}: {event}",
+                       "Hej {name}. {event} afholdes d. {date}{start}.\n"
+                       "Tilmeldingsfrist: {deadline}.\n{link}"),
 }
 
 
@@ -67,6 +70,15 @@ def template_for(conn, group, tkey):
 def render_message(conn, group, tkey, ctx):
     subject, body = template_for(conn, group, tkey)
     return _safe_format(subject, ctx), _safe_format(body, ctx)
+
+
+def channels(conn, group):
+    """(mail, whatsapp): kan gruppen reelt sende? Kræver BÅDE global opsætning og at
+    master har slået kanalen til for gruppen. `app.group_channels` kalder den her, så
+    UI og afsendelse aldrig kan være uenige om, hvad der er aktiveret på systemet."""
+    s = db.get_settings(conn)
+    return (bool(s["smtp_host"]) and bool(group["mail_enabled"]),
+            bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"]))
 
 
 def _log(channel: str, to: str, subject: str, body: str) -> None:
@@ -203,6 +215,121 @@ def notify_participant(conn, group, email: str, whatsapp: str, subject: str, bod
                    group["slug"])
 
 
+# ---- Notifikationsliste: hvem står på den, og hvordan sendes der til dem ------
+
+def _norm_mail(v):
+    return (v or "").strip().lower()
+
+
+def _norm_phone(v):
+    """Sammenlignings-form for et nummer: kun cifre og et evt. ledende +.
+    "+45 20 12 34 56" og "+4520123456" er den samme modtager."""
+    keep = "".join(ch for ch in (v or "") if ch.isdigit() or ch == "+")
+    return keep if not keep.startswith("+") else "+" + keep[1:].replace("+", "")
+
+
+def list_recipients(conn, group):
+    """Modtagerne på gruppens notifikationsliste.
+
+    To kilder: dem admin har skrevet ind i hånden, og — når gruppen kører med
+    individuelle bruger-konti — gruppens egne brugere, hvis mail og mobilnummer
+    hentes direkte fra deres profil. Sidstnævnte skal ikke vedligeholdes to steder:
+    retter brugeren sin mail, følger listen med af sig selv.
+
+    Dubletter (samme mail eller samme nummer) fjernes. De manuelle står først og
+    vinder, så et navn admin selv har skrevet ikke bliver overskrevet af et brugernavn.
+    """
+    rows = conn.execute(
+        "SELECT * FROM notify_recipients WHERE group_id = ? ORDER BY id",
+        (group["id"],)).fetchall()
+    out = [{"id": r["id"], "name": r["name"] or "", "email": r["email"] or "",
+            "whatsapp": r["whatsapp"] or "", "active": bool(r["active"]),
+            "source": "manual"} for r in rows]
+
+    if group["user_accounts_enabled"] and group["notify_list_users"]:
+        users = conn.execute(
+            "SELECT u.* FROM users u JOIN user_groups ug ON ug.user_id = u.id "
+            "WHERE ug.group_id = ? ORDER BY u.username", (group["id"],)).fetchall()
+        for u in users:
+            out.append({"id": None, "name": u["name"] or u["username"],
+                        "email": u["email"] or "", "whatsapp": u["whatsapp"] or "",
+                        "active": True, "source": "user", "username": u["username"]})
+
+    seen_mail, seen_phone, uniq = set(), set(), []
+    for r in out:
+        m, p = _norm_mail(r["email"]), _norm_phone(r["whatsapp"])
+        if (m and m in seen_mail) or (p and p in seen_phone):
+            continue
+        if m:
+            seen_mail.add(m)
+        if p:
+            seen_phone.add(p)
+        uniq.append(r)
+    return uniq
+
+
+def send_to_list(conn, group, subject, body, ctx=None, note=""):
+    """Send én besked til hele notifikationslisten. Returnér (mails, whatsapps, fejl).
+
+    `subject` og `body` er RÅ skabelontekst — pladsholderne udfyldes her, én gang pr.
+    modtager, så {name} bliver modtagerens eget navn. Kanalerne følger det, master har
+    aktiveret for gruppen: er mail slået fra, sendes der ikke mail, uanset hvad der står
+    i listen.
+    """
+    mail_on, wa_on = channels(conn, group)
+    settings = db.get_settings(conn)
+    mails = whatsapps = 0
+    errors = []
+    for r in list_recipients(conn, group):
+        if not r["active"]:
+            continue
+        c = dict(ctx or {}, name=r["name"])
+        subj, text = _safe_format(subject, c), _safe_format(body, c)
+        if mail_on and r["email"]:
+            err = send_email(settings, r["email"], subj, text)
+            if err:
+                errors.append(f"{r['email']}: {err}")
+            else:
+                mails += 1
+        if wa_on and r["whatsapp"]:
+            err = send_whatsapp(settings, r["whatsapp"], f"{subj}: {text}")
+            if err:
+                errors.append(f"{r['whatsapp']}: {err}")
+            else:
+                whatsapps += 1
+
+    # Én logline for hele udsendelsen — ikke én pr. modtager. Listen kan være lang,
+    # og aktivitetsloggen skal stadig kunne læses.
+    suffix = f" ({note})" if note else ""
+    if mails or whatsapps:
+        db.add_log(conn, "mail" if mails else "whatsapp",
+                   f"Notifikationsliste{suffix}: {mails} mail, {whatsapps} WhatsApp — "
+                   f"»{_safe_format(subject, dict(ctx or {}, name=''))}«", group["slug"])
+    for e in errors[:10]:
+        db.add_log(conn, "mail", f"Notifikationsliste{suffix} ikke leveret — {e}",
+                   group["slug"])
+    return mails, whatsapps, errors
+
+
+def announce_message(conn, group, ev, base_url=""):
+    """(subject, body, ctx) til varslingen om et event. Skabelonen er RÅ — {name}
+    udfyldes først pr. modtager i `send_to_list`."""
+    subject, body = template_for(conn, group, "event_announce")
+    base = (base_url or "").rstrip("/")
+    ctx = {"event": ev["name"], "date": ev["event_date"], "group": group["name"],
+           "deadline": ev["signup_deadline"] or "ingen",
+           "start": f" kl. {ev['start_time']}" if ev["start_time"] else "",
+           "link": f"{base}/{group['slug']}/{ev['slug']}" if base else ""}
+    return subject, body, ctx
+
+
+def announce_event(conn, group, ev, note=""):
+    """Varsl notifikationslisten om ét event."""
+    subject, body, ctx = announce_message(
+        conn, group, ev, (db.get_settings(conn)["base_url"] or "").strip())
+    return send_to_list(conn, group, subject, body, ctx, note=note)
+
+
 # ---- Scheduler: påmindelse 24t før frist + CSV 2t efter frist ------------------
 
 def process_scheduled(now=None):
@@ -215,6 +342,33 @@ def process_scheduled(now=None):
         cutoff = (now - timedelta(days=30)).isoformat(timespec="seconds")
         conn.execute("DELETE FROM activity_log WHERE created_at < ?", (cutoff,))
         conn.commit()
+
+        # Varsling til notifikationslisten X dage før eventet ("der er et nyt event").
+        # Opdages et event først INDE i vinduet — fx oprettet 3 dage før med 14 dages
+        # varsel — sendes varslingen med det samme. Det er meningen: pointen er at nå
+        # ud, ikke at ramme en bestemt dag.
+        nl_rows = conn.execute(
+            "SELECT * FROM events WHERE notify_list = 1 AND notify_list_sent = 0"
+        ).fetchall()
+        for ev in nl_rows:
+            group = conn.execute(
+                "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
+            if not group or not group["notify_list_enabled"]:
+                continue
+            try:
+                start = datetime.strptime(
+                    f"{ev['event_date']} {ev['start_time'] or '00:00'}", "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue
+            days = max(0, group["notify_list_days"] if group["notify_list_days"] is not None else 14)
+            if now < start - timedelta(days=days):
+                continue  # endnu ikke tid
+            if now <= start:
+                announce_event(conn, group, ev, note=f"{days} dage før")
+            # Uanset om der blev sendt: markér som afsendt. Et event, der allerede er
+            # begyndt, skal ikke varsles — og slet ikke tjekkes igen hvert 10. minut.
+            conn.execute("UPDATE events SET notify_list_sent = 1 WHERE id = ?", (ev["id"],))
+            conn.commit()
 
         # Påmindelse 24t før SELVE eventet (til dem der er tilmeldt, ikke afbud/venteliste)
         er_rows = conn.execute(

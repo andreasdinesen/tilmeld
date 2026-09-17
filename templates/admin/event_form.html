@@ -41,6 +41,14 @@
     <label class="chk"><input type="checkbox" name="notify_reminder" {{ 'checked' if ev and ev.notify_reminder }}> Påmindelse 24t før frist</label>
     <label class="chk"><input type="checkbox" name="notify_event_reminder" {{ 'checked' if ev and ev.notify_event_reminder }}> Påmindelse til deltagere 24t før selve eventet</label>
     <label class="chk"><input type="checkbox" name="notify_deadline" {{ 'checked' if ev and ev.notify_deadline }}> Besked til admin når fristen er nået (med link til deltagerliste)</label>
+    <label class="chk"><input type="checkbox" name="notify_list"
+      {{ 'checked' if (ev.notify_list if ev else group.notify_list_enabled) }}>
+      Varsl notifikationslisten om dette event</label>
+    {% if not group.notify_list_enabled %}
+      <p class="muted small">Notifikationslisten er slået fra for gruppen — slå den til under
+         <a href="{{ url_for('admin_notify', slug=group.slug) }}">Notifikationsliste</a>,
+         så varslingen sendes automatisk. Fluebenet gemmes uanset hvad.</p>
+    {% endif %}
     {% if mail_on %}
     <label class="chk"><input type="checkbox" name="csv_after_deadline" {{ 'checked' if ev and ev.csv_after_deadline }}> Send deltagerliste (CSV) til admin-mail 2 timer efter frist</label>
     {% endif %}
