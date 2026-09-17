@@ -11,19 +11,24 @@ permissions:
   packages: write
 
 jobs:
+  # Alle actions koerer paa Node 24. GitHub udfasede Node 20 og tvang de gamle
+  # majors over paa 24 alligevel (med en advarsel i hver koersel) - her er de
+  # loeftet til de majors, der selv erklaerer node24. De kraever runner
+  # v2.327.1+, hvilket ubuntu-latest laengst har. Ingen af de fjernede
+  # inputs/envs i de nye majors bruges her.
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -47,7 +52,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
@@ -57,7 +62,7 @@ jobs:
             type=semver,pattern={{version}}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
