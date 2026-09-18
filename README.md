@@ -229,21 +229,10 @@ et build-værktøj, ikke en afhængighed.
 
 SQLite-filen ligger i `data/tilmeld.db`. Slet mappen for at nulstille alt.
 
-## Docker
-
-```bash
-docker build -t tilmeld .
-docker run -p 8080:8080 -v tilmeld-data:/data -e MASTER_PASSWORD=skift-mig tilmeld
-```
-
-Data (SQLite + uploads) ligger i volumen `/data`. Imaget bygges og udgives også
-automatisk til GitHub Container Registry (`ghcr.io/andreasdinesen/tilmeld`) via
-GitHub Actions ved hvert push til `main`.
-
 ## Yggdrasil-rune
 
 `runes/tilmeld.yaml` pakker appen som en rune til
-[yggdrasil](https://github.com/kristianwind/yggdrasil) (peger på GHCR-imaget).
+[yggdrasil](https://github.com/kristianwind/yggdrasil).
 
 Installér via yggdrasils **"Browse runes on GitHub"**:
 - Repository: `andreasdinesen/tilmeld`
@@ -251,31 +240,61 @@ Installér via yggdrasils **"Browse runes on GitHub"**:
 
 Sæt `MASTER_PASSWORD` ved oprettelsen. Port 8080 eksponeres.
 
+Runen **bærer ikke koden**. Den kører et almindeligt `python:3.12-slim`-image og
+henter app-koden fra repoets `vN`-tag — samme model som doda. Der bygges altså ikke
+længere et Docker-image; en **udgivelse er et git-tag**.
+
+Afhængighederne (Flask, waitress, bleach, Markdown, webauthn, cryptography) kan ikke
+ligge i repoet — `cryptography` er kompileret — så de installeres i et virtuelt miljø i
+`/data/venv` ved første start. Det tager ca. 10 sekunder og fylder ca. 45 MB. Miljøet
+bygges om af sig selv, hvis `requirements.txt` eller Python-versionen ændrer sig.
+
 **Overvågning:** runen giver to log-watchers, der sender en notifikation i panelet —
 én for `[MAIL-FEJL]`/`[WHATSAPP-FEJL]`/`[SMS-FEJL]`/`[SCHEDULER-FEJL]`/`[LOG-FEJL]` og én
 for uhåndterede serverfejl (HTTP 500). En eksisterende server får dem ved næste Reinstall.
 
 **Wipe** starter forfra med en tom database: `tilmeld.db` (og dens journal-filer)
-slettes, og ved næste start gælder `MASTER_PASSWORD` igen. `uploads/` røres ikke.
-Panelet tilbyder en backup først.
+slettes, og ved næste start gælder `MASTER_PASSWORD` igen. `uploads/`, `app/` og `venv/`
+røres ikke. Panelet tilbyder en backup først.
+
+**Backup** tager kun brugerdata med (database + `uploads/`). `app/` hentes fra GitHub
+og `venv/` bygges på ti sekunder — de hører ikke hjemme i en sikkerhedskopi.
 
 ## Version og opdatering
 
-Der er **ét versionsnummer**: runens `version:` i `runes/tilmeld.yaml`. Det er det tal,
-Yggdrasil-panelet viser, og det står under **master → System** som et link til
-[versionsloggen](CHANGELOG.md).
+Der er **ét versionsnummer**: runens `version:` i `runes/tilmeld.yaml`. Hele repoet
+pakkes ud, så rune-filen følger med koden, og den udpakkede fils `version:` **er** den
+kørende udgave — det tal, der står under **master → System** som et link til
+[versionsloggen](CHANGELOG.md). Git-taggen `vN` skal derfor matche rune-versionen.
 
-Opdatering sker i panelet — ikke inde i appen:
+**En genstart er opdateringen.** Ved hver start spørger `kilde.py` GitHub om det højeste
+`v<tal>`-tag og henter det, hvis det er nyere end det udrullede. Kan GitHub ikke nås,
+kører serveren bare videre på den kode, der ligger — en netværksfejl må aldrig kunne
+slukke for tilmeldingerne.
 
-1. **Runes → Browse GitHub → Reload** henter den nye rune-definition.
-2. **Serveren → Settings → Update/Reinstall** henter det nye Docker-image.
+| Handling i panelet | Hvad der sker |
+|---|---|
+| **Restart** | Henter nyeste udgivelse og starter. Den normale vej. |
+| **Opdater Tilmeld** | Samme opdatering, uden at vente på en genstart. |
+| **Runes → Browse GitHub → Reload** | Kun nødvendigt når selve *rune-definitionen* har ændret sig (variabler, porte, watchers). |
 
-`/data` (database og uploads) overlever begge trin. Panelet henter også imaget igen
-ved hver **Restart**, så med `IMAGE_TAG=latest` er en Restart også en opdatering;
-`IMAGE_TAG=v12` (eller en anden version) låser installationen.
+`KODE_VERSION` er en **lås, ikke et ønske**. Tom = hent nyeste ved hver genstart. Et tal
+(fx `20`) henter præcis den udgave og bliver på den, også selvom der findes en nyere.
+Det er vejen tilbage, når en udgivelse driller: skriv tallet, gem, genstart.
 
-**Tomt felt:** `IMAGE_TAG` må aldrig stå tomt. Panelet bruger ikke standardværdien for et
-tomt felt, men gemmer det tomme, så image-adressen ender på `:` og hverken install eller
-Start kan hente imaget. Står feltet tomt, så skriv `latest`, gem og tryk Restart.
+Til forskel fra den gamle `IMAGE_TAG` **må feltet gerne stå tomt** — en tom værdi læses
+som »nyeste« i stedet for at blive sat ind i en image-adresse.
+
+### Sådan udgives en ny version
+
+```bash
+# 1. bump version: i runes/tilmeld.yaml + skriv et afsnit i CHANGELOG.md
+git commit -am "feat: ... (rune N)"
+git tag vN
+git push && git push --tags
+```
+
+Taggen **skal** være pushet — det er den, runen henter fra. Uden den finder en ny
+installation ingen kode.
 
 GitHub-repoet sættes under **master → Opsætning** og bruges til at slå versionsloggen op.

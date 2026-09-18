@@ -2,70 +2,157 @@ gameskill:
   id: tilmeld
   name: "Tilmeld"
   category: "Apps"
-  description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, notifikationsliste, push-notifikationer, lyst/mørkt tema og passkey-login."
+  description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, notifikationsliste, madbestilling, mail/WhatsApp/SMS/push-notifikationer, lyst/moerkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 20
+  version: 21
   icon: "app"
 
-  docker:
-    image: "ghcr.io/andreasdinesen/tilmeld:{{IMAGE_TAG}}"
-    user: "0:0"
-    data_path: "/data"
-
-  install:
-    image: "ghcr.io/andreasdinesen/tilmeld:{{IMAGE_TAG}}"
-    script: |
-      mkdir -p /data
-      echo "Tilmeld-image hentet. Tryk Start."
-
-  # Egen "Opdater app"-knap, saa man ikke skal geninstallere serveren for at faa en
-  # ny version. Panelet stopper appen, henter imaget FRISKT (docker pull), koerer
-  # dette script i en midlertidig container og gen-skaber derefter app-containeren
-  # fra det nye image - det er selve pull'et og gen-skabelsen, der opdaterer appen.
+  # Fra og med rune 21 baerer runen IKKE app-koden. Den koerer et almindeligt
+  # python-image og henter koden fra repoets vN-tag, praecis som doda. Foer laa
+  # koden i et eget Docker-image paa GHCR; det betoed et image-byg i GitHub
+  # Actions for hver eneste udgivelse. Nu er en UDGIVELSE = et git-tag.
   #
-  # App-koden ligger i imaget, ikke i datamappen, saa der er ingen filer at pakke ud
-  # her (til forskel fra payload-baserede runer, der skal "rm -rf app" foerst).
-  # /data - database og uploads - skal netop IKKE roeres.
+  # Afhaengighederne (Flask, waitress, bleach, Markdown, webauthn, cryptography)
+  # kan ikke ligge i repoet - cryptography er kompileret. De installeres i et
+  # venv i /data ved foerste start og genbruges derefter; det tager ca. 10
+  # sekunder og fylder ca. 45 MB. Se `venv/`-afsnittet i startup-kommandoen.
+  docker:
+    image: "{{PYTHON_IMAGE}}"
+    user: "0:0"
+    data_path: /data
+
+  # Install henter koden ÉN gang, saa serveren kan starte uden netvaerk bagefter.
+  # Herefter er det startup-kommandoen (kilde.py), der holder den opdateret.
+  install:
+    image: "{{PYTHON_IMAGE}}"
+    script: |
+      set -eu
+      echo "Installerer Tilmeld (startsnor rune 21) ..."
+      echo "Python: $(python3 --version)"
+      mkdir -p /data
+      cd /data
+
+      # kilde.py ligger i selve koden, som vi endnu ikke har. Foerste hentning
+      # goeres derfor her; derefter ligger den i app/ og klarer resten selv.
+      python3 - <<'TILMELD_HENT'
+      import io, json, os, re, shutil, sys, tarfile, urllib.request
+
+      EJER, REPO = "andreasdinesen", "tilmeld"
+      # Kan pegs et andet sted hen, saa PROEVERNE koerer selve denne hentning mod
+      # en lokal server - og koden bliver afproevet, ikke bare laest.
+      API = os.environ.get("GITHUB_API", "https://api.github.com").rstrip("/")
+      CODELOAD = os.environ.get("GITHUB_CODELOAD",
+                                "https://codeload.github.com").rstrip("/")
+      HOVEDER = {"User-Agent": "tilmeld-installer", "Accept": "*/*"}
+
+
+      def doed(besked):
+          sys.stderr.write("[fejl] " + besked + "\n")
+          sys.stderr.write("[fejl] Repoet er offentligt, saa en 404 betyder, at "
+                           "taggen ikke er pushet.\n")
+          sys.exit(1)
+
+
+      def hent(url, timeout=120):
+          req = urllib.request.Request(url, headers=HOVEDER)
+          with urllib.request.urlopen(req, timeout=timeout) as svar:
+              return svar.read(64 * 1024 * 1024)
+
+      laas = (os.environ.get("KODE_VERSION") or "").strip()
+      if "KODE_VERSION" in laas or laas.lower() in ("seneste", "latest"):
+          laas = ""
+      try:
+          if laas.isdigit():
+              vil = int(laas)
+          else:
+              numre = [int(m.group(1)) for t in
+                       json.loads(hent(API + "/repos/%s/%s/tags?per_page=100"
+                                       % (EJER, REPO)).decode("utf-8"))
+                       for m in [re.fullmatch(r"v(\d+)", str(t.get("name", "")))] if m]
+              if not numre:
+                  doed("fandt ingen v<tal>-tag paa GitHub")
+              vil = max(numre)
+      except SystemExit:
+          raise
+      except Exception as e:
+          doed("kunne ikke spoerge GitHub om udgivelser: %s" % e)
+
+      print("Henter v%d fra GitHub ..." % vil, flush=True)
+      try:
+          raa = hent("%s/%s/%s/tar.gz/refs/tags/v%d" % (CODELOAD, EJER, REPO, vil))
+      except Exception as e:
+          doed("kunne ikke hente arkivet: %s" % e)
+
+      shutil.rmtree(".tilmeld-ny", ignore_errors=True)
+      os.makedirs(".tilmeld-ny", exist_ok=True)
+      with tarfile.open(fileobj=io.BytesIO(raa), mode="r:gz") as tf:
+          try:
+              tf.extractall(".tilmeld-ny", filter="data")
+          except TypeError:
+              rod = os.path.abspath(".tilmeld-ny")
+              tf.extractall(".tilmeld-ny", members=[
+                  p for p in tf.getmembers() if (p.isfile() or p.isdir())
+                  and os.path.abspath(os.path.join(rod, p.name)).startswith(rod)])
+
+      ny = None
+      for rod, _, filer in os.walk(".tilmeld-ny"):
+          if "app.py" in filer and os.path.isdir(os.path.join(rod, "templates")):
+              ny = rod
+              break
+      if not ny:
+          doed("arkivet indeholder hverken app.py eller templates/")
+
+      shutil.rmtree(".tilmeld-gammel", ignore_errors=True)
+      if os.path.isdir("app"):
+          os.rename("app", ".tilmeld-gammel")
+      os.rename(ny, "app")
+      shutil.rmtree(".tilmeld-gammel", ignore_errors=True)
+      shutil.rmtree(".tilmeld-ny", ignore_errors=True)
+      print("v%d er udrullet." % vil)
+      TILMELD_HENT
+
+      echo "Filer udpakket:"
+      ls -1 app | head -20
+      echo "Klar. Tryk Start - serveren bygger sit venv foerste gang (ca. 10 sek.)"
+      echo "og henter selv nyeste udgave ved hver genstart."
+
+  # Egen "Opdater Tilmeld"-knap. Panelet stopper appen, koerer scriptet i en
+  # midlertidig container og starter appen igen. Selve opdateringen er kilde.py -
+  # den samme kode, som startup koerer, saa der er kun ét sted at fejlsoege.
   update:
-    image: "ghcr.io/andreasdinesen/tilmeld:{{IMAGE_TAG}}"
+    image: "{{PYTHON_IMAGE}}"
     label: "Opdater Tilmeld"
     script: |
       set -eu
-      mkdir -p /data
-      ver=$(sed -n 's/^  version: *//p' /app/runes/tilmeld.yaml 2>/dev/null || true)
-      echo "Tilmeld version ${ver:-ukendt} hentet."
+      cd /data
+      if [ -f app/kilde.py ]; then
+        python3 app/kilde.py || echo "[kode] advarsel: opdateringen kunne ikke koeres"
+      else
+        echo "[kode] app/kilde.py mangler - geninstaller serveren."
+      fi
       echo "Databasen i /data er uroert; skemaaendringer koeres naar appen starter."
 
   variables:
-    # Gør app-versionen til et felt i panelet: "latest" følger med hver udgivelse,
-    # "v12" laaser installationen til netop den version. Det er vejen tilbage, hvis
-    # en udgivelse driller — uden at vente paa en ny.
-    # NB: versions-taggene begynder ved v12; aeldre udgivelser findes kun som latest.
-    #
-    # Kun tagget er et felt, ikke hele image-adressen (til forskel fra {{NODE_IMAGE}}
-    # i de oevrige runer, hvor man med rette skal kunne skifte selve runtime-imaget).
-    # Her er imaget vores eget, og der er ingen grund til at kunne pege appen paa et
-    # vilkaarligt image — moenstret tillader kun "latest" eller "v<tal>".
-    #
-    # Feltet maa ALDRIG staa tomt - panelet bruger IKKE default for en tom vaerdi
-    # (yggdrasil @ddcf9d2; rune-schema.md:348/:388 lover det, koden goer det ikke):
-    #  1. validateVar returnerer ok paa "" (internal/api/env_validate.go:61-63)
-    #     FOER type- og pattern-tjekket (:65-113), saa moenstret afviser aldrig "".
-    #  2. `required` haandhaeves ikke server-side (samme fil :57-60); det giver kun
-    #     stjernen i formularen (web/src/components/VarForm.svelte:41).
-    #  3. "" gemmes og vinder over default (create: handlers_servers.go:324-327,
-    #     start/install: handlers_query_rcon.go:50-51), saa imaget bliver "...:"
-    #     og pull/create fejler (handlers_servers.go:828-887, install.go:150-198).
-    #     Install-scriptet koerer i samme image og naar aldrig at melde fejlen.
-    # Derfor required (stjerne) og "aldrig tomt" i feltnavnet. Staar feltet tomt:
-    # skriv latest, gem og tryk Restart.
-    - key: IMAGE_TAG
-      name: "App-version: latest (foelger nyeste) eller fx v12 for at laase/rulle tilbage - aldrig tomt, skriv latest hvis i tvivl"
+    - key: PYTHON_IMAGE
+      name: "Python-image"
       type: string
       required: true
-      default: "latest"
-      pattern: '^(latest|v[0-9]+)$'
-      hint: "Skriv latest eller et versionsnummer som v12 - se versionsloggen i CHANGELOG.md"
+      default: "python:3.12-slim"
+      pattern: '^python:3\.[0-9]+[A-Za-z0-9._.-]*$'
+      hint: "Skal vaere et python:3.x-image, fx python:3.12-slim. Skiftes det, bygges venv'et om ved naeste start."
+    # Afloeser IMAGE_TAG: nu er det koden, ikke imaget, der laases. Tom = hent
+    # nyeste udgivelse ved hver genstart. Et tal (fx 20) laaser til praecis den
+    # udgave - vejen tilbage, naar en udgivelse driller.
+    #
+    # Til forskel fra IMAGE_TAG maa feltet gerne staa TOMT: en tom vaerdi bliver
+    # laest af kilde.py som "nyeste", ikke sat ind i en image-adresse. Netop det
+    # tomme felt vaeltede den gamle rune (se rune 15 i CHANGELOG).
+    - key: KODE_VERSION
+      name: "Kodeversion: tom = nyeste udgivelse, eller fx 20 for at laase/rulle tilbage"
+      type: string
+      default: ""
+      pattern: '^([0-9]+|seneste|latest)?$'
+      hint: "Tom = hent nyeste udgivelse fra GitHub ved hver genstart. Et tal laaser til netop den udgave - se CHANGELOG.md"
     - key: MASTER_PASSWORD
       name: "Master-password (KUN ved allerførste opstart — skift derefter i appen under master → Opsætning)"
       type: string
@@ -81,8 +168,53 @@ gameskill:
       default: "Europe/Copenhagen"
 
   startup:
-    command: "waitress-serve --listen=0.0.0.0:8080 app:app"
+    # En genstart ER opdateringen. Rækkefølgen er: red en afbrudt udskiftning,
+    # hent nyeste kode, sørg for at venv'et passer til den kode - og start saa.
+    # Ingen af de tre foerste trin maa kunne forhindre serveren i at starte.
+    command: |
+      cd /data
+
+      # DATA_DIR SKAL saettes. db.py falder ellers tilbage paa <mappen med
+      # db.py>/data - altsaa /data/app/data - og app/ er praecis den mappe,
+      # kilde.py udskifter ved hver opdatering. Uden denne linje ville hver
+      # eneste opdatering slette databasen og alle uploads. (Det gjorde
+      # Dockerfilen foer rune 21; den findes ikke mere.)
+      export DATA_DIR=/data
+      if [ ! -f app/app.py ] && [ -f .tilmeld-gammel/app.py ]; then
+        rm -rf app
+        mv .tilmeld-gammel app
+        echo "[kode] app/ sat tilbage efter en afbrudt udskiftning"
+      fi
+      rm -rf .tilmeld-ny
+      if [ -f app/kilde.py ]; then
+        python3 app/kilde.py || echo "[kode] advarsel: opdateringen kunne ikke koeres"
+      fi
+      if [ ! -f app/app.py ]; then
+        echo "[fejl] der ligger ingen app-kode i /data/app - geninstaller serveren."
+        exit 1
+      fi
+
+      # venv/: afhaengighederne kan ikke ligge i repoet (cryptography er
+      # kompileret), og de kan ikke ligge i imaget (det er et stock-image). De
+      # bygges derfor i /data og genbruges. Stemplet er python-versionen +
+      # requirements.txt: aendrer én af dem sig, bygges venv'et om. Uden det
+      # ville et skift fra python:3.12 til 3.13 give ImportError paa
+      # cryptography, fordi hjulet er bygget til én bestemt ABI.
+      STEMPEL="$(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])')-$(sha1sum app/requirements.txt | cut -c1-12)"
+      if [ ! -x venv/bin/waitress-serve ] || [ "$(cat venv/.stempel 2>/dev/null || true)" != "$STEMPEL" ]; then
+        echo "[venv] bygger afhaengigheder ($STEMPEL) ..."
+        rm -rf venv
+        python3 -m venv venv
+        venv/bin/pip install --no-cache-dir --quiet --upgrade pip
+        venv/bin/pip install --no-cache-dir --quiet -r app/requirements.txt
+        echo "$STEMPEL" > venv/.stempel
+        echo "[venv] klar"
+      fi
+
+      cd app
+      exec /data/venv/bin/waitress-serve --listen=0.0.0.0:8080 app:app
     done_regex: 'Serving on'
+    stop_timeout: 30
 
   ports:
     - { name: web, default: 8080, protocol: tcp }
@@ -113,11 +245,16 @@ gameskill:
   # (SMTP, WhatsApp, SMS). Ved naeste start oprettes databasen igen, og
   # MASTER_PASSWORD gaelder paa ny (det er "allerfoerste opstart" igen).
   # uploads/ (brugernes billeder) roeres IKKE - de ligger tilbage uden noget,
-  # der peger paa dem, og kan slettes under Files. Tag en backup foerst;
-  # backup_first er dokumentation - panelet spoerger selv ved hver wipe.
+  # der peger paa dem, og kan slettes under Files. app/ og venv/ roeres heller
+  # ikke: de er kode, ikke brugerdata, og hentes/bygges alligevel igen.
+  # Tag en backup foerst; backup_first er dokumentation - panelet spoerger selv.
   wipe:
     paths: ["tilmeld.db", "tilmeld.db-journal", "tilmeld.db-wal", "tilmeld.db-shm"]
     backup_first: true
 
+  # KUN brugerdata. Tidligere stod her ["."] - hele datamappen - men den rummer
+  # nu ogsaa app/ (hentes fra GitHub) og venv/ (45 MB, bygges paa 10 sekunder).
+  # Begge dele kan skabes igen fra ingenting; en backup, der slaeber dem med,
+  # er bare stor og langsom.
   backup:
-    include: ["."]
+    include: ["tilmeld.db", "tilmeld.db-journal", "tilmeld.db-wal", "tilmeld.db-shm", "uploads"]

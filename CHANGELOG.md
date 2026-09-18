@@ -3,13 +3,69 @@
 Versionsnummeret er runens `version:` i [`runes/tilmeld.yaml`](runes/tilmeld.yaml) — det
 samme nummer, Yggdrasil-panelet viser, og det der står under **master → System** i appen.
 
-Sådan opdaterer du:
+Sådan opdaterer du: **tryk Restart.** Fra rune 21 henter appen selv nyeste udgivelse
+fra GitHub, hver gang den starter. Har selve *rune-definitionen* ændret sig (variabler,
+porte, watchers), skal **Runes → Browse GitHub → Reload** køres først.
 
-1. **Runes → Browse GitHub → Reload** henter den nye rune-definition (det nye nummer
-   dukker op i listen).
-2. **Serveren → Settings → Update/Reinstall** henter den nye app.
+Databasen i `/data` overlever begge dele.
 
-Databasen i `/data` overlever begge trin.
+---
+
+## Version 21
+
+**Runen bærer ikke længere koden — den henter den fra GitHub.**
+
+Indtil nu lå app-koden i et Docker-image på GHCR, som GitHub Actions byggede ved hvert
+push. Nu kører runen et almindeligt `python:3.12-slim`-image og henter koden fra
+repoets `vN`-tag, præcis som doda. **En udgivelse er et git-tag**, og **en genstart er
+opdateringen.**
+
+Det betyder i praksis:
+
+| Før | Nu |
+|---|---|
+| Push til `main` → Actions bygger et image | `git tag vN && git push --tags` |
+| Update/Reinstall i panelet | **Restart** — appen henter selv nyeste udgivelse |
+| `IMAGE_TAG=v12` låser installationen | `KODE_VERSION=12` låser den, og feltet må gerne stå tomt |
+| Koden kun synlig som et image-lag | Koden ligger i `/data/app` og kan læses i panelets Files-fane |
+
+`Dockerfile` og GitHub Actions-workflowet er fjernet — intet brugte dem længere. De
+allerede udgivne images (til og med `:v20`) bliver liggende på GHCR, så en gammel
+installation kører videre; der kommer bare ikke nye.
+
+### Hvordan opdateringen opfører sig
+
+`kilde.py` kører før serveren starter og følger tre regler:
+
+1. **En fejl må aldrig kunne forhindre serveren i at starte.** Kan GitHub ikke nås,
+   kører den kode, der ligger. En netværksfejl må ikke kunne slukke for tilmeldingerne.
+2. **Der byttes aldrig halvt.** Der pakkes ud i en frisk mappe ved siden af, den
+   tjekkes, og først derefter skiftes navnene — og en afbrudt udskiftning sættes
+   tilbage ved næste start.
+3. **`KODE_VERSION` er en lås, ikke et ønske.** Står der et tal, hentes præcis det tag,
+   også selvom der findes et nyere.
+
+Der spørges om **tags**, ikke om en gren: `main` er arbejdsbordet, `vN` er det eneste,
+der betyder »udgivet«.
+
+### Afhængighederne
+
+Flask, waitress, bleach, Markdown, webauthn og cryptography kan ikke ligge i repoet —
+`cryptography` er kompileret. De installeres derfor i et virtuelt miljø i `/data/venv`
+ved første start: ca. 10 sekunder og ca. 45 MB, én gang. Miljøet bygges om af sig selv,
+hvis `requirements.txt` eller Python-versionen ændrer sig — uden det ville et skift fra
+`python:3.12` til `3.13` give en importfejl, fordi hjulene er bygget til én bestemt ABI.
+
+**Backup** tager nu kun brugerdata med (database + `uploads/`) i stedet for hele
+datamappen. `app/` hentes fra GitHub og `venv/` bygges på ti sekunder; de hører ikke
+hjemme i en sikkerhedskopi.
+
+### Rettelse
+
+**Aktivitetsloggen manglede én udsendelse.** Deltagerlisten (CSV), der sendes til
+admin-mailen to timer efter fristen, blev sendt uden at skrive en linje i loggen — den
+eneste besked i appen, man ikke kunne se var afsted. Nu står den der som alle andre,
+med årsag hvis den ikke kunne leveres.
 
 ---
 

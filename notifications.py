@@ -149,12 +149,14 @@ def send_email(settings, to: str, subject: str, body: str) -> str:
         return str(e)[:300]
 
 
-def send_email_with_attachment(settings, to, subject, body, filename, content):
+def send_email_with_attachment(settings, to, subject, body, filename, content) -> str:
+    """Returnér "" hvis mailen blev afsendt, ellers en kort fejl-/årsagstekst —
+    samme kontrakt som `send_email`, så kalderen kan skrive udfaldet i loggen."""
     if not to:
-        return
+        return "ingen modtager"
     if not settings["smtp_host"]:
         _log("MAIL+CSV", to, subject, f"{body}\n[vedhæftet: {filename}]\n{content}")
-        return
+        return "SMTP ikke konfigureret"
     try:
         msg = MIMEMultipart()
         msg["Subject"] = subject
@@ -165,9 +167,11 @@ def send_email_with_attachment(settings, to, subject, body, filename, content):
         part.add_header("Content-Disposition", "attachment", filename=filename)
         msg.attach(part)
         _smtp_send(settings, msg)
+        return ""
     except Exception as e:
         print(f"[MAIL-FEJL] {e}", flush=True)
         _log("MAIL+CSV", to, subject, f"{body}\n[vedhæftet: {filename}]")
+        return str(e)[:300]
 
 
 def send_whatsapp(settings, to: str, body: str) -> str:
@@ -757,12 +761,17 @@ def process_scheduled(now=None):
                 if group["mail_enabled"] and group["admin_email"] and csv_builder:
                     content = csv_builder(conn, group, ev)
                     settings = db.get_settings(conn)
-                    send_email_with_attachment(
+                    err = send_email_with_attachment(
                         settings, group["admin_email"],
                         f"Deltagerliste: {ev['name']}",
                         f"Tilmeldingsfristen for '{ev['name']}' er udløbet. "
                         "Deltagerlisten er vedhæftet.",
                         f"{group['slug']}-{ev['slug']}-deltagere.csv", content)
+                    # Skal i loggen som alt andet, der bliver sendt — ellers er den
+                    # eneste udsendelse i appen, man ikke kan se i aktivitetsloggen.
+                    db.add_log(conn, "mail",
+                               f"Deltagerliste (CSV) til {group['admin_email']}: "
+                               f"{ev['name']}{_note(err)}", group["slug"])
                 conn.execute("UPDATE events SET csv_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()
     finally:
