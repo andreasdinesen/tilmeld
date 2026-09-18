@@ -29,6 +29,7 @@ import auth
 import db
 import notifications
 import passkeys
+import push
 import system_info
 
 # Tilladte HTML-tags i renderet Markdown (alt andet fjernes, så en beskrivelse
@@ -373,8 +374,8 @@ def master_group_new():
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
                 "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, "
-                "templates_enabled, user_accounts_enabled, calendar_token, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "templates_enabled, user_accounts_enabled, push_enabled, calendar_token, "
+                "created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
@@ -383,6 +384,7 @@ def master_group_new():
                  request.form.get("whatsapp_recipient", "").strip(),
                  1 if request.form.get("templates_enabled") else 0,
                  1 if request.form.get("user_accounts_enabled") else 0,
+                 1 if request.form.get("push_enabled") else 0,
                  secrets.token_urlsafe(16),
                  db.now_iso()),
             )
@@ -403,11 +405,12 @@ def master_group_toggle(slug):
     conn = db.get_db()
     conn.execute(
         "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, templates_enabled = ?, "
-        "user_accounts_enabled = ? WHERE id = ?",
+        "user_accounts_enabled = ?, push_enabled = ? WHERE id = ?",
         (1 if request.form.get("mail_enabled") else 0,
          1 if request.form.get("whatsapp_enabled") else 0,
          1 if request.form.get("templates_enabled") else 0,
-         1 if request.form.get("user_accounts_enabled") else 0, g["id"]),
+         1 if request.form.get("user_accounts_enabled") else 0,
+         1 if request.form.get("push_enabled") else 0, g["id"]),
     )
     conn.commit()
     conn.close()
@@ -745,10 +748,10 @@ def admin_home(slug):
         }
         (past if state == "finished" else rows).append(item)
     past.reverse()  # afholdte: nyeste øverst
-    mail_on, wa_on = group_channels(conn, group)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("admin/home.html", group=group, events=rows, past=past,
-                           notify_on=mail_on or wa_on)
+                           notify_on=mail_on or wa_on or push_on)
 
 
 @app.route("/<slug>/admin/settings", methods=["GET", "POST"])
@@ -857,7 +860,7 @@ def admin_settings(slug):
         return redirect(url_for("admin_settings", slug=slug)
                         + _SETTINGS_ANCHOR.get(action, ""))
     fields = all_group_fields(conn, group["id"])
-    mail_on, wa_on = group_channels(conn, group)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     templates = []
     if group["templates_enabled"]:
         labels = {"new_signup": "Ny tilmelding (til admin)",
@@ -884,7 +887,7 @@ def admin_settings(slug):
     return render_template("admin/settings.html", group=group, fields=parsed,
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request),
-                           notify_on=mail_on or wa_on)
+                           notify_on=mail_on or wa_on or push_on, push_on=push_on)
 
 
 # Hvilket afsnit på opsætnings-siden hører en handling til. Bruges til ankeret i
@@ -980,11 +983,11 @@ def _render_event_form(group, ev):
     fields = all_group_fields(conn, group["id"])
     hidden = hidden_field_ids(conn, ev["id"]) if ev else set()
     days = db.get_settings(conn)["default_deadline_days"]
-    mail_on, wa_on = group_channels(conn, group)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("admin/event_form.html", group=group, ev=ev,
                            fields=fields, hidden=hidden, default_deadline_days=days,
-                           mail_on=mail_on, wa_on=wa_on)
+                           mail_on=mail_on, wa_on=wa_on, push_on=push_on)
 
 
 
@@ -1607,10 +1610,12 @@ def user_home(slug):
                      "count": count_attending(conn, group["id"], ev["id"])})
     cal_url = url_for("group_calendar_ics", slug=group["slug"],
                       token=ensure_calendar_token(conn, group), _external=True)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("user/home.html", group=group, events=rows, cal_url=cal_url,
                            accounts=bool(group["user_accounts_enabled"]),
-                           is_admin=bool(session.get(f"admin_{group['slug']}")))
+                           is_admin=bool(session.get(f"admin_{group['slug']}")),
+                           push_on=push_on)
 
 
 @app.route("/<slug>/<event_slug>")
@@ -1632,7 +1637,7 @@ def user_event(slug, event_slug):
     attending = count_attending(conn, group["id"], ev["id"])
     full = bool(ev["capacity_limit"] and ev["expected_count"]
                 and attending >= ev["expected_count"])
-    mail_on, wa_on = group_channels(conn, group)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     decline_ids = [f["id"] for f in fields if f["is_decline"]]
     is_admin = bool(session.get(f"admin_{group['slug']}"))
     accounts = bool(group["user_accounts_enabled"])
@@ -1701,7 +1706,7 @@ def user_edit(slug, event_slug, reg_id):
     vals = conn.execute(
         "SELECT field_id, value FROM registration_values WHERE registration_id = ?",
         (reg_id,)).fetchall()
-    mail_on, wa_on = group_channels(conn, group)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     conn.close()
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     current = {v["field_id"]: v["value"] for v in vals}
@@ -1936,9 +1941,11 @@ def user_profile(slug):
         "WHERE r.user_id = ? AND e.event_date >= ? ORDER BY e.event_date, e.start_time",
         (uid, datetime.now().strftime("%Y-%m-%d"))).fetchall()
     creds = passkeys.list_credentials(conn, "user", user_id=uid)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("user/profile.html", group=group, u=u, mine=mine, creds=creds,
-                           passkey_blocked=passkeys.blocked_reason(request))
+                           passkey_blocked=passkeys.blocked_reason(request),
+                           push_on=push_on)
 
 
 @app.route("/<slug>/glemt", methods=["GET", "POST"])
@@ -2062,10 +2069,186 @@ def admin_users(slug):
     users = conn.execute(
         "SELECT u.* FROM users u JOIN user_groups ug ON ug.user_id = u.id "
         "WHERE ug.group_id = ? ORDER BY u.username", (group["id"],)).fetchall()
-    mail_on, wa_on = group_channels(conn, group)
+    mail_on, wa_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("admin/users.html", group=group, users=users,
-                           notify_on=mail_on or wa_on)
+                           notify_on=mail_on or wa_on or push_on)
+
+
+# --------------------------------------------------------------------------- #
+# Web Push: service worker, manifest og abonnementer
+# --------------------------------------------------------------------------- #
+@app.route("/sw.js")
+def service_worker():
+    """Service workeren SKAL ligge i roden.
+
+    En worker kan kun styre sin egen mappe og nedad. Lå den under /static/,
+    kunne den ikke tage imod pushes for /<gruppe> — og på iOS findes PushManager
+    kun i en installeret app, hvor scope er alt.
+    """
+    resp = send_file(os.path.join(app.static_folder, "sw.js"), mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"   # ellers ruller en ny worker aldrig ud
+    return resp
+
+
+@app.route("/<slug>/manifest.webmanifest")
+def group_manifest(slug):
+    """Én manifest pr. gruppe, så appen på hjemmeskærmen hedder gruppens navn og
+    åbner direkte på dens side. `manifest.webmanifest` kan aldrig kollidere med et
+    event-slug: punktum er ikke tilladt i en slug."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    icon = url_for("static", filename="icon-192.png")
+    data = {
+        "name": group["name"],
+        "short_name": group["name"][:12],
+        "description": f"Tilmelding til events i {group['name']}.",
+        "start_url": f"/{slug}",
+        "scope": f"/{slug}",
+        "display": "standalone",
+        "background_color": "#f9f9f7",
+        "theme_color": "#f9f9f7",
+        "lang": "da",
+        "icons": [
+            {"src": url_for("static", filename="favicon.svg"), "sizes": "any",
+             "type": "image/svg+xml", "purpose": "any maskable"},
+            {"src": icon, "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        ],
+    }
+    return Response(json.dumps(data, ensure_ascii=False),
+                    mimetype="application/manifest+json")
+
+
+def _push_scope(group, wanted: str):
+    """(scope, user_id, fejl). Hvem må abonnere på hvad.
+
+    Klienten beder om et scope, men serveren bestemmer: ellers kunne en besøgende
+    melde sig til admin-beskederne ved at rette et felt i sin browser.
+    """
+    if wanted == "admin":
+        if not admin_has_access(group):
+            return None, None, "kræver admin-login"
+        return "admin", None, ""
+    if wanted == "user":
+        uid = current_user_id(group)
+        if not uid:
+            return None, None, "kræver login som bruger"
+        return "user", uid, ""
+    if wanted == "list":
+        if not user_has_access(group):
+            return None, None, "kræver adgang til gruppen"
+        return "list", current_user_id(group), ""
+    return None, None, "ukendt type"
+
+
+@app.route("/<slug>/push/key")
+def push_key(slug):
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    conn = db.get_db()
+    mail_on, wa_on, push_on = group_channels(conn, group)
+    if not push_on:
+        conn.close()
+        return {"error": "push er ikke slået til for gruppen"}, 403
+    key = push.public_key(conn)
+    conn.close()
+    return {"publicKey": key}
+
+
+@app.route("/<slug>/push/subscribe", methods=["POST"])
+def push_subscribe(slug):
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    # Kravet om application/json er CSRF-spærren oven på SameSite=Lax: en
+    # fremmed formular kan ikke sætte den content-type.
+    if not request.is_json:
+        return {"error": "forventer JSON"}, 400
+    data = request.get_json(silent=True) or {}
+    conn = db.get_db()
+    mail_on, wa_on, push_on = group_channels(conn, group)
+    if not push_on:
+        conn.close()
+        return {"error": "push er ikke slået til for gruppen"}, 403
+    scope, uid, err = _push_scope(group, data.get("scope", "list"))
+    if err:
+        conn.close()
+        return {"error": err}, 403
+
+    endpoint = (data.get("endpoint") or "").strip()
+    p256dh = (data.get("p256dh") or "").strip()
+    auth = (data.get("auth") or "").strip()
+    if not endpoint.startswith("https://") or not p256dh or not auth:
+        conn.close()
+        return {"error": "ufuldstændigt abonnement"}, 400
+
+    # Samme enhed kan skifte rolle (bruger logger ind som admin) — endepunktet er
+    # unikt, så rækken opdateres i stedet for at blive fordoblet.
+    conn.execute(
+        "INSERT INTO push_subscriptions (group_id, user_id, scope, endpoint, p256dh, auth, "
+        "label, created_at) VALUES (?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(endpoint) DO UPDATE SET group_id = excluded.group_id, "
+        "user_id = excluded.user_id, scope = excluded.scope, p256dh = excluded.p256dh, "
+        "auth = excluded.auth, fails = 0",
+        (group["id"], uid, scope, endpoint, p256dh, auth,
+         (data.get("label") or "").strip()[:40], db.now_iso()))
+    conn.commit()
+    db.add_log(conn, "push", f"Enhed tilmeldt push ({scope})", group["slug"])
+    conn.close()
+    return {"ok": True}
+
+
+@app.route("/<slug>/push/unsubscribe", methods=["POST"])
+def push_unsubscribe(slug):
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not request.is_json:
+        return {"error": "forventer JSON"}, 400
+    endpoint = ((request.get_json(silent=True) or {}).get("endpoint") or "").strip()
+    # Et TOMT endepunkt må ALDRIG betyde »slet dem alle«. doda havde den fejl: en
+    # knap der lovede én enhed, afmeldte alle de andre med.
+    if not endpoint:
+        return {"error": "intet endepunkt"}, 400
+    conn = db.get_db()
+    conn.execute("DELETE FROM push_subscriptions WHERE group_id = ? AND endpoint = ?",
+                 (group["id"], endpoint))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.route("/<slug>/push/test", methods=["POST"])
+def push_test(slug):
+    """Send en prøve til den, der trykker — så man kan se at det virker, uden at
+    vente på et event."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not request.is_json:
+        return {"error": "forventer JSON"}, 400
+    data = request.get_json(silent=True) or {}
+    conn = db.get_db()
+    mail_on, wa_on, push_on = group_channels(conn, group)
+    if not push_on:
+        conn.close()
+        return {"error": "push er ikke slået til for gruppen"}, 403
+    scope, uid, err = _push_scope(group, data.get("scope", "list"))
+    if err:
+        conn.close()
+        return {"error": err}, 403
+    subs = notifications.push_targets(conn, group, scope, uid)
+    endpoint = (data.get("endpoint") or "").strip()
+    if endpoint:      # kun DENNE enhed, ikke alle brugerens
+        subs = [r for r in subs if r["endpoint"] == endpoint]
+    n = notifications.send_push(
+        conn, group, subs, f"Prøve fra {group['name']}",
+        "Virker det? Så er du klar til at få besked om events.")
+    conn.close()
+    return {"ok": True, "sent": n}
 
 
 # --------------------------------------------------------------------------- #
@@ -2095,10 +2278,10 @@ def admin_notify(slug):
     if not admin_has_access(group):
         return redirect(url_for("admin_login", slug=slug))
     conn = db.get_db()
-    mail_on, wa_on = group_channels(conn, group)
-    if not (mail_on or wa_on):
+    mail_on, wa_on, push_on = group_channels(conn, group)
+    if not (mail_on or wa_on or push_on):
         conn.close()
-        flash("Hverken mail eller WhatsApp er sat op for gruppen — "
+        flash("Hverken mail, WhatsApp eller push er sat op for gruppen — "
               "en notifikationsliste kan ikke sende noget.", "error")
         return redirect(url_for("admin_home", slug=slug))
 
@@ -2159,21 +2342,21 @@ def admin_notify(slug):
             if not ev:
                 flash("Vælg et event.", "error")
             else:
-                mails, was, errors = notifications.announce_event(conn, group, ev,
-                                                                  note="manuelt")
+                mails, was, pushes, errors = notifications.announce_event(
+                    conn, group, ev, note="manuelt")
                 # Markér som varslet, så scheduleren ikke sender det samme igen om lidt.
                 conn.execute("UPDATE events SET notify_list_sent = 1 WHERE id = ?",
                              (ev["id"],))
-                _flash_send_result(mails, was, errors)
+                _flash_send_result(mails, was, pushes, errors)
         elif action == "send_text":
             subject = request.form.get("subject", "").strip()
             body = request.form.get("body", "").strip()
             if not subject and not body:
                 flash("Skriv en besked først.", "error")
             else:
-                mails, was, errors = notifications.send_to_list(
+                mails, was, pushes, errors = notifications.send_to_list(
                     conn, group, subject, body, {"group": group["name"]}, note="manuelt")
-                _flash_send_result(mails, was, errors)
+                _flash_send_result(mails, was, pushes, errors)
         conn.commit()
         conn.close()
         return redirect(url_for("admin_notify", slug=slug)
@@ -2186,14 +2369,25 @@ def admin_notify(slug):
          if event_state(e) != "finished"], key=event_sort_key)
     reach = sum(1 for r in recipients
                 if r["active"] and ((mail_on and r["email"]) or (wa_on and r["whatsapp"])))
+    push_devices = conn.execute(
+        "SELECT COUNT(*) AS n FROM push_subscriptions WHERE group_id = ? AND scope = 'list'",
+        (group["id"],)).fetchone()["n"]
     conn.close()
     return render_template("admin/notify.html", group=group, recipients=recipients,
-                           events=events, mail_on=mail_on, wa_on=wa_on, reach=reach)
+                           events=events, mail_on=mail_on, wa_on=wa_on, push_on=push_on,
+                           reach=reach, push_devices=push_devices)
 
 
-def _flash_send_result(mails, whatsapps, errors):
-    if mails or whatsapps:
-        flash(f"Sendt: {mails} mail og {whatsapps} WhatsApp-besked(er).", "ok")
+def _flash_send_result(mails, whatsapps, pushes, errors):
+    if mails or whatsapps or pushes:
+        dele = []
+        if mails:
+            dele.append(f"{mails} mail")
+        if whatsapps:
+            dele.append(f"{whatsapps} WhatsApp")
+        if pushes:
+            dele.append(f"{pushes} push")
+        flash("Sendt: " + " og ".join(dele) + ".", "ok")
     elif not errors:
         flash("Ingen modtagere på listen at sende til.", "error")
     for e in errors[:5]:

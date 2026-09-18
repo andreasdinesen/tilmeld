@@ -2,9 +2,9 @@ gameskill:
   id: tilmeld
   name: "Tilmeld"
   category: "Apps"
-  description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, lyst/mørkt tema og passkey-login."
+  description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, notifikationsliste, push-notifikationer, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 16
+  version: 17
   icon: "app"
 
   docker:
@@ -93,6 +93,7 @@ gameskill:
     # notifications.py og db.py skriver [MAIL-FEJL], [WHATSAPP-FEJL],
     # [SCHEDULER-FEJL] og [LOG-FEJL]. Hver linje er en besked, der ikke kom ud,
     # eller en paamindelsesrunde, der fejlede.
+    # [MAIL-FEJL], [WHATSAPP-FEJL], [PUSH-FEJL], [SCHEDULER-FEJL], [LOG-FEJL]
     - name: "Notifikationer eller baggrundsjob fejler"
       pattern: '\[[A-Z]+-FEJL\]'
       threshold: 1

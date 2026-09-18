@@ -58,6 +58,7 @@
         <label class="chk"><input type="checkbox" name="whatsapp_enabled" {{ 'checked' if g.whatsapp_enabled }}> WhatsApp</label>
         <label class="chk"><input type="checkbox" name="templates_enabled" {{ 'checked' if g.templates_enabled }}> Skabeloner</label>
         <label class="chk"><input type="checkbox" name="user_accounts_enabled" {{ 'checked' if g.user_accounts_enabled }}> Brugere</label>
+        <label class="chk"><input type="checkbox" name="push_enabled" {{ 'checked' if g.push_enabled }}> Push</label>
         <button type="submit">Gem</button>
       </form>
       <form method="post" action="{{ url_for('master_group_delete', slug=g.slug) }}"

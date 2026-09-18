@@ -13,6 +13,56 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 17
+
+**Push-notifikationer på telefonen — og én knap til lyst/mørkt tema.**
+
+### Tilmeld kan lægges på hjemmeskærmen
+
+Hver gruppe har nu sit eget web-manifest, så `/<gruppe>` kan installeres som en app:
+den hedder gruppens navn, har sit eget ikon og åbner direkte på gruppens side.
+
+### Notifikationer som en tredje kanal
+
+Push følger **præcis samme regler som mail og WhatsApp**: master slår den til pr.
+gruppe, og event-fluebenene bestemmer, hvad der sendes. Er der intet flueben, kommer
+der ingen notifikation.
+
+Tre steder kan man slå dem til, og hvert sted gælder **den enhed man står ved**:
+
+- **Min profil** (deltagere med brugerkonto) — kvittering, påmindelse før fristen og
+  påmindelse dagen før eventet.
+- **Gruppe-opsætning** (gruppe-admin) — ny tilmelding, ændring og »fristen er nået«.
+- **Bruger-siden** (alle, også grupper med delt adgangskode) — varsling om nye events.
+  Det er vejen for grupper uden individuelle konti: et abonnement hører til en enhed,
+  ikke til en adresse, så der skal ingen identitet til.
+
+Der er en **»Send en prøve«**-knap, så man kan se at det virker uden at vente på et event.
+
+**På iPhone og iPad skal siden først lægges på hjemmeskærmen.** Apple tillader ikke
+notifikationer fra en almindelig fane. Kan der ikke sendes til enheden, skriver appen
+hvorfor — https, browseren, eller netop hjemmeskærmen — i stedet for at have en knap,
+der bare ikke gør noget.
+
+Teknisk: VAPID + RFC 8291 er skrevet direkte oven på `cryptography`, som allerede var
+med til passkeys — **ingen ny afhængighed**. Nyttelasten krypteres med enhedens egne
+nøgler, så Apple og Google videresender en byteklump, de ikke kan læse: de får aldrig
+at vide, hvad eventet hedder. Krypteringen er efterprøvet mod RFC 8291's officielle
+testvektor (`python push.py`). Abonnementer, som push-tjenesten melder døde (404/410),
+slettes automatisk.
+
+**Push kræver en offentlig URL** under master → Opsætning. Notifikationen indeholder
+absolutte adresser, og uden en offentlig URL er der ikke noget at gøre dem absolutte med.
+
+### Tema-skifteren er blevet til ét ikon
+
+De tre knapper (Auto / Lys / Mørk) er erstattet af **én rund ikon-knap**, der vipper
+mellem lyst og mørkt. Den viser det tema, et klik giver dig.
+
+Siden **starter altid på systemets tema** og følger det live, indtil du selv trykker.
+Dit valg gælder fanen — også gennem de mange sideskift appen laver — og en ny fane
+starter forfra på systemets tema.
+
 ## Version 16
 
 **Notifikationsliste: giv besked om nye events — også til folk der ikke er tilmeldt.**

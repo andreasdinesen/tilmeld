@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_passkeys.html" as pk %}
+{% import "_push.html" as push %}
 
 {# Felterne i et tilmeldings-punkt. Samme makro bruges til BÅDE tilføj og redigér,
    så de to formularer ikke kan komme til at tilbyde forskellige muligheder. #}
@@ -166,4 +167,12 @@
 <div class="card narrow">
   {{ pk.manage('admin', group.slug, creds, passkey_blocked) }}
 </div>
+
+{% if push_on %}
+<div class="card narrow">
+  {{ push.manage('admin', group.slug, 'Notifikationer på din egen enhed',
+     'Få admin-beskederne som en notifikation i stedet for kun på mail — ny
+      tilmelding, ændring og »fristen er nået«. Følger de samme flueben på eventet.') }}
+</div>
+{% endif %}
 {% endblock %}

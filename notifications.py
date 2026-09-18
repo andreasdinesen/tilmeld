@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import db
+import push as webpush
 
 # Sættes af app.py: funktion (conn, group, event) -> csv-tekst. Undgår cirkulær import.
 csv_builder = None
@@ -37,8 +38,11 @@ DEFAULT_TEMPLATES = {
     "event_reminder": ("Påmindelse: {event} er i morgen",
                        "Hej {name}. Husk at du er tilmeldt {event} d. {date}"
                        "{start}. Vi ses!"),
+    # Uden »Hej {name}«: varslingen går også til modtagere UDEN navn — en adresse
+    # admin har tastet ind, eller en telefon der har abonneret. »Hej .« er værre
+    # end ingen hilsen. Admin kan selv sætte {name} ind, hvis listen har navne.
     "event_announce": ("Nyt event i {group}: {event}",
-                       "Hej {name}. {event} afholdes d. {date}{start}.\n"
+                       "{event} afholdes d. {date}{start}.\n"
                        "Tilmeldingsfrist: {deadline}.\n{link}"),
 }
 
@@ -73,12 +77,19 @@ def render_message(conn, group, tkey, ctx):
 
 
 def channels(conn, group):
-    """(mail, whatsapp): kan gruppen reelt sende? Kræver BÅDE global opsætning og at
-    master har slået kanalen til for gruppen. `app.group_channels` kalder den her, så
-    UI og afsendelse aldrig kan være uenige om, hvad der er aktiveret på systemet."""
+    """(mail, whatsapp, push): kan gruppen reelt sende? Hver kanal kræver BÅDE global
+    opsætning og at master har slået den til for gruppen. `app.group_channels` kalder
+    den her, så UI og afsendelse aldrig kan være uenige om, hvad der er aktiveret.
+
+    Push' »globale opsætning« er den offentlige URL. VAPID-nøglerne laver appen selv,
+    men nyttelasten skal indeholde ABSOLUTTE adresser — en relativ adresse får en
+    streng parser til at kassere hele notifikationen (doda, 07-09-2026). Uden en
+    offentlig URL er der ikke noget at gøre dem absolutte med.
+    """
     s = db.get_settings(conn)
     return (bool(s["smtp_host"]) and bool(group["mail_enabled"]),
-            bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"]))
+            bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"]),
+            bool((s["base_url"] or "").strip()) and bool(group["push_enabled"]))
 
 
 def _log(channel: str, to: str, subject: str, body: str) -> None:
@@ -190,9 +201,65 @@ def _note(err: str) -> str:
     return f"  ⚠ ikke leveret ({err})" if err else ""
 
 
-def notify_admin(conn, group, subject: str, body: str) -> None:
+# ---- Push: den tredje kanal ---------------------------------------------------
+
+def group_url(conn, group, path: str = "") -> str:
+    """Absolut adresse ind i gruppen. Push-nyttelasten SKAL bruge absolutte
+    adresser — se `push.build_payload`."""
+    base = (db.get_settings(conn)["base_url"] or "").strip().rstrip("/")
+    if not base:
+        return ""
+    return f"{base}/{group['slug']}" + (f"/{path.lstrip('/')}" if path else "")
+
+
+def push_targets(conn, group, scope: str, user_id=None):
+    """Enhederne der skal have en push. Én række pr. ENHED — samme person har
+    typisk både en telefon og en bærbar, og begge skal have besked."""
+    if scope == "user":
+        if not user_id:
+            return []
+        return conn.execute(
+            "SELECT * FROM push_subscriptions WHERE group_id = ? AND scope = 'user' "
+            "AND user_id = ?", (group["id"], user_id)).fetchall()
+    return conn.execute(
+        "SELECT * FROM push_subscriptions WHERE group_id = ? AND scope = ?",
+        (group["id"], scope)).fetchall()
+
+
+def send_push(conn, group, subs, subject: str, body: str, link: str = "") -> int:
+    """Send til en række enheder. Returnér antal der tog imod.
+
+    Døde abonnementer (404/410) slettes med det samme: ellers vokser en liste af
+    endepunkter, der koster et HTTPS-kald hver gang der sker noget.
+    """
+    if not subs:
+        return 0
+    url = link or group_url(conn, group)
+    icon = ""
+    base = (db.get_settings(conn)["base_url"] or "").strip().rstrip("/")
+    if base:
+        icon = f"{base}/static/icon-192.png"
+    contact = base or "mailto:tilmeld@invalid"
+    sent = 0
+    for sub in subs:
+        r = webpush.send(conn, sub, subject, body, url, icon, contact)
+        if r["ok"]:
+            sent += 1
+            conn.execute("UPDATE push_subscriptions SET last_ok = ?, fails = 0 WHERE id = ?",
+                         (db.now_iso(), sub["id"]))
+        elif r["gone"]:
+            conn.execute("DELETE FROM push_subscriptions WHERE id = ?", (sub["id"],))
+        else:
+            conn.execute("UPDATE push_subscriptions SET fails = fails + 1 WHERE id = ?",
+                         (sub["id"],))
+    conn.commit()
+    return sent
+
+
+def notify_admin(conn, group, subject: str, body: str, link: str = "") -> None:
     """Send til gruppe-admin via de kanaler master har slået til."""
     settings = db.get_settings(conn)
+    mail_on, wa_on, push_on = channels(conn, group)
     if group["mail_enabled"] and group["admin_email"]:
         err = send_email(settings, group["admin_email"], subject, body)
         db.add_log(conn, "mail",
@@ -202,10 +269,17 @@ def notify_admin(conn, group, subject: str, body: str) -> None:
         db.add_log(conn, "whatsapp",
                    f"WhatsApp til {group['whatsapp_recipient']}: {subject}{_note(err)}",
                    group["slug"])
+    if push_on:
+        n = send_push(conn, group, push_targets(conn, group, "admin"), subject, body, link)
+        if n:
+            db.add_log(conn, "push", f"Push til admin ({n} enhed(er)): {subject}",
+                       group["slug"])
 
 
-def notify_participant(conn, group, email: str, whatsapp: str, subject: str, body: str) -> None:
+def notify_participant(conn, group, email: str, whatsapp: str, subject: str, body: str,
+                       user_id=None, link: str = "") -> None:
     settings = db.get_settings(conn)
+    mail_on, wa_on, push_on = channels(conn, group)
     if group["mail_enabled"] and email:
         err = send_email(settings, email, subject, body)
         db.add_log(conn, "mail", f"Mail til {email}: {subject}{_note(err)}", group["slug"])
@@ -213,6 +287,15 @@ def notify_participant(conn, group, email: str, whatsapp: str, subject: str, bod
         err = send_whatsapp(settings, whatsapp, f"{subject}: {body}")
         db.add_log(conn, "whatsapp", f"WhatsApp til {whatsapp}: {subject}{_note(err)}",
                    group["slug"])
+    # Push følger BRUGERKONTOEN, ikke tilmeldingen: en deltager uden konto har
+    # ingen identitet at binde en enhed til. De grupper når push gennem
+    # notifikationslisten i stedet.
+    if push_on and user_id:
+        n = send_push(conn, group, push_targets(conn, group, "user", user_id),
+                      subject, body, link)
+        if n:
+            db.add_log(conn, "push", f"Push til bruger ({n} enhed(er)): {subject}",
+                       group["slug"])
 
 
 # ---- Notifikationsliste: hvem står på den, og hvordan sendes der til dem ------
@@ -269,14 +352,14 @@ def list_recipients(conn, group):
 
 
 def send_to_list(conn, group, subject, body, ctx=None, note=""):
-    """Send én besked til hele notifikationslisten. Returnér (mails, whatsapps, fejl).
+    """Send én besked til hele notifikationslisten. Returnér (mails, whatsapps, push, fejl).
 
     `subject` og `body` er RÅ skabelontekst — pladsholderne udfyldes her, én gang pr.
     modtager, så {name} bliver modtagerens eget navn. Kanalerne følger det, master har
     aktiveret for gruppen: er mail slået fra, sendes der ikke mail, uanset hvad der står
     i listen.
     """
-    mail_on, wa_on = channels(conn, group)
+    mail_on, wa_on, push_on = channels(conn, group)
     settings = db.get_settings(conn)
     mails = whatsapps = 0
     errors = []
@@ -298,17 +381,28 @@ def send_to_list(conn, group, subject, body, ctx=None, note=""):
             else:
                 whatsapps += 1
 
+    # Push til de enheder, der har abonneret på gruppens varslinger. De har ingen
+    # identitet — det ER pointen: en gruppe med delt adgangskode har ingen brugere
+    # at hænge et abonnement på, men kan stadig sige »giv mig besked om nye events«.
+    pushes = 0
+    if push_on:
+        subj = _safe_format(subject, dict(ctx or {}, name=""))
+        text = _safe_format(body, dict(ctx or {}, name=""))
+        pushes = send_push(conn, group, push_targets(conn, group, "list"), subj, text,
+                           (ctx or {}).get("link", ""))
+
     # Én logline for hele udsendelsen — ikke én pr. modtager. Listen kan være lang,
     # og aktivitetsloggen skal stadig kunne læses.
     suffix = f" ({note})" if note else ""
-    if mails or whatsapps:
-        db.add_log(conn, "mail" if mails else "whatsapp",
-                   f"Notifikationsliste{suffix}: {mails} mail, {whatsapps} WhatsApp — "
-                   f"»{_safe_format(subject, dict(ctx or {}, name=''))}«", group["slug"])
+    if mails or whatsapps or pushes:
+        db.add_log(conn, "mail" if mails else ("whatsapp" if whatsapps else "push"),
+                   f"Notifikationsliste{suffix}: {mails} mail, {whatsapps} WhatsApp, "
+                   f"{pushes} push — »{_safe_format(subject, dict(ctx or {}, name=''))}«",
+                   group["slug"])
     for e in errors[:10]:
         db.add_log(conn, "mail", f"Notifikationsliste{suffix} ikke leveret — {e}",
                    group["slug"])
-    return mails, whatsapps, errors
+    return mails, whatsapps, pushes, errors
 
 
 def announce_message(conn, group, ev, base_url=""):

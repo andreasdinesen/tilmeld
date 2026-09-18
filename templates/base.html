@@ -6,11 +6,25 @@
   <title>{% block title %}Tilmeld{% endblock %}</title>
   <meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
-  {# Skal stå FØR stylesheetet: sætter temaet inden første paint, så mørkt tema ikke blinker hvidt. #}
-  <script data-theme-init>try{var _t=localStorage.getItem('tilmeld_theme');if(_t==='light'||_t==='dark')document.documentElement.dataset.theme=_t}catch(e){}</script>
+  {# Skal stå FØR stylesheetet: sætter temaet inden første paint, så mørkt tema ikke blinker hvidt.
+     sessionStorage, ikke localStorage: et klik gælder fanen, og en ny fane starter altid
+     på systemets tema. Appen laver et sideskift ved hvert »Gem«, så valget SKAL overleve
+     et reload — ellers sprang temaet tilbage ved hver handling. #}
+  <script data-theme-init>try{var _t=sessionStorage.getItem('tilmeld_theme');if(_t==='light'||_t==='dark')document.documentElement.dataset.theme=_t}catch(e){}</script>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="mask-icon" href="{{ url_for('static', filename='favicon.svg') }}" color="#2a78d6">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ app_version }}">
+  {# Gør siden installerbar på telefonen. Manifestet er pr. gruppe, så appen på
+     hjemmeskærmen hedder gruppens navn og åbner direkte på dens side — og på iOS
+     er en installeret app den ENESTE måde at få notifikationer på. #}
+  {% if group is defined and group %}
+  <link rel="manifest" href="{{ url_for('group_manifest', slug=group.slug) }}">
+  <meta name="apple-mobile-web-app-title" content="{{ group.name }}">
+  {% endif %}
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+  {# Begge: den første er Apples gamle navn, som iOS stadig er den eneste der læser. #}
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
   <header class="topbar">
@@ -18,11 +32,7 @@
       <span class="brand">{% block brand %}Tilmeld{% endblock %}</span>
       <div class="topbar-right">
         <nav>{% block nav %}{% endblock %}</nav>
-        <div class="chips themepick" id="themeChips" role="group" aria-label="Farvetema">
-          <button type="button" class="chip" data-theme-opt="auto" title="Følg systemets tema">Auto</button>
-          <button type="button" class="chip" data-theme-opt="light" title="Lyst tema">☀️<span class="lbl"> Lys</span></button>
-          <button type="button" class="chip" data-theme-opt="dark" title="Mørkt tema">🌙<span class="lbl"> Mørk</span></button>
-        </div>
+        <button type="button" class="themetoggle" id="themeToggle"><span aria-hidden="true">🌙</span></button>
       </div>
     </div>
   </header>
@@ -35,39 +45,63 @@
     {% block content %}{% endblock %}
   </main>
   <script>
-  /* Tema-valg: ren UI-præference. Head-scriptet anvender den før første paint;
-     her holdes chips, meta-farver og localStorage synkrone. */
+  /* Tema-skifter: ÉN knap, der vipper mellem lyst og mørkt.
+
+     Uden et valg følger siden systemet — og gør det LIVE, så en Mac der skifter
+     til mørkt ved solnedgang også skifter her. Første klik låser fanen fast på
+     det modsatte af det, man ser lige nu; valget gemmes i sessionStorage, så det
+     overlever de mange sideskift appen laver, men en ny fane starter forfra på
+     systemets tema.
+
+     Knappen viser det, man skifter TIL — ikke det man har. Derfor står der 🌙,
+     når siden er lys. */
   (function () {
     var KEY = 'tilmeld_theme';
-    var pref = 'auto';
-    try { pref = localStorage.getItem(KEY) || 'auto'; } catch (e) {}
-    if (pref !== 'light' && pref !== 'dark') pref = 'auto';
+    var btn = document.getElementById('themeToggle');
+    var ikon = btn.firstElementChild;
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
-    var chips = document.getElementById('themeChips');
+
+    function valgt() {
+      try {
+        var v = sessionStorage.getItem(KEY);
+        return (v === 'light' || v === 'dark') ? v : null;   // null = følg systemet
+      } catch (e) { return null; }
+    }
+
+    /* Hvad ser brugeren rent faktisk? Uden et valg er det systemets svar. */
+    function aktivt() {
+      return valgt() || (mq.matches ? 'dark' : 'light');
+    }
 
     function apply() {
-      if (pref === 'auto') delete document.documentElement.dataset.theme;
-      else document.documentElement.dataset.theme = pref;
+      var v = valgt();
+      if (v) document.documentElement.dataset.theme = v;
+      else delete document.documentElement.dataset.theme;
+
+      var nu = aktivt();
+      var naeste = nu === 'dark' ? 'light' : 'dark';
+      ikon.textContent = naeste === 'dark' ? '🌙' : '☀️';
+      var tekst = naeste === 'dark' ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+      btn.title = tekst;
+      btn.setAttribute('aria-label', tekst);
+
+      /* Adresselinjen på telefonen skal følge med — ellers står der en lys
+         bjælke over en mørk side. Begge metaer sættes, så de ikke kan være
+         uenige, når valget afviger fra systemet. */
       document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
-        m.content = pref === 'auto'
-          ? (m.media.indexOf('light') >= 0 ? '#f9f9f7' : '#0d0d0d')
-          : (pref === 'light' ? '#f9f9f7' : '#0d0d0d');
-      });
-      chips.querySelectorAll('[data-theme-opt]').forEach(function (b) {
-        var on = b.dataset.themeOpt === pref;
-        b.classList.toggle('on', on);
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        m.content = nu === 'dark' ? '#0d0d0d' : '#f9f9f7';
       });
     }
 
-    chips.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-theme-opt]');
-      if (!b) return;
-      pref = b.dataset.themeOpt;
-      try { localStorage.setItem(KEY, pref); } catch (e2) {}
+    btn.addEventListener('click', function () {
+      var naeste = aktivt() === 'dark' ? 'light' : 'dark';
+      try { sessionStorage.setItem(KEY, naeste); } catch (e) {}
       apply();
     });
-    mq.addEventListener('change', apply);
+
+    /* Følger man systemet, skal en ændring slå igennem med det samme. Har man
+       valgt selv, skal den ikke — så ville valget blive revet væk under en. */
+    mq.addEventListener('change', function () { if (!valgt()) apply(); });
     apply();
   })();
   </script>

@@ -47,7 +47,9 @@ valget på en gruppe der senere slettes, falder forsiden automatisk tilbage til 
 
 ## Tema
 
-Lyst og mørkt tema med Auto/Lys/Mørk i topbaren. Valget gemmes i browseren og sættes før
+Lyst og mørkt tema. Én ikon-knap i topbaren vipper mellem dem og viser det tema, et klik
+giver dig. Siden starter altid på **systemets** tema og følger det live, indtil du selv
+trykker; dit valg gælder fanen og forsvinder, når du åbner appen igen. Temaet sættes før
 første paint, så mørkt tema ikke blinker hvidt ved sideskift.
 
 ## Passkeys
@@ -95,6 +97,41 @@ Listen bruges to steder:
 
 Teksten er en mail-skabelon (»Nyt event«) og kan rettes under **Opsætning**, hvis master
 har givet gruppen lov til at redigere skabeloner.
+
+## Push-notifikationer og app på hjemmeskærmen
+
+Hver gruppe har sit eget web-manifest, så `/<gruppe>` kan lægges på hjemmeskærmen som en
+app med gruppens navn og eget ikon.
+
+Push er en **tredje kanal ved siden af mail og WhatsApp og følger de samme regler**:
+master slår den til pr. gruppe under **Opsætning**, og event-fluebenene bestemmer, hvad
+der sendes. Notifikationer slås til pr. **enhed** tre steder:
+
+| Sted | Scope | Hvad man får |
+|---|---|---|
+| **Min profil** | deltager med konto | kvittering, påmindelse før frist, påmindelse før eventet |
+| **Gruppe-opsætning** | gruppe-admin | ny tilmelding, ændring, »fristen er nået« |
+| **Bruger-siden** | alle, også delt adgangskode | varsling om nye events |
+
+Den sidste er vejen for grupper uden individuelle konti: et abonnement hører til en
+enhed, ikke til en adresse, så der kræves ingen identitet.
+
+**Push kræver en offentlig URL** under master → Opsætning — notifikationen indeholder
+absolutte adresser. **På iPhone og iPad skal siden lægges på hjemmeskærmen først;** Apple
+tillader ikke notifikationer fra en almindelig fane. Kan der ikke sendes til enheden,
+skriver appen hvorfor.
+
+VAPID og kryptering (RFC 8291) er skrevet direkte oven på `cryptography`, som allerede var
+med til passkeys — ingen ny afhængighed, og ingen tjeneste udenom. Nyttelasten krypteres
+med enhedens egne nøgler, så Apple og Google aldrig kan læse, hvad eventet hedder.
+Krypteringen kan efterprøves mod RFC 8291's officielle testvektor:
+
+```bash
+./.venv/bin/python push.py
+```
+
+Ikonet (`static/icon-192.png`) genereres af `make_icons.py` og committes; Pillow er derfor
+et build-værktøj, ikke en afhængighed.
 
 ## Data
 

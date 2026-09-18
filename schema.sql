@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS settings (
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT 'andreasdinesen/tilmeld',  -- "ejer/repo" til opdaterings-tjek
     update_branch       TEXT DEFAULT 'main',
-    default_group       TEXT DEFAULT ''              -- slug: forsiden "/" sender videre hertil
+    default_group       TEXT DEFAULT '',             -- slug: forsiden "/" sender videre hertil
+    vapid_public        TEXT DEFAULT '',             -- Web Push: afsender-nøglepar. Laves én
+    vapid_private       TEXT DEFAULT ''              -- gang; skiftes de, dør ALLE abonnementer.
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS groups (
     notify_list_enabled INTEGER DEFAULT 0,         -- notifikationsliste: varsling om nye events
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
+    push_enabled        INTEGER DEFAULT 0,         -- push-notifikationer (slået til af master)
     created_at          TEXT NOT NULL
 );
 
@@ -170,6 +173,30 @@ CREATE TABLE IF NOT EXISTS notify_recipients (
     whatsapp            TEXT DEFAULT '',           -- mobilnummer til WhatsApp-broen
     active              INTEGER DEFAULT 1,         -- sat på pause uden at blive slettet
     created_at          TEXT NOT NULL
+);
+
+-- Web Push-abonnementer: én række pr. ENHED, ikke pr. person. Samme menneske har
+-- typisk både en telefon og en bærbar, og de skal begge have besked.
+--
+-- scope afgør HVAD enheden får, og spejler passkeys' tre scopes:
+--   'user'  = en deltager med brugerkonto (user_id sat) -> kvittering, påmindelser
+--   'admin' = gruppe-admins egen enhed                  -> admin-beskeder
+--   'list'  = notifikationslisten (ingen identitet)     -> varsling om nye events
+--
+-- endpoint ER hemmeligheden bag et abonnement: den, der har adressen, kan sende
+-- til enheden. Vis den aldrig i et UI, og log den aldrig.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id             INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    scope               TEXT NOT NULL CHECK (scope IN ('user','admin','list')),
+    endpoint            TEXT NOT NULL UNIQUE,
+    p256dh              TEXT DEFAULT '',           -- modtagerens offentlige nøgle (base64url)
+    auth                TEXT DEFAULT '',           -- modtagerens auth-hemmelighed (base64url)
+    label               TEXT DEFAULT '',           -- brugerens eget navn på enheden
+    created_at          TEXT NOT NULL,
+    last_ok             TEXT DEFAULT '',
+    fails               INTEGER NOT NULL DEFAULT 0
 );
 
 -- Punkter der er skjult på et bestemt event (default: alle vises)

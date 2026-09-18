@@ -1,0 +1,24 @@
+{# Notifikationer på denne enhed. Én makro, tre steder — præcis som _passkeys.html,
+   så bruger, admin og notifikationsliste ikke kan komme til at tilbyde forskellige
+   ting.
+
+   scope: 'user' (deltager med konto) | 'admin' (gruppe-admin) | 'list' (varsling om
+   nye events). Serveren afgør selv om man MÅ det scope, man beder om. #}
+
+{% macro manage(scope, slug, titel, forklaring) %}
+<h2 id="notifikationer">{{ titel }}</h2>
+<p class="muted small">{{ forklaring }}</p>
+<div class="pushbox" data-push="{{ scope }}" data-slug="{{ slug }}">
+  <div class="actions">
+    <button type="button" data-push-btn>Slå notifikationer til</button>
+    <button type="button" class="small" data-push-test hidden>Send en prøve</button>
+  </div>
+  <p class="formnote" data-push-note></p>
+</div>
+<p class="muted small">Notifikationer gælder <strong>denne enhed</strong> — har du både
+   telefon og computer, skal de slås til hvert sted.
+   <strong>På iPhone og iPad</strong> skal siden først lægges på hjemmeskærmen
+   (Del → »Føj til hjemmeskærm«) og åbnes derfra; Apple tillader ikke notifikationer
+   fra en almindelig fane.</p>
+<script src="{{ url_for('static', filename='push.js') }}?v={{ app_version }}" defer></script>
+{% endmacro %}

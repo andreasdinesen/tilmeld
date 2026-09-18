@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_push.html" as push %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
   {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
@@ -50,4 +51,13 @@
   </script>
   {% endif %}
 </div>
+
+{% if push_on %}
+<div class="card">
+  {{ push.manage('list', group.slug, 'Få besked om nye events',
+     'Læg siden på hjemmeskærmen, så kan du få en notifikation, når der er et nyt event
+      på vej — uden at skulle kigge efter. Det er den samme varsling, som sendes på mail,
+      og den styres af gruppens notifikationsliste.') }}
+</div>
+{% endif %}
 {% endblock %}

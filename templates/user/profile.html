@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_passkeys.html" as pk %}
+{% import "_push.html" as push %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Events</a>
@@ -30,6 +31,15 @@
 
   {{ pk.manage('user', group.slug, creds, passkey_blocked) }}
 </div>
+
+{% if push_on %}
+<div class="card narrow">
+  {{ push.manage('user', group.slug, 'Notifikationer på telefonen',
+     'Få en besked direkte på enheden — kvittering, påmindelse før fristen og
+      påmindelse dagen før eventet. Det følger de samme flueben som mail: står
+      der intet flueben på eventet, sendes der heller ingen notifikation.') }}
+</div>
+{% endif %}
 
 <div class="card narrow">
   <h2>Mine tilmeldinger</h2>

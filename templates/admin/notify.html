@@ -32,7 +32,18 @@
   <h1>Notifikationsliste</h1>
   <p class="muted small">Modtagere der får besked, når der er et nyt event på vej — eller når
      du selv trykker send. Listen sender via de kanaler, master har slået til for gruppen:
-     {% if mail_on %}<strong>mail</strong>{% endif %}{% if mail_on and wa_on %} og {% endif %}{% if wa_on %}<strong>WhatsApp</strong>{% endif %}.</p>
+     {% set kanaler = [] %}
+     {% if mail_on %}{% set _ = kanaler.append('mail') %}{% endif %}
+     {% if wa_on %}{% set _ = kanaler.append('WhatsApp') %}{% endif %}
+     {% if push_on %}{% set _ = kanaler.append('push') %}{% endif %}
+     <strong>{{ kanaler|join(', ') }}</strong>.</p>
+  {% if push_on %}
+    <p class="muted small"><strong>{{ push_devices }}</strong> enhed(er) har slået
+       push-notifikationer til for gruppens varslinger. De melder sig selv til nede på
+       <a href="{{ url_for('user_home', slug=group.slug) }}">bruger-siden</a> og står
+       ikke på modtagerlisten nedenfor — et abonnement hører til en enhed, ikke til en
+       adresse.</p>
+  {% endif %}
 
   <h2 id="indstillinger">Indstillinger</h2>
   <form method="post">

@@ -32,6 +32,7 @@
   --cat-mail-soft: #fdf3dc;    --cat-mail-ink: #7a5200;
   --cat-whatsapp-soft: #e2f3e2; --cat-whatsapp-ink: #006300;
   --cat-user-soft: #f2e6fb;    --cat-user-ink: #6b21a8;
+  --cat-push-soft: #fde8ef;    --cat-push-ink: #9d174d;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -63,6 +64,7 @@
   --cat-mail-soft: #2e2410;    --cat-mail-ink: #e5b95c;
   --cat-whatsapp-soft: #12290f; --cat-whatsapp-ink: #4fc44f;
   --cat-user-soft: #2a1638;    --cat-user-ink: #cb9bf0;
+  --cat-push-soft: #35111f;    --cat-push-ink: #f09bbb;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -95,6 +97,7 @@
     --cat-mail-soft: #2e2410;    --cat-mail-ink: #e5b95c;
     --cat-whatsapp-soft: #12290f; --cat-whatsapp-ink: #4fc44f;
     --cat-user-soft: #2a1638;    --cat-user-ink: #cb9bf0;
+    --cat-push-soft: #35111f;    --cat-push-ink: #f09bbb;
   }
 }
 
@@ -146,7 +149,17 @@ code {
   white-space: nowrap; cursor: pointer; margin: 0;
 }
 .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.themepick .lbl { margin-left: 4px; }
+
+/* Tema-skifteren: én rund ikon-knap. Samme højde som en chip, men kvadratisk,
+   så den fylder mindst muligt i topbaren. Emojien bærer ingen betydning for en
+   skærmlæser (aria-hidden) — knappens aria-label siger, hvad et klik gør. */
+.themetoggle {
+  flex: 0 0 auto; width: 30px; height: 30px; padding: 0; margin: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
+}
+.themetoggle:hover { border-color: var(--muted); }
 
 /* --- Kort og rækker ----------------------------------------------------- */
 
@@ -265,6 +278,7 @@ button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: non
 .tag.cat-mail { background: var(--cat-mail-soft); color: var(--cat-mail-ink); }
 .tag.cat-whatsapp { background: var(--cat-whatsapp-soft); color: var(--cat-whatsapp-ink); }
 .tag.cat-user { background: var(--cat-user-soft); color: var(--cat-user-ink); }
+.tag.cat-push { background: var(--cat-push-soft); color: var(--cat-push-ink); }
 /* × inde i et mærkat: skal arve mærkatets tekstfarve, ikke være hvid */
 .tag .x { background: none; border: none; color: inherit; cursor: pointer; padding: 0 2px; margin: 0; font: inherit; }
 .tag .x:hover { border: none; opacity: 0.7; }
@@ -419,7 +433,6 @@ details.help[open] summary { border-bottom: 1px solid var(--line); }
   .topbar { margin-bottom: 16px; }
   .topbar .wrap { gap: 8px; }
   .topbar-right { width: 100%; justify-content: space-between; }
-  .themepick .lbl { display: none; }   /* kun ikonet på små skærme */
   .event-card { flex-direction: column; align-items: flex-start; gap: 6px; }
   .count { white-space: normal; }
   .row { flex-direction: column; align-items: flex-start; }
