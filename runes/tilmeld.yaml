@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, notifikationsliste, madbestilling, mail/WhatsApp/SMS/push-notifikationer, lyst/moerkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 21
+  version: 22
   icon: "app"
 
   # Fra og med rune 21 baerer runen IKKE app-koden. Den koerer et almindeligt
@@ -128,7 +128,89 @@ gameskill:
       if [ -f app/kilde.py ]; then
         python3 app/kilde.py || echo "[kode] advarsel: opdateringen kunne ikke koeres"
       else
-        echo "[kode] app/kilde.py mangler - geninstaller serveren."
+        # Ingen kode endnu - fx en server, der blev installeret dengang koden laa
+        # i et Docker-image (rune <=20). Saa goer knappen det samme som en
+        # foerste installation i stedet for at sende brugeren tilbage til en
+        # anden knap. Blokken herunder er ORD FOR ORD den samme som i install:
+        # (afproevet af tests/tjek_rune.py) - ret dem altid to steder.
+        echo "[kode] der ligger ingen kode i /data/app - henter den som ved en"
+        echo "[kode] foerste installation."
+      python3 - <<'TILMELD_HENT'
+      import io, json, os, re, shutil, sys, tarfile, urllib.request
+
+      EJER, REPO = "andreasdinesen", "tilmeld"
+      # Kan pegs et andet sted hen, saa PROEVERNE koerer selve denne hentning mod
+      # en lokal server - og koden bliver afproevet, ikke bare laest.
+      API = os.environ.get("GITHUB_API", "https://api.github.com").rstrip("/")
+      CODELOAD = os.environ.get("GITHUB_CODELOAD",
+                                "https://codeload.github.com").rstrip("/")
+      HOVEDER = {"User-Agent": "tilmeld-installer", "Accept": "*/*"}
+
+
+      def doed(besked):
+          sys.stderr.write("[fejl] " + besked + "\n")
+          sys.stderr.write("[fejl] Repoet er offentligt, saa en 404 betyder, at "
+                           "taggen ikke er pushet.\n")
+          sys.exit(1)
+
+
+      def hent(url, timeout=120):
+          req = urllib.request.Request(url, headers=HOVEDER)
+          with urllib.request.urlopen(req, timeout=timeout) as svar:
+              return svar.read(64 * 1024 * 1024)
+
+      laas = (os.environ.get("KODE_VERSION") or "").strip()
+      if "KODE_VERSION" in laas or laas.lower() in ("seneste", "latest"):
+          laas = ""
+      try:
+          if laas.isdigit():
+              vil = int(laas)
+          else:
+              numre = [int(m.group(1)) for t in
+                       json.loads(hent(API + "/repos/%s/%s/tags?per_page=100"
+                                       % (EJER, REPO)).decode("utf-8"))
+                       for m in [re.fullmatch(r"v(\d+)", str(t.get("name", "")))] if m]
+              if not numre:
+                  doed("fandt ingen v<tal>-tag paa GitHub")
+              vil = max(numre)
+      except SystemExit:
+          raise
+      except Exception as e:
+          doed("kunne ikke spoerge GitHub om udgivelser: %s" % e)
+
+      print("Henter v%d fra GitHub ..." % vil, flush=True)
+      try:
+          raa = hent("%s/%s/%s/tar.gz/refs/tags/v%d" % (CODELOAD, EJER, REPO, vil))
+      except Exception as e:
+          doed("kunne ikke hente arkivet: %s" % e)
+
+      shutil.rmtree(".tilmeld-ny", ignore_errors=True)
+      os.makedirs(".tilmeld-ny", exist_ok=True)
+      with tarfile.open(fileobj=io.BytesIO(raa), mode="r:gz") as tf:
+          try:
+              tf.extractall(".tilmeld-ny", filter="data")
+          except TypeError:
+              rod = os.path.abspath(".tilmeld-ny")
+              tf.extractall(".tilmeld-ny", members=[
+                  p for p in tf.getmembers() if (p.isfile() or p.isdir())
+                  and os.path.abspath(os.path.join(rod, p.name)).startswith(rod)])
+
+      ny = None
+      for rod, _, filer in os.walk(".tilmeld-ny"):
+          if "app.py" in filer and os.path.isdir(os.path.join(rod, "templates")):
+              ny = rod
+              break
+      if not ny:
+          doed("arkivet indeholder hverken app.py eller templates/")
+
+      shutil.rmtree(".tilmeld-gammel", ignore_errors=True)
+      if os.path.isdir("app"):
+          os.rename("app", ".tilmeld-gammel")
+      os.rename(ny, "app")
+      shutil.rmtree(".tilmeld-gammel", ignore_errors=True)
+      shutil.rmtree(".tilmeld-ny", ignore_errors=True)
+      print("v%d er udrullet." % vil)
+      TILMELD_HENT
       fi
       echo "Databasen i /data er uroert; skemaaendringer koeres naar appen starter."
 
@@ -190,7 +272,9 @@ gameskill:
         python3 app/kilde.py || echo "[kode] advarsel: opdateringen kunne ikke koeres"
       fi
       if [ ! -f app/app.py ]; then
-        echo "[fejl] der ligger ingen app-kode i /data/app - geninstaller serveren."
+        echo "[fejl] der ligger ingen app-kode i /data/app."
+        echo "[fejl] Tryk 'Opdater Tilmeld' eller 'Update / Reinstall' i panelet -"
+        echo "[fejl] begge henter koden fra GitHub. Databasen roeres ikke."
         exit 1
       fi
 

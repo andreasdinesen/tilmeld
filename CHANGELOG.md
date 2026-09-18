@@ -11,6 +11,34 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 22
+
+**Rettelse: »Opdater Tilmeld« kunne ikke hente koden første gang.**
+
+En server, der blev installeret dengang koden lå i et Docker-image (rune 20 og
+ældre), har ingen `app/`-mappe i datamappen. Trykkede man **Opdater Tilmeld** efter
+at have hentet rune 21, sagde knappen bare:
+
+```
+[kode] app/kilde.py mangler - geninstaller serveren.
+```
+
+— og bagefter stoppede serveren med vilje, fordi der ingen kode var. Man stod altså
+med en slukket server og en besked, der pegede på en anden knap.
+
+Nu gør **begge** knapper det samme, når `app/` er tom: de henter koden fra GitHub,
+præcis som en første installation. Databasen og `uploads/` røres ikke.
+
+Startup-beskeden nævner desuden hvilke knapper der hjælper, i stedet for bare
+»geninstaller serveren«.
+
+`tests/tjek_rune.py` er ny og fanger netop denne slags fejl, før de når panelet: at
+begge knapper kan hente koden fra ingenting, at de to hente-blokke er ord for ord ens,
+at `DATA_DIR` er sat, at `done_regex` matcher waitress' startlinje, og at backup ikke
+slæber koden og det virtuelle miljø med.
+
+---
+
 ## Version 21
 
 **Runen bærer ikke længere koden — den henter den fra GitHub.**
