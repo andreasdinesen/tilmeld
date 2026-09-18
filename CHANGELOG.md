@@ -13,6 +13,44 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 18
+
+**Filer på et event — og en rettelse af notifikationslisten.**
+
+### Filer
+
+Gruppe-admin kan lægge filer på et event: program, kort, menu, vedtægter. De vises
+under beskrivelsen på eventets side og kan hentes af dem, der har adgang til gruppen.
+
+- Vælg flere filer på én gang. Højst **25 MB pr. forsendelse**.
+- Tilladte typer er en hvidliste (pdf, Office/OpenDocument, billeder, txt, csv, zip,
+  ics). Filer leveres **altid som download**, aldrig vist i siden, så en vedhæftet fil
+  ikke kan køre noget på appens eget domæne.
+- Danske filnavne overlever: »Køreplan æøå.pdf« hedder stadig det, når den hentes.
+  På disken får filen et tilfældigt navn, så to filer med samme navn ikke kan
+  overskrive hinanden.
+- Slettes eventet, ryddes filerne fra disken — ikke kun rækkerne i databasen.
+- **Master slår det til pr. gruppe** (som mail, WhatsApp og push). Filerne fylder på
+  serverens disk, så det er master, der bestemmer hvem der må.
+
+En kopi af et event får **ikke** filerne med — de skal lægges på igen. Det er med
+vilje: to events, der pegede på den samme fil, ville miste den begge to, når det ene
+blev slettet.
+
+### Rettelse: notifikationslisten bad om modtagere, den ikke kunne tage imod.
+
+Er hverken SMTP eller WhatsApp-gatewayen sat op — men push er slået til — kunne
+notifikationslisten åbnes, og »Tilføj modtager« viste kun et navnefelt. Der var
+ingen steder at skrive mailadressen eller nummeret, og formularen kunne derfor
+aldrig gemmes: en modtager på listen ER jo en adresse eller et nummer.
+
+Afsnittet forklarer nu i stedet, hvad der mangler (SMTP sættes op under
+master → Opsætning), og at push virker uafhængigt af det: de enheder, der har
+slået notifikationer til på bruger-siden, melder sig selv til og skal ikke tastes ind.
+
+Bekræftelsen under »Send nu« tæller også enhederne med — med kun push var
+»0 modtagere« sandt og alligevel misvisende, for beskeden nåede jo frem.
+
 ## Version 17
 
 **Push-notifikationer på telefonen — og én knap til lyst/mørkt tema.**

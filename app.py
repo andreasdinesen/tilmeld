@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import time
 import urllib.request
 from datetime import datetime, timedelta
@@ -42,10 +43,25 @@ _MD_ATTRS = {"a": ["href", "title"]}
 
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
+# Filer der kan vedhæftes et event. En hvidliste, ikke en sortliste: en sortliste
+# er forkert første gang der kommer en ny farlig filtype. Filerne leveres altid som
+# download (se `event_file_download`), så de kan ikke køre i browseren.
+ALLOWED_FILE_EXT = {
+    ".pdf", ".doc", ".docx", ".odt", ".rtf", ".txt", ".md",
+    ".xls", ".xlsx", ".ods", ".csv",
+    ".ppt", ".pptx", ".odp",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic",
+    ".zip", ".ics",
+}
+MAX_UPLOAD_MB = 25
+
 app = Flask(__name__)
 # SameSite=Lax er browsernes standard i forvejen, men sæt den eksplicit: sammen med
 # kravet om Content-Type: application/json på webauthn-endpointsene er den CSRF-spærren.
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Loft på hele requesten. Uden det kan en enkelt upload fylde /data op — og på en
+# hjemmeserver er disken den knappe ressource.
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 db.init_db()
 _conn = db.get_db()
@@ -256,6 +272,26 @@ def inject_app_version():
     return {"app_version": system_info.rune_version()}
 
 
+@app.template_filter("filstr")
+def fmt_filesize(n):
+    """Filstørrelse i noget, et menneske kan læse."""
+    try:
+        n = float(n or 0)
+    except (TypeError, ValueError):
+        return ""
+    for enhed in ("B", "KB", "MB", "GB"):
+        if n < 1024 or enhed == "GB":
+            return f"{n:.0f} {enhed}" if enhed == "B" else f"{n:.1f} {enhed}"
+        n /= 1024
+
+
+@app.errorhandler(413)
+def for_stor_upload(e):
+    """Werkzeug afbryder FØR handleren har læst formularen, så der er ingen
+    session at flashe i — derfor en hel lille side i stedet."""
+    return render_template("for_stor.html", maks=MAX_UPLOAD_MB), 413
+
+
 @app.template_filter("dt")
 def fmt_dt(value):
     if not value:
@@ -374,8 +410,8 @@ def master_group_new():
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
                 "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, "
-                "templates_enabled, user_accounts_enabled, push_enabled, calendar_token, "
-                "created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "templates_enabled, user_accounts_enabled, push_enabled, files_enabled, "
+                "calendar_token, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
@@ -385,6 +421,7 @@ def master_group_new():
                  1 if request.form.get("templates_enabled") else 0,
                  1 if request.form.get("user_accounts_enabled") else 0,
                  1 if request.form.get("push_enabled") else 0,
+                 1 if request.form.get("files_enabled") else 0,
                  secrets.token_urlsafe(16),
                  db.now_iso()),
             )
@@ -405,12 +442,13 @@ def master_group_toggle(slug):
     conn = db.get_db()
     conn.execute(
         "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, templates_enabled = ?, "
-        "user_accounts_enabled = ?, push_enabled = ? WHERE id = ?",
+        "user_accounts_enabled = ?, push_enabled = ?, files_enabled = ? WHERE id = ?",
         (1 if request.form.get("mail_enabled") else 0,
          1 if request.form.get("whatsapp_enabled") else 0,
          1 if request.form.get("templates_enabled") else 0,
          1 if request.form.get("user_accounts_enabled") else 0,
-         1 if request.form.get("push_enabled") else 0, g["id"]),
+         1 if request.form.get("push_enabled") else 0,
+         1 if request.form.get("files_enabled") else 0, g["id"]),
     )
     conn.commit()
     conn.close()
@@ -984,10 +1022,13 @@ def _render_event_form(group, ev):
     hidden = hidden_field_ids(conn, ev["id"]) if ev else set()
     days = db.get_settings(conn)["default_deadline_days"]
     mail_on, wa_on, push_on = group_channels(conn, group)
+    filer = event_files(conn, ev["id"]) if ev else []
     conn.close()
     return render_template("admin/event_form.html", group=group, ev=ev,
                            fields=fields, hidden=hidden, default_deadline_days=days,
-                           mail_on=mail_on, wa_on=wa_on, push_on=push_on)
+                           mail_on=mail_on, wa_on=wa_on, push_on=push_on,
+                           filer=filer, maks_mb=MAX_UPLOAD_MB,
+                           filtyper=", ".join(sorted(e[1:] for e in ALLOWED_FILE_EXT)))
 
 
 
@@ -1226,6 +1267,7 @@ def admin_event_delete(slug, event_id):
     conn.execute("DELETE FROM events WHERE id = ? AND group_id = ?", (event_id, group["id"]))
     conn.commit()
     conn.close()
+    _delete_event_files(group, event_id)
     flash("Event slettet.", "ok")
     return redirect(url_for("admin_home", slug=slug))
 
@@ -1661,6 +1703,7 @@ def user_event(slug, event_slug):
     if accounts and my_uid and not is_admin:
         mu = get_user(conn, my_uid)
         my_name = (mu["name"] or mu["username"]) if mu else ""
+    filer = event_files(conn, ev["id"]) if group["files_enabled"] else []
     conn.close()
     # Med konti: brugere ser kun tilmeldings-formularen hvis de ikke allerede er tilmeldt
     show_signup = (state == "open") and (is_admin or not accounts or not has_own)
@@ -1669,7 +1712,7 @@ def user_event(slug, event_slug):
                            fields=parsed_fields, regs=regs, count=attending, full=full,
                            mail_on=mail_on, wa_on=wa_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
-                           group_users=group_users, my_name=my_name)
+                           group_users=group_users, my_name=my_name, filer=filer)
 
 
 @app.route("/<slug>/<event_slug>/signup", methods=["POST"])
@@ -2073,6 +2116,123 @@ def admin_users(slug):
     conn.close()
     return render_template("admin/users.html", group=group, users=users,
                            notify_on=mail_on or wa_on or push_on)
+
+
+# --------------------------------------------------------------------------- #
+# Filer vedhæftet et event
+# --------------------------------------------------------------------------- #
+def event_files_dir(group, event_id) -> str:
+    return os.path.join(db.DATA_DIR, "uploads", group["slug"], "events", str(event_id))
+
+
+def event_files(conn, event_id) -> list:
+    return conn.execute(
+        "SELECT * FROM event_files WHERE event_id = ? ORDER BY original_name COLLATE NOCASE",
+        (event_id,)).fetchall()
+
+
+def _delete_event_files(group, event_id) -> None:
+    """Fjern et events filer fra disken.
+
+    Databasen rydder selv op (ON DELETE CASCADE), men rækkerne er kun bogholderi —
+    bytesene bliver liggende i /data for evigt, hvis ingen sletter dem her.
+    """
+    try:
+        shutil.rmtree(event_files_dir(group, event_id), ignore_errors=True)
+    except OSError as e:
+        print(f"[FIL-FEJL] kunne ikke rydde filer for event {event_id}: {e}", flush=True)
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/filer", methods=["POST"])
+def admin_event_files(slug, event_id):
+    """Læg filer på et event, eller fjern én. Egen rute, fordi upload kræver
+    `enctype="multipart/form-data"` — og en formular inde i en anden formular er
+    ugyldig HTML (faldgrube 7)."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        return redirect(url_for("admin_login", slug=slug))
+    conn = db.get_db()
+    ev = conn.execute("SELECT * FROM events WHERE id = ? AND group_id = ?",
+                      (event_id, group["id"])).fetchone()
+    if not ev:
+        conn.close()
+        abort(404)
+    if not group["files_enabled"]:
+        conn.close()
+        flash("Filer er ikke slået til for gruppen (master styrer det).", "error")
+        return redirect(url_for("admin_event_edit", slug=slug, event_id=event_id))
+
+    if request.form.get("action") == "delete":
+        row = conn.execute("SELECT * FROM event_files WHERE id = ? AND event_id = ?",
+                           (request.form.get("file_id"), event_id)).fetchone()
+        if row:
+            try:
+                os.remove(os.path.join(event_files_dir(group, event_id), row["stored_name"]))
+            except OSError:
+                pass   # filen er væk i forvejen — rækken skal stadig slettes
+            conn.execute("DELETE FROM event_files WHERE id = ?", (row["id"],))
+            conn.commit()
+            flash(f"»{row['original_name']}« er fjernet.", "ok")
+    else:
+        gemt, afvist = 0, []
+        mappe = event_files_dir(group, event_id)
+        os.makedirs(mappe, exist_ok=True)
+        for f in request.files.getlist("files"):
+            if not f or not f.filename:
+                continue
+            ext = os.path.splitext(f.filename)[1].lower()
+            if ext not in ALLOWED_FILE_EXT:
+                afvist.append(f.filename)
+                continue
+            # Navnet på disken er et token: brugerens filnavn kan indeholde æ/ø/å
+            # (som secure_filename æder) og kan kollidere med en fil, der ligger der.
+            stored = secrets.token_hex(8) + ext
+            sti = os.path.join(mappe, stored)
+            f.save(sti)
+            conn.execute(
+                "INSERT INTO event_files (event_id, stored_name, original_name, size, "
+                "created_at) VALUES (?,?,?,?,?)",
+                (event_id, stored, f.filename[:200], os.path.getsize(sti), db.now_iso()))
+            gemt += 1
+        conn.commit()
+        if gemt:
+            flash(f"{gemt} fil(er) lagt på eventet.", "ok")
+            db.add_log(conn, "event", f"{gemt} fil(er) lagt på '{ev['name']}'", group["slug"])
+        if afvist:
+            flash("Ikke gemt (filtypen er ikke tilladt): " + ", ".join(afvist[:5]), "error")
+        if not gemt and not afvist:
+            flash("Vælg en fil først.", "error")
+    conn.close()
+    return redirect(url_for("admin_event_edit", slug=slug, event_id=event_id) + "#filer")
+
+
+@app.route("/<slug>/<event_slug>/fil/<int:file_id>")
+def event_file_download(slug, event_slug, file_id):
+    """Hent en fil. Kræver adgang til gruppen — filerne er ikke offentlige."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    row = conn.execute(
+        "SELECT f.*, e.id AS ev_id FROM event_files f JOIN events e ON e.id = f.event_id "
+        "WHERE f.id = ? AND e.slug = ? AND e.group_id = ?",
+        (file_id, event_slug, group["id"])).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    sti = os.path.join(event_files_dir(group, row["ev_id"]), row["stored_name"])
+    if not os.path.exists(sti):
+        abort(404)
+    # Altid som download, aldrig vist i siden: så kan en vedhæftet .svg eller .html
+    # ikke køre scripts på appens eget domæne. nosniff spærrer for at browseren
+    # gætter en anden type end den, vi sender.
+    resp = send_file(sti, as_attachment=True, download_name=row["original_name"])
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return resp
 
 
 # --------------------------------------------------------------------------- #

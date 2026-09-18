@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS groups (
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
     push_enabled        INTEGER DEFAULT 0,         -- push-notifikationer (slået til af master)
+    files_enabled       INTEGER DEFAULT 0,         -- må admin vedhæfte filer på events (master styrer
+                                                   -- det: filerne fylder på SERVERENS disk)
     created_at          TEXT NOT NULL
 );
 
@@ -172,6 +174,21 @@ CREATE TABLE IF NOT EXISTS notify_recipients (
     email               TEXT DEFAULT '',
     whatsapp            TEXT DEFAULT '',           -- mobilnummer til WhatsApp-broen
     active              INTEGER DEFAULT 1,         -- sat på pause uden at blive slettet
+    created_at          TEXT NOT NULL
+);
+
+-- Filer vedhæftet et event (program, kort, menu ...).
+--
+-- Navnet på disken er et TILFÆLDIGT token, ikke brugerens filnavn. To grunde:
+-- `secure_filename` æder æ/ø/å (»Køreplan.pdf« bliver til »Kreplan.pdf«), og to
+-- filer med samme navn ville overskrive hinanden. Det rigtige navn står i
+-- `original_name` og bruges, når filen hentes.
+CREATE TABLE IF NOT EXISTS event_files (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id            INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    stored_name         TEXT NOT NULL,             -- <token>.<ext> i uploads/<slug>/events/<event_id>/
+    original_name       TEXT NOT NULL,             -- vises i UI og bruges som download-navn
+    size                INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL
 );
 

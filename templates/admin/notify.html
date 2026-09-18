@@ -69,6 +69,22 @@
 
 <div class="card narrow">
   <h2 id="modtagere">Modtagere</h2>
+{% if not (mail_on or wa_on) %}
+  {# Modtagere ER mailadresser og mobilnumre. Er ingen af de to kanaler sat op,
+     kan formularen ikke udfyldes — så vis hvorfor i stedet for et felt, der
+     aldrig kan gemmes. Push står for sig selv: de enheder melder sig selv til. #}
+  <p class="muted small">En modtager på listen er en <strong>mailadresse</strong> eller et
+     <strong>mobilnummer</strong> — og ingen af de to kanaler kan sende endnu, så der er
+     ikke noget at skrive ind her.</p>
+  <p class="muted small">Sæt <strong>SMTP</strong> op under
+     <em>master → Opsætning</em> (eller WhatsApp-gatewayen samme sted), så dukker felterne
+     op af sig selv. Gruppen har allerede fået lov til at bruge kanalen; det er den globale
+     opsætning, der mangler.</p>
+  <p class="muted small">Push virker uafhængigt af det. De enheder, der har slået
+     notifikationer til på <a href="{{ url_for('user_home', slug=group.slug) }}">bruger-siden</a>,
+     får både de automatiske varslinger og »Send nu« nedenfor — de melder sig selv til og
+     skal ikke tastes ind.</p>
+{% else %}
   <p class="muted small">{{ reach }} modtager(e) kan nås lige nu.</p>
   {% if not recipients %}<p>Ingen modtagere endnu.</p>{% endif %}
 
@@ -125,15 +141,19 @@
     {{ contact_fields() }}
     <button type="submit">Tilføj modtager</button>
   </form>
+{% endif %}
 </div>
 
 <div class="card narrow">
   <h2 id="send">Send nu</h2>
+  {# Bekræftelsen skal nævne BEGGE dele: med kun push er »0 modtagere« sandt og
+     alligevel misvisende — beskeden når jo enhederne. #}
+  {% set maal %}{{ reach }} modtager(e){% if push_on %} og {{ push_devices }} enhed(er){% endif %}{% endset %}
   {% if events %}
     <h3>Varsling om et event</h3>
     <p class="muted small">Sender skabelonen »Nyt event« til hele listen med det samme.
        Eventet regnes derefter som varslet, så den automatiske varsling ikke gentager den.</p>
-    <form method="post" onsubmit="return confirm('Send varsling til {{ reach }} modtager(e)?')">
+    <form method="post" onsubmit="return confirm('Send varsling til {{ maal }}?')">
       <input type="hidden" name="action" value="send_event">
       <label>Event
         <select name="event_id">
@@ -150,7 +170,7 @@
   <h3>Egen besked</h3>
   <p class="muted small">Fri tekst til hele listen. <code>{name}</code> bliver modtagerens
      navn, <code>{group}</code> gruppens.</p>
-  <form method="post" onsubmit="return confirm('Send beskeden til {{ reach }} modtager(e)?')">
+  <form method="post" onsubmit="return confirm('Send beskeden til {{ maal }}?')">
     <input type="hidden" name="action" value="send_text">
     <label>Emne <input type="text" name="subject" placeholder="fx Ny sæson i {group}"></label>
     <label>Besked <textarea name="body" rows="4"></textarea></label>

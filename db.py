@@ -116,6 +116,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("groups", "notify_list_days", "INTEGER DEFAULT 14")
     add("groups", "notify_list_users", "INTEGER DEFAULT 1")
     add("groups", "push_enabled", "INTEGER DEFAULT 0")
+    add("groups", "files_enabled", "INTEGER DEFAULT 0")
     add("registrations", "user_id", "INTEGER DEFAULT NULL")
     add("registrations", "seats", "INTEGER DEFAULT 1")
     add("registrations", "waitlist", "INTEGER DEFAULT 0")

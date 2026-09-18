@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card narrow">
+  <h1>Filen er for stor</h1>
+  <p>Der kan højst sendes <strong>{{ maks }} MB</strong> ad gangen. Prøv med en mindre fil —
+     eller del uploaden op, hvis du valgte flere på én gang.</p>
+  <p class="muted small">Grænsen gælder hele forsendelsen, ikke den enkelte fil.</p>
+  <p><a class="btn" href="javascript:history.back()">Tilbage</a></p>
+</div>
+{% endblock %}

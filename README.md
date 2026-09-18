@@ -98,6 +98,19 @@ Listen bruges to steder:
 Teksten er en mail-skabelon (»Nyt event«) og kan rettes under **Opsætning**, hvis master
 har givet gruppen lov til at redigere skabeloner.
 
+## Filer på et event
+
+Gruppe-admin kan vedhæfte filer til et event — program, kort, menu — under **Redigér
+event**. De vises på eventets side og kan hentes af dem, der har adgang til gruppen.
+
+Højst 25 MB pr. forsendelse, og kun kendte filtyper (pdf, Office/OpenDocument, billeder,
+txt, csv, zip, ics). Filer leveres altid som download, aldrig vist i siden. Filerne ligger
+i `data/uploads/<gruppe>/events/<id>/` og følger med i runens backup; slettes eventet,
+ryddes de fra disken.
+
+**Master slår filer til pr. gruppe** under Opsætning — de fylder på serverens disk.
+En kopi af et event får ikke filerne med.
+
 ## Push-notifikationer og app på hjemmeskærmen
 
 Hver gruppe har sit eget web-manifest, så `/<gruppe>` kan lægges på hjemmeskærmen som en

@@ -73,6 +73,51 @@
     <button type="submit">{{ 'Gem ændringer' if ev else 'Opret event' }}</button>
   </form>
 </div>
+
+{% if group.files_enabled %}
+{# Egen formular OG eget kort: en upload kræver enctype="multipart/form-data", og
+   en <form> inde i en anden <form> er ugyldig HTML (faldgrube 7). #}
+<div class="card narrow" id="filer">
+  <h2>Filer</h2>
+  {% if not ev %}
+    <p class="muted small">Opret eventet først — så kan du lægge filer på det.
+       De skal bruge et event at høre til.</p>
+  {% else %}
+    <p class="muted small">Program, kort, menu … Filerne kan hentes af dem, der har adgang
+       til gruppen, og vises nederst på eventets side.</p>
+    {% if not filer %}<p>Ingen filer endnu.</p>{% endif %}
+    {% for f in filer %}
+      <div class="row">
+        <div>
+          <strong>{{ f.original_name }}</strong>
+          <div class="muted small">{{ f.size|filstr }} · lagt på {{ f.created_at|dt }}</div>
+        </div>
+        <div class="actions">
+          <a class="btn small" href="{{ url_for('event_file_download', slug=group.slug, event_slug=ev.slug, file_id=f.id) }}">Hent</a>
+          <form method="post" class="inline"
+                action="{{ url_for('admin_event_files', slug=group.slug, event_id=ev.id) }}"
+                onsubmit="return confirm('Fjern »{{ f.original_name }}«?')">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="file_id" value="{{ f.id }}">
+            <button class="danger small">Fjern</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+
+    <h3>Tilføj filer</h3>
+    <form method="post" enctype="multipart/form-data"
+          action="{{ url_for('admin_event_files', slug=group.slug, event_id=ev.id) }}">
+      <label>Vælg en eller flere filer
+        <input type="file" name="files" multiple>
+      </label>
+      <p class="muted small">Højst {{ maks_mb }} MB pr. forsendelse. Tilladte typer:
+         {{ filtyper }}.</p>
+      <button type="submit">Læg filerne på</button>
+    </form>
+  {% endif %}
+</div>
+{% endif %}
 <script>
   // Tilmeldingsfristen holder sin afstand til eventets start: flytter man datoen,
   // flytter fristen med. Samme regel som gentagelser bruger server-side.

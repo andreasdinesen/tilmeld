@@ -20,6 +20,17 @@
   <div class="count big">{{ count }} / {{ ev.expected_count }} deltagere
     {% if full %}<span class="tag locked">FULDT</span>{% endif %}</div>
   {% if ev.description %}<div class="description">{{ ev.description | md }}</div>{% endif %}
+  {% if filer %}
+    <h2>Filer</h2>
+    <ul class="filliste">
+      {% for f in filer %}
+        <li>
+          <a href="{{ url_for('event_file_download', slug=group.slug, event_slug=ev.slug, file_id=f.id) }}">{{ f.original_name }}</a>
+          <span class="muted small">{{ f.size|filstr }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
   <p style="margin-top:12px">
     <a class="btn" href="{{ url_for('user_event_ics', slug=group.slug, event_slug=ev.slug) }}">📅 Tilføj til kalender</a>
   </p>
