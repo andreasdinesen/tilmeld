@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block brand %}SMS-status{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>SMS hos Gigahost</h1>
+  <p class="muted small">Prøve-opslag på kontoen. Svarer siden, er brugernavn og
+     API-adgangskode rigtige.</p>
+
+  {% if error %}
+    {# Fejlteksterne er skrevet til at stå inde i en sætning (»ikke leveret (…)«).
+       Her står de alene, så de får et stort begyndelsesbogstav. #}
+    <p class="flash error">{{ error[0]|upper }}{{ error[1:] }}</p>
+    <p class="muted small">Tjek brugernavn og API-adgangskode under
+       <a href="{{ url_for('master_settings') }}">Opsætning</a>. API-adgangskoden
+       oprettes i <a href="https://controlcenter.gigahost.dk/" target="_blank" rel="noopener">Gigahost
+       Kontrolcenter</a> og er ikke den, du logger ind med.</p>
+  {% else %}
+    <h2>Saldo</h2>
+    <p><strong>{{ konto.credits }}</strong> {{ konto.unit }} tilbage på kontoen
+       <code>{{ konto.username }}</code>.</p>
+    {% if konto.credits < 20 %}
+      <p class="tag big locked">Saldoen er ved at være lille — gatewayen afviser beskeder,
+         når klippene slipper op.</p>
+    {% endif %}
+
+    <h2>Godkendte afsendernumre</h2>
+    {% if not numre %}
+      <p class="muted small">Kontoen har ingen verificerede afsendernumre. Uden ét svarer
+         gatewayen med en fejl på hver eneste besked.</p>
+    {% else %}
+      <ul>
+        {% for n in numre %}<li><code>{{ n }}</code></li>{% endfor %}
+      </ul>
+    {% endif %}
+
+    {# Det er her fejlen sidder, når alt andet ser rigtigt ud: nummeret er gemt, men
+       ikke godkendt. Sammenligningen ser bort fra mellemrum og et ledende +. #}
+    {% set af = afsender | replace(' ', '') | replace('+', '') %}
+    {% set godkendte = (numre or []) | map('replace', ' ', '') | map('replace', '+', '') | list %}
+    {% if afsender %}
+      {% if af in godkendte %}
+        <p class="flash ok">Afsenderen <code>{{ afsender }}</code> er godkendt.</p>
+      {% else %}
+        <p class="tag big locked">Afsenderen <code>{{ afsender }}</code> står ikke på listen —
+           beskeder vil blive afvist. Få nummeret verificeret i Kontrolcenteret.</p>
+      {% endif %}
+    {% else %}
+      <p class="tag big locked">Der er ikke sat noget afsendernummer under
+         <a href="{{ url_for('master_settings') }}">Opsætning</a>.</p>
+    {% endif %}
+  {% endif %}
+
+  <h2>Gateway</h2>
+  <p class="muted small">Slås op i DNS (<code>_sms._tcp.tel.gigahost.dk</code>) og bruges i
+     denne rækkefølge:</p>
+  <ul>{% for g in gateways %}<li><code>{{ g }}</code></li>{% endfor %}</ul>
+
+  <p><a class="btn" href="{{ url_for('master_settings') }}">Tilbage til Opsætning</a></p>
+</div>
+{% endblock %}

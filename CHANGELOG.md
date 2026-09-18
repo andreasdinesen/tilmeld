@@ -13,6 +13,133 @@ Databasen i `/data` overlever begge trin.
 
 ---
 
+## Version 20
+
+**Madbestilling: en besked med antal kuverter, når tilmeldingen lukker.**
+
+Den, der skal bestille mad til et event, får nu selv besked — med tallet. Beskeden
+sendes én gang, når tilmeldingsfristen er nået, på mail og/eller SMS.
+
+### Hvem får den
+
+Gruppen sætter en fast madbestiller under **Opsætning → Kontakt → Madbestiller**
+(mail, mobilnummer eller begge). Hvert event kan overskrive den under *Redigér event →
+Notifikationer → Madbestilling* — de to felter vælges hver for sig, så gruppens faste
+mailmodtager kan blive stående, selvom ét event skal ringe til en anden telefon.
+
+Fluebenet **»Besked til madbestilleren når fristen er nået«** slår den til pr. event.
+En kopi af et event arver både fluebenet og modtageren.
+
+På deltagerlisten står der nu, hvem beskeden går til og hvor mange kuverter — med en
+knap **»Send nu«**, hvis man skal melde tallet ind før fristen eller sende det igen.
+
+### »Spiser ikke med«
+
+Der er kommet en ny slags tilmeldings-punkt ved siden af »deltager ikke«: et
+**»spiser ikke med«-felt**. Deltageren kommer til eventet, men trækkes fra
+madbestillingen. Det oprettes under **Opsætning → Tilmeldings-punkter** og kan som
+alle andre punkter skjules på de events, hvor det ikke giver mening.
+
+Krydset gælder **hele tilmeldingen** — også dens gæster. Krydser man af for sig selv
+og to gæster, er det tre kuverter færre. De to fra-meldinger udelukker hinanden: et
+afbud spiser ikke med alligevel.
+
+Deltagerlisten viser tallet: *Spiser med: 4 (2 har meldt fra til spisning)*.
+
+### Teksten kan rettes
+
+Skabelonen **»Madbestilling«** ligger sammen med de øvrige under *Opsætning →
+Mail-skabeloner* (hvis master har givet gruppen lov). Ud over de sædvanlige
+pladsholdere har den fem tal:
+
+| Pladsholder | Betyder |
+|---|---|
+| `{meals}` | Hvor mange der skal have mad |
+| `{count}` | Deltagere + gæster i alt |
+| `{no_meals}` | Har meldt fra til spisning |
+| `{signups}` | Antal tilmeldinger (personer) |
+| `{waitlist}` | Antal på venteliste |
+
+Standardteksten er:
+
+> Tilmeldingen til {event} d. {date}{start} er lukket.
+> Der skal bestilles mad til {meals}.
+> I alt {count} deltagere inkl. gæster, heraf {no_meals} uden mad.
+
+### Detaljer
+
+- **Afbud og venteliste tæller ikke med.** Kun dem, der reelt deltager, bliver til
+  kuverter — samme regel som deltagertallet på listen bruger.
+- **Beskeden sendes én gang.** Kunne den ikke leveres, fejler den én gang og står i
+  aktivitetsloggen; den prøver ikke igen hvert tiende minut og sender maden af sted
+  tre dage senere. »Send nu« er vejen, hvis den skal ud alligevel.
+- **Et skjult felt tømmer ikke længere sit indhold.** Er mail ikke sat op globalt,
+  vises madbestillerens mailfelt ikke i event-formularen — og før ville et gem så
+  have slettet den gemte adresse. Nu bevares den.
+
+---
+
+## Version 19
+
+**SMS som fjerde notifikationskanal — via Gigahost.**
+
+Tilmeld kan nu sende SMS ved siden af mail, WhatsApp og push. Kanalen følger nøjagtig
+samme regler som de tre andre: master sætter den op globalt og slår den til pr. gruppe,
+og event-fluebenene bestemmer, hvad der bliver sendt.
+
+### Opsætning
+
+Under **master → Opsætning → SMS (Gigahost)** sættes tre ting: brugernavn (det samme som
+til Gigahost Kontrolcenter), en **API-adgangskode** (oprettes i Kontrolcenteret — det er
+ikke den, du logger ind med) og et **afsendernummer**, der er verificeret på kontoen.
+Alle tre skal være udfyldt, før kanalen regnes for sat op.
+
+Knappen **»Tjek saldo og afsendernumre«** slår kontoen op hos Gigahost og viser, hvor
+mange klip der er tilbage, hvilke afsendernumre der er godkendt, og om det nummer, du
+har skrevet ind, står på listen. Det er dér, fejlen næsten altid sidder, når alt andet
+ser rigtigt ud.
+
+### Hvor SMS bliver brugt
+
+- **Til gruppe-admin** — ny tilmelding, ændring, »fristen er nået«. SMS har sit eget
+  modtagerfelt ved siden af WhatsApps, fordi en WhatsApp-modtager også kan være en
+  gruppechat, og et gruppe-id kan man ikke sende en SMS til.
+- **Til deltagere** — kvittering, påmindelse før frist, påmindelse før eventet.
+- **Til notifikationslisten** — både den automatiske varsling om nye events og
+  »Send nu«.
+
+Deltagerens **mobilnummer er ét felt**, som både WhatsApp og SMS bruger. Feltet hedder
+nu »Mobilnummer« i stedet for »WhatsApp-nummer« — også i deltagerlisten og CSV-filen —
+og parentesen fortæller, hvad nummeret bliver brugt til i netop den gruppe. Er begge
+kanaler slået til, får modtageren begge dele.
+
+### Detaljer
+
+- **Gatewayen slås op i DNS.** Gigahost annoncerer sine aktive gateways som SRV-poster;
+  svarer den ene ikke, bruges den næste. Slår opslaget fejl, falder appen tilbage på de
+  kendte værtsnavne — opslaget er en forbedring, ikke en forudsætning.
+- **Beskeder holdes inden for 3 SMS-dele.** Et enkelt tegn uden for latin-1 (fx en
+  tankestreg) ville ellers halvere pladsen fra 459 til 201 tegn og koste flere klip, så
+  de typografiske tegn, skabelonerne bruger, oversættes automatisk (— bliver til -,
+  … til ...). Er teksten stadig for lang, forkortes den.
+- **Fejl i aktivitetsloggen får nu den rigtige kategori.** Før blev alt, der ikke kunne
+  leveres fra notifikationslisten, logget som »mail«, uanset kanal. Nu kan man filtrere
+  på **SMS** og se præcis, hvad der ikke kom af sted.
+- SMS er skrevet direkte oven på stdlib i `gigasms.py` — ingen ny afhængighed, præcis
+  som Web Push. `python gigasms.py` slår gatewayene op og kan med `GIGAHOST_USER` +
+  `GIGAHOST_PASSWORD` i miljøet hente saldo og afsendernumre.
+
+### Migration af gamle databaser
+
+Tilmeld havde SMS én gang før, og databaser fra dengang har stadig kolonnerne
+`sms_enabled` og `admin_phone`. De blev i sin tid flyttet over i WhatsApp-felterne — men
+flytningen kørte ved hver opstart, og med en ny kanal af samme navn ville den have slået
+WhatsApp til igen på enhver gruppe, der brugte SMS. Flytningen sker nu **én gang**, og de
+gamle kolonner fjernes bagefter. Det gamle admin-nummer følger med over i den nye kanals
+modtagerfelt, så det ikke går tabt; selve kanalen starter slukket.
+
+---
+
 ## Version 18
 
 **Filer på et event — og en rettelse af notifikationslisten.**

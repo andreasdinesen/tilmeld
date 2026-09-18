@@ -31,6 +31,7 @@
   --cat-signup-soft: #ddf2ef;  --cat-signup-ink: #0f6b62;
   --cat-mail-soft: #fdf3dc;    --cat-mail-ink: #7a5200;
   --cat-whatsapp-soft: #e2f3e2; --cat-whatsapp-ink: #006300;
+  --cat-sms-soft: #e0f0f6;    --cat-sms-ink: #0d5f7a;
   --cat-user-soft: #f2e6fb;    --cat-user-ink: #6b21a8;
   --cat-push-soft: #fde8ef;    --cat-push-ink: #9d174d;
 }
@@ -63,6 +64,7 @@
   --cat-signup-soft: #0f2b28;  --cat-signup-ink: #5ec9bd;
   --cat-mail-soft: #2e2410;    --cat-mail-ink: #e5b95c;
   --cat-whatsapp-soft: #12290f; --cat-whatsapp-ink: #4fc44f;
+  --cat-sms-soft: #0f2630;    --cat-sms-ink: #6ec4e0;
   --cat-user-soft: #2a1638;    --cat-user-ink: #cb9bf0;
   --cat-push-soft: #35111f;    --cat-push-ink: #f09bbb;
 }
@@ -96,6 +98,7 @@
     --cat-signup-soft: #0f2b28;  --cat-signup-ink: #5ec9bd;
     --cat-mail-soft: #2e2410;    --cat-mail-ink: #e5b95c;
     --cat-whatsapp-soft: #12290f; --cat-whatsapp-ink: #4fc44f;
+    --cat-sms-soft: #0f2630;    --cat-sms-ink: #6ec4e0;
     --cat-user-soft: #2a1638;    --cat-user-ink: #cb9bf0;
     --cat-push-soft: #35111f;    --cat-push-ink: #f09bbb;
   }
@@ -277,6 +280,7 @@ button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: non
 .tag.cat-signup { background: var(--cat-signup-soft); color: var(--cat-signup-ink); }
 .tag.cat-mail { background: var(--cat-mail-soft); color: var(--cat-mail-ink); }
 .tag.cat-whatsapp { background: var(--cat-whatsapp-soft); color: var(--cat-whatsapp-ink); }
+.tag.cat-sms { background: var(--cat-sms-soft); color: var(--cat-sms-ink); }
 .tag.cat-user { background: var(--cat-user-soft); color: var(--cat-user-ink); }
 .tag.cat-push { background: var(--cat-push-soft); color: var(--cat-push-ink); }
 /* × inde i et mærkat: skal arve mærkatets tekstfarve, ikke være hvid */
@@ -289,7 +293,7 @@ table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 700; }
 tr:last-child td { border-bottom: none; }
-/* Deltagerlisten kan have mange kolonner (navn + e-mail + WhatsApp + ét pr. tilmeldings-
+/* Deltagerlisten kan have mange kolonner (navn + e-mail + mobilnr. + ét pr. tilmeldings-
    punkt + tilmeldt + mødt + handlinger). Med width:100% alene klemmes hver kolonne ned
    til sit længste ord — ét ord pr. linje, og rækker på ti linjers højde.
    min-width:max-content lader tabellen få den plads, indholdet kræver, og .tablewrap

@@ -28,7 +28,8 @@ MASTER_PASSWORD="dit-hemmelige-kodeord" bash run.sh
 ## Sådan hænger det sammen
 
 1. **Master-admin** (`/master`) opretter grupper, sætter hver gruppes admin-password
-   og slår mail/WhatsApp til/fra. Her konfigureres også SMTP og WhatsApp-gateway globalt.
+   og slår mail/WhatsApp/SMS/push til/fra. Her konfigureres også SMTP, WhatsApp-gateway
+   og SMS globalt.
 2. **Gruppe-admin** (`/gruppe/admin`) opretter events, definerer tilmeldings-punkter
    (tekst/dropdown/checkbox, påkrævet eller ej), sætter/sletter gruppe-password og
    henter deltagerlister (vis eller CSV).
@@ -69,7 +70,7 @@ virker bag en reverse proxy (fx Cloudflare Tunnel) uden konfiguration.
 
 ## Notifikationer
 
-Uden SMTP/WhatsApp-konfiguration logges notifikationer i serverens konsol — fint til test.
+Uden SMTP/WhatsApp/SMS-konfiguration logges notifikationer i serverens konsol — fint til test.
 Sæt rigtige værdier under master → Opsætning for at sende rigtige beskeder.
 
 **WhatsApp** sendes via en HTTP-bro/gateway du selv hoster (fx wppconnect/Baileys).
@@ -77,11 +78,53 @@ Tilmeld kalder den med `POST <gateway-url>` og JSON-body `{"to": "<nummer eller 
 "message": "..."}` samt header `Authorization: Bearer <api-nøgle>`. Konfigurér din bro
 til at acceptere det format (eller sæt en lille adapter foran).
 
+## SMS (Gigahost)
+
+SMS er den fjerde kanal og følger samme regler som de øvrige: master sætter den op
+globalt og slår den til pr. gruppe, og event-fluebenene bestemmer, hvad der sendes.
+
+Under **master → Opsætning → SMS (Gigahost)** udfyldes tre felter:
+
+| Felt | Hvad |
+|---|---|
+| Brugernavn | Det samme som til [Gigahost Kontrolcenter](https://controlcenter.gigahost.dk/). |
+| API-adgangskode | Oprettes i Kontrolcenteret — **ikke** den, du logger ind med. |
+| Afsendernummer | Et nummer, der er **verificeret** på kontoen. |
+
+Alle tre skal være der, før kanalen regnes for sat op. Knappen **»Tjek saldo og
+afsendernumre«** slår kontoen op og viser saldoen, de godkendte afsendernumre og om dit
+afsendernummer står på listen — det er dér, fejlen næsten altid sidder.
+
+Der skal være **SMS-klip** på kontoen; gatewayen afviser en besked, hvis saldoen ikke
+rækker. Kontoen topper man op i Kontrolcenteret.
+
+Deltagerens **mobilnummer er ét felt**, som både WhatsApp og SMS bruger — ét nummer, op
+til to kanaler. Er begge slået til for gruppen, får modtageren begge dele. SMS har
+derimod sit **eget admin-modtagerfelt**, fordi WhatsApp-modtageren også kan være en
+gruppechat, og et gruppe-id kan man ikke sende en SMS til.
+
+En besked må fylde højst **3 SMS-dele** (459 tegn i latin-1). Appen oversætter selv de
+typografiske tegn, skabelonerne bruger (`—` → `-`, `…` → `...`), så ét enkelt tegn ikke
+tvinger hele beskeden over i unicode og halverer pladsen til 201 tegn. Er teksten stadig
+for lang, forkortes den.
+
+Gatewayen slås op i DNS (`_sms._tcp.tel.gigahost.dk`), så Gigahost kan flytte den uden
+at appen skal rettes; svarer den ene ikke, bruges den næste. Hele API-klienten ligger i
+`gigasms.py` og bruger kun stdlib — ingen ny afhængighed. Slå gatewayene op med:
+
+```bash
+./.venv/bin/python gigasms.py
+```
+
+Med `GIGAHOST_USER` og `GIGAHOST_PASSWORD` i miljøet henter den også saldo og
+afsendernumre.
+
 ## Notifikationsliste
 
 Gruppe-admin kan under **Notifikationsliste** samle de modtagere, der skal høre om et nyt
 event — også dem, der ikke er tilmeldt noget endnu. Modtagerne kan have en mailadresse,
 et mobilnummer eller begge dele; kun de kanaler, master har slået til for gruppen, vises.
+Mobilnummeret bruges af både WhatsApp og SMS.
 
 Kører gruppen med individuelle bruger-konti, hentes brugernes mail og mobilnummer
 **direkte fra deres profil** — de skal ikke skrives ind på listen. Admin kan tilføje
@@ -97,6 +140,42 @@ Listen bruges to steder:
 
 Teksten er en mail-skabelon (»Nyt event«) og kan rettes under **Opsætning**, hvis master
 har givet gruppen lov til at redigere skabeloner.
+
+## Madbestilling
+
+Den, der skal bestille mad til et event, kan få besked med **antallet af kuverter**,
+når tilmeldingsfristen er nået. Beskeden sendes én gang, på mail og/eller SMS.
+
+Gruppen sætter en fast madbestiller under **Opsætning → Kontakt → Madbestiller**; hvert
+event kan overskrive mail og telefon hver for sig under *Redigér event →
+Notifikationer → Madbestilling*, hvor fluebenet også slår beskeden til. En kopi af et
+event arver begge dele.
+
+Deltagerlisten viser, hvem beskeden går til og hvor mange kuverter, med en knap
+**»Send nu«** — til når tallet skal meldes ind før fristen, eller sendes igen.
+
+### »Spiser ikke med«
+
+Et tilmeldings-punkt kan markeres som et **»spiser ikke med«-felt**: deltageren kommer
+til eventet, men trækkes fra madbestillingen. Det oprettes under **Opsætning →
+Tilmeldings-punkter** ved siden af »deltager ikke«, og kan skjules på de events, hvor
+det ikke giver mening.
+
+Krydset gælder **hele tilmeldingen** — også dens gæster. De to fra-meldinger udelukker
+hinanden: et afbud spiser ikke med alligevel. Afbud og venteliste tæller aldrig med.
+
+### Teksten
+
+Skabelonen »Madbestilling« rettes under **Opsætning → Mail-skabeloner** (hvis master har
+givet gruppen lov). Ud over de sædvanlige pladsholdere har den fem tal:
+
+| Pladsholder | Betyder |
+|---|---|
+| `{meals}` | Hvor mange der skal have mad |
+| `{count}` | Deltagere + gæster i alt |
+| `{no_meals}` | Har meldt fra til spisning |
+| `{signups}` | Antal tilmeldinger (personer) |
+| `{waitlist}` | Antal på venteliste |
 
 ## Filer på et event
 
@@ -116,7 +195,7 @@ En kopi af et event får ikke filerne med.
 Hver gruppe har sit eget web-manifest, så `/<gruppe>` kan lægges på hjemmeskærmen som en
 app med gruppens navn og eget ikon.
 
-Push er en **tredje kanal ved siden af mail og WhatsApp og følger de samme regler**:
+Push er en **kanal ved siden af mail, WhatsApp og SMS og følger de samme regler**:
 master slår den til pr. gruppe under **Opsætning**, og event-fluebenene bestemmer, hvad
 der sendes. Notifikationer slås til pr. **enhed** tre steder:
 
@@ -173,8 +252,8 @@ Installér via yggdrasils **"Browse runes on GitHub"**:
 Sæt `MASTER_PASSWORD` ved oprettelsen. Port 8080 eksponeres.
 
 **Overvågning:** runen giver to log-watchers, der sender en notifikation i panelet —
-én for `[MAIL-FEJL]`/`[WHATSAPP-FEJL]`/`[SCHEDULER-FEJL]`/`[LOG-FEJL]` og én for
-uhåndterede serverfejl (HTTP 500). En eksisterende server får dem ved næste Reinstall.
+én for `[MAIL-FEJL]`/`[WHATSAPP-FEJL]`/`[SMS-FEJL]`/`[SCHEDULER-FEJL]`/`[LOG-FEJL]` og én
+for uhåndterede serverfejl (HTTP 500). En eksisterende server får dem ved næste Reinstall.
 
 **Wipe** starter forfra med en tom database: `tilmeld.db` (og dens journal-filer)
 slettes, og ved næste start gælder `MASTER_PASSWORD` igen. `uploads/` røres ikke.

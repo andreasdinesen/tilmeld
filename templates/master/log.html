@@ -12,13 +12,13 @@
     </form>
     {% endif %}
   </div>
-  <p class="muted small">Oprettelser og sendte mail/WhatsApp-beskeder (nyeste øverst, op til 500).
+  <p class="muted small">Oprettelser og sendte mail/WhatsApp/SMS-beskeder (nyeste øverst, op til 500).
      Gemmes i op til 30 dage.</p>
 
   <div class="log-filters">
     {% set cats = [('', 'Alle'), ('group', 'Grupper'), ('event', 'Events'),
                    ('signup', 'Tilmeldinger'), ('user', 'Brugere'), ('mail', 'Mail'),
-                   ('whatsapp', 'WhatsApp'), ('push', 'Push')] %}
+                   ('whatsapp', 'WhatsApp'), ('sms', 'SMS'), ('push', 'Push')] %}
     {% for val, lbl in cats %}
       <a class="btn small {{ 'primary' if category == val }}"
          href="{{ url_for('master_log', category=val) if val else url_for('master_log') }}">{{ lbl }}</a>

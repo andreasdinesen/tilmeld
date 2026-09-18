@@ -24,9 +24,15 @@
     <label>WhatsApp-modtager (bruger-nummer, fx 4512345678, eller gruppe-id)
       <input type="text" name="whatsapp_recipient">
     </label>
-    <p class="muted small">Gruppe-admin kan selv rette disse to felter bagefter.</p>
+    <label>SMS-modtager (admins mobilnummer, fx +4520123456)
+      <input type="text" name="sms_recipient">
+    </label>
+    <p class="muted small">Gruppe-admin kan selv rette disse felter bagefter. SMS har sit
+       eget felt, fordi WhatsApp-modtageren også kan være en gruppechat — og et gruppe-id
+       kan man ikke sende en SMS til.</p>
     <label class="chk"><input type="checkbox" name="mail_enabled"> Tillad mail-notifikationer</label>
     <label class="chk"><input type="checkbox" name="whatsapp_enabled"> Tillad WhatsApp-notifikationer</label>
+    <label class="chk"><input type="checkbox" name="sms_enabled"> Tillad SMS-notifikationer (koster klip hos Gigahost)</label>
     <label class="chk"><input type="checkbox" name="templates_enabled"> Tillad at admin redigerer mail-skabeloner</label>
     <label class="chk"><input type="checkbox" name="user_accounts_enabled"> Individuelle bruger-konti (login med brugernavn)</label>
     <label class="chk"><input type="checkbox" name="push_enabled"> Tillad push-notifikationer (kræver en offentlig URL)</label>

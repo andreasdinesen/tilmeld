@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS settings (
     smtp_use_tls        INTEGER DEFAULT 1,
     whatsapp_api_url    TEXT DEFAULT '',             -- URL til WhatsApp-bro/gateway
     whatsapp_api_key    TEXT DEFAULT '',             -- API-nøgle (sendes som Bearer-token)
+    sms_username        TEXT DEFAULT '',             -- Gigahost: brugernavn (som i Kontrolcenteret)
+    sms_password        TEXT DEFAULT '',             -- Gigahost: API-adgangskode (ikke login-koden)
+    sms_sender          TEXT DEFAULT '',             -- afsendernummer, VERIFICERET hos Gigahost
     base_url            TEXT DEFAULT '',             -- offentlig URL (til links i mails)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT 'andreasdinesen/tilmeld',  -- "ejer/repo" til opdaterings-tjek
@@ -29,8 +32,13 @@ CREATE TABLE IF NOT EXISTS groups (
     admin_password_hash TEXT NOT NULL,
     mail_enabled        INTEGER DEFAULT 0,         -- slået til af master admin
     whatsapp_enabled    INTEGER DEFAULT 0,
+    sms_enabled         INTEGER DEFAULT 0,
     admin_email         TEXT DEFAULT '',           -- modtager af admin-notifikationer (mail)
     whatsapp_recipient  TEXT DEFAULT '',           -- WhatsApp bruger-nr eller gruppe-id
+    sms_recipient       TEXT DEFAULT '',           -- admins mobilnummer (SMS har ingen gruppechat,
+                                                   -- derfor sit eget felt ved siden af WhatsApps)
+    catering_email      TEXT DEFAULT '',           -- madbestilleren: gruppens standard. Et event
+    catering_phone      TEXT DEFAULT '',           -- kan overskrive begge (events.catering_*).
     image_path          TEXT DEFAULT '',           -- logo/billede vist på bruger-siden
     login_text          TEXT DEFAULT '',           -- tekst vist på bruger-login-skærmen
     templates_enabled   INTEGER DEFAULT 0,         -- master tillader admin at redigere mail-skabeloner
@@ -52,7 +60,9 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash       TEXT NOT NULL,
     name                TEXT DEFAULT '',           -- fulde navn (bruges automatisk ved tilmelding)
     email               TEXT DEFAULT '',
-    whatsapp            TEXT DEFAULT '',
+    whatsapp            TEXT DEFAULT '',           -- mobilnummer: bruges til BÅDE WhatsApp og SMS.
+                                                   -- Kolonnenavnet er historisk (SMS kom til igen
+                                                   -- efter WhatsApp) — ét nummer, to kanaler.
     reset_token         TEXT DEFAULT '',           -- "glemt adgangskode"-token
     reset_expires       TEXT DEFAULT '',
     created_at          TEXT NOT NULL
@@ -81,6 +91,9 @@ CREATE TABLE IF NOT EXISTS group_fields (
     options             TEXT DEFAULT '',           -- JSON-liste til dropdown
     required            INTEGER DEFAULT 0,
     is_decline          INTEGER DEFAULT 0,         -- "deltager ikke": kun navn kræves hvis afkrydset
+    is_meal_decline     INTEGER DEFAULT 0,         -- "spiser ikke med": deltager, men skal ikke have
+                                                   -- mad. Trækkes fra i madbestillingens antal.
+                                                   -- Udelukker is_decline (et afbud spiser slet ikke).
     multiline           INTEGER DEFAULT 0,         -- notefelt: flerlinjet tekst (alle kan se den)
     sort_order          INTEGER DEFAULT 0
 );
@@ -112,6 +125,10 @@ CREATE TABLE IF NOT EXISTS events (
     event_reminder_sent INTEGER DEFAULT 0,
     notify_list         INTEGER DEFAULT 0,         -- varsl notifikationslisten om dette event
     notify_list_sent    INTEGER DEFAULT 0,
+    notify_catering     INTEGER DEFAULT 0,         -- besked til madbestilleren når fristen er nået
+    catering_sent       INTEGER DEFAULT 0,
+    catering_email      TEXT DEFAULT '',           -- tomt = brug gruppens standard
+    catering_phone      TEXT DEFAULT '',
     created_at          TEXT NOT NULL,
     updated_at          TEXT DEFAULT '',           -- iCal LAST-MODIFIED
     revision            INTEGER DEFAULT 0,         -- iCal SEQUENCE: tælles op når noget
@@ -140,11 +157,11 @@ CREATE TABLE IF NOT EXISTS registration_values (
     value               TEXT DEFAULT ''
 );
 
--- Aktivitetslog til master-admin (oprettelser + sendte mail/WhatsApp-beskeder)
+-- Aktivitetslog til master-admin (oprettelser + sendte mail/WhatsApp/SMS-beskeder)
 CREATE TABLE IF NOT EXISTS activity_log (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at          TEXT NOT NULL,
-    category            TEXT NOT NULL,             -- group | event | signup | mail | whatsapp
+    category            TEXT NOT NULL,             -- group | event | signup | mail | whatsapp | sms | push
     group_slug          TEXT DEFAULT '',
     message             TEXT NOT NULL
 );
@@ -172,7 +189,8 @@ CREATE TABLE IF NOT EXISTS notify_recipients (
     group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     name                TEXT DEFAULT '',
     email               TEXT DEFAULT '',
-    whatsapp            TEXT DEFAULT '',           -- mobilnummer til WhatsApp-broen
+    whatsapp            TEXT DEFAULT '',           -- mobilnummer til WhatsApp-broen OG til SMS
+                                                   -- (samme nummer; se users.whatsapp)
     active              INTEGER DEFAULT 1,         -- sat på pause uden at blive slettet
     created_at          TEXT NOT NULL
 );

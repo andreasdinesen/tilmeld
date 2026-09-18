@@ -73,6 +73,34 @@
     <p><a class="btn" href="{{ url_for('master_whatsapp_groups') }}" target="_blank" rel="noopener">Hent WhatsApp-gruppe-id'er ↗</a></p>
     {% endif %}
 
+    <h2>SMS (Gigahost)</h2>
+    <details class="help">
+      <summary>Sådan sætter du SMS op</summary>
+      <div class="help-body">
+        <ol>
+          <li>Log ind i <a href="https://controlcenter.gigahost.dk/" target="_blank" rel="noopener">Gigahost Kontrolcenter</a>
+              og opret en <strong>API-adgangskode</strong>. Det er ikke den, du logger ind med.</li>
+          <li><strong>Brugernavnet</strong> er det samme som til Kontrolcenteret.</li>
+          <li>Køb <strong>SMS-klip</strong> — gatewayen afviser en besked, hvis saldoen ikke rækker.</li>
+          <li>Få dit <strong>afsendernummer verificeret</strong>. Et ikke-godkendt nummer
+              giver fejl på hver eneste besked, uanset at alt andet er rigtigt.</li>
+        </ol>
+        <p class="muted small">Numre skrives med landekode, fx <code>+4520123456</code>.
+           En besked må fylde 3 SMS-dele (459 tegn); længere tekst forkortes automatisk.</p>
+      </div>
+    </details>
+    <label>Brugernavn (som i Kontrolcenteret)
+      <input type="text" name="sms_username" value="{{ s.sms_username }}">
+    </label>
+    <label>API-adgangskode <input type="password" name="sms_password" value="{{ s.sms_password }}"></label>
+    <label>Afsendernummer (verificeret hos Gigahost)
+      <input type="text" name="sms_sender" value="{{ s.sms_sender }}" placeholder="+4520123456">
+    </label>
+    <p class="muted small">Alle tre felter skal være udfyldt, før SMS kan sendes.</p>
+    {% if s.sms_username and s.sms_password %}
+    <p><a class="btn" href="{{ url_for('master_sms_status') }}" target="_blank" rel="noopener">Tjek saldo og afsendernumre ↗</a></p>
+    {% endif %}
+
     <h2>Links i mails</h2>
     <label>Offentlig URL (bruges til links i mails, fx til deltagerlisten)
       <input type="text" name="base_url" value="{{ s.base_url }}" placeholder="https://tilmeld.eksempel.dk">

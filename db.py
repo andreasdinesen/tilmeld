@@ -96,11 +96,22 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if col not in cols(table):
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
 
+    # Kolonnerne på `groups` som de så ud FØR denne kørsel. Skal aflæses her, ikke
+    # til sidst: engangs-flytningen af de gamle SMS-felter nederst i funktionen
+    # spørger, om `sms_enabled` findes — og siden SMS kom tilbage som selvstændig
+    # kanal, tilføjer vi selv den kolonne længere nede. Blev listen læst bagefter,
+    # ville flytningen køre ved HVER opstart og slå WhatsApp til på alle grupper,
+    # der har SMS slået til.
+    groups_cols_foer = cols("groups")
+
     add("settings", "default_deadline_days", "INTEGER DEFAULT 4")
     add("settings", "github_repo", "TEXT DEFAULT ''")
     add("settings", "update_branch", "TEXT DEFAULT 'main'")
     add("settings", "whatsapp_api_url", "TEXT DEFAULT ''")
     add("settings", "whatsapp_api_key", "TEXT DEFAULT ''")
+    add("settings", "sms_username", "TEXT DEFAULT ''")
+    add("settings", "sms_password", "TEXT DEFAULT ''")
+    add("settings", "sms_sender", "TEXT DEFAULT ''")
     add("settings", "base_url", "TEXT DEFAULT ''")
     add("settings", "default_group", "TEXT DEFAULT ''")
     add("settings", "vapid_public", "TEXT DEFAULT ''")
@@ -117,6 +128,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("groups", "notify_list_users", "INTEGER DEFAULT 1")
     add("groups", "push_enabled", "INTEGER DEFAULT 0")
     add("groups", "files_enabled", "INTEGER DEFAULT 0")
+    add("groups", "catering_email", "TEXT DEFAULT ''")
+    add("groups", "catering_phone", "TEXT DEFAULT ''")
     add("registrations", "user_id", "INTEGER DEFAULT NULL")
     add("registrations", "seats", "INTEGER DEFAULT 1")
     add("registrations", "waitlist", "INTEGER DEFAULT 0")
@@ -132,6 +145,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("events", "notify_list_sent", "INTEGER DEFAULT 0")
     add("group_fields", "is_decline", "INTEGER DEFAULT 0")
     add("group_fields", "multiline", "INTEGER DEFAULT 0")
+    add("group_fields", "is_meal_decline", "INTEGER DEFAULT 0")
     add("events", "csv_after_deadline", "INTEGER DEFAULT 0")
     add("events", "csv_sent", "INTEGER DEFAULT 0")
     add("events", "capacity_limit", "INTEGER DEFAULT 0")
@@ -139,17 +153,50 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("events", "deadline_sent", "INTEGER DEFAULT 0")
     add("events", "updated_at", "TEXT DEFAULT ''")
     add("events", "revision", "INTEGER DEFAULT 0")
+    add("events", "notify_catering", "INTEGER DEFAULT 0")
+    add("events", "catering_sent", "INTEGER DEFAULT 0")
+    add("events", "catering_email", "TEXT DEFAULT ''")
+    add("events", "catering_phone", "TEXT DEFAULT ''")
 
-    # Flyt evt. gamle SMS-data over til WhatsApp-felterne (kun hvis de gamle kolonner
-    # findes — dvs. databaser oprettet før WhatsApp-skiftet).
-    gcols = cols("groups")
-    if "admin_phone" in gcols:
+    # --- SMS: to generationer af det samme kolonnenavn -------------------------
+    # Databaser fra FØR WhatsApp-skiftet har stadig de oprindelige kolonner
+    # `sms_enabled` og `admin_phone`. Værdierne flyttes over i WhatsApp-felterne
+    # som hidtil — og DEREFTER fjernes de gamle kolonner.
+    #
+    # Fjernelsen er ikke pænhed, den er nødvendig: `sms_enabled` er nu også navnet
+    # på den nye SMS-kanals flag, og de to kan ikke stå i tabellen samtidig. Uden
+    # den ville flytningen desuden køre ved HVER opstart — og slå WhatsApp til igen
+    # på enhver gruppe, der bruger SMS.
+    #
+    # Derfor står `add()`-linjerne for de nye kolonner NEDENFOR dette afsnit og ikke
+    # oppe i listen: den gamle kolonne skal være væk, før den nye kan laves.
+    gamle_numre = {}
+    if "admin_phone" in groups_cols_foer:
         conn.execute("UPDATE groups SET whatsapp_recipient = admin_phone "
                      "WHERE (whatsapp_recipient IS NULL OR whatsapp_recipient = '') "
                      "AND admin_phone != ''")
-    if "sms_enabled" in gcols:
-        conn.execute("UPDATE groups SET whatsapp_enabled = sms_enabled "
-                     "WHERE whatsapp_enabled = 0 AND sms_enabled = 1")
+        if "sms_enabled" in groups_cols_foer:
+            conn.execute("UPDATE groups SET whatsapp_enabled = sms_enabled "
+                         "WHERE whatsapp_enabled = 0 AND sms_enabled = 1")
+        # Nummeret er et SMS-nummer og hører hjemme i den nye kanals eget felt.
+        # Læs det, mens kolonnen stadig findes.
+        gamle_numre = {r["id"]: r["admin_phone"] for r in conn.execute(
+            "SELECT id, admin_phone FROM groups WHERE admin_phone != ''")}
+        for gammel in ("admin_phone", "sms_enabled"):
+            if gammel in cols("groups"):
+                try:
+                    conn.execute(f"ALTER TABLE groups DROP COLUMN {gammel}")
+                except sqlite3.OperationalError as e:
+                    # DROP COLUMN kræver SQLite 3.35 (2021). Sker det alligevel,
+                    # bliver den gamle kolonne stående og bruges som den nye —
+                    # betydningen er den samme, så appen kører videre.
+                    print(f"[MIGRATION] kunne ikke fjerne groups.{gammel}: {e}", flush=True)
+
+    add("groups", "sms_enabled", "INTEGER DEFAULT 0")
+    add("groups", "sms_recipient", "TEXT DEFAULT ''")
+    for gid, nummer in gamle_numre.items():
+        conn.execute("UPDATE groups SET sms_recipient = ? WHERE id = ? AND sms_recipient = ''",
+                     (nummer, gid))
     conn.commit()
 
 

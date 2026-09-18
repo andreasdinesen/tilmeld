@@ -1,9 +1,10 @@
 {# Delt felt-render til både ny tilmelding og redigering.
-   Forventer: fields. Valgfrit: reg, current (field_id->value), mail_on, wa_on. #}
+   Forventer: fields. Valgfrit: reg, current (field_id->value), mail_on, wa_on, sms_on. #}
 {% set reg = reg|default(none) %}
 {% set current = current|default({}) %}
 {% set mail_on = mail_on|default(false) %}
 {% set wa_on = wa_on|default(false) %}
+{% set sms_on = sms_on|default(false) %}
 {% set accounts = accounts|default(false) %}
 {% set hide_name = hide_name|default(false) %}
 {# Med individuelle konti bruges brugerens eget navn — feltet skjules #}
@@ -23,9 +24,15 @@
   <input type="email" name="email" value="{{ reg.email if reg else '' }}">
 </label>
 {% endif %}
-{% if wa_on and not accounts %}
-<label>WhatsApp-nummer (til kvittering)
-  <input type="text" name="phone" value="{{ reg.phone if reg else '' }}">
+{# Ét mobilnummer dækker både WhatsApp og SMS — derfor ét felt, og en parentes
+   der siger, hvad nummeret faktisk bruges til i netop denne gruppe. #}
+{% if (wa_on or sms_on) and not accounts %}
+{% set kanaler = [] %}
+{% if wa_on %}{% set _ = kanaler.append('WhatsApp') %}{% endif %}
+{% if sms_on %}{% set _ = kanaler.append('SMS') %}{% endif %}
+<label>Mobilnummer (til kvittering på {{ kanaler|join(' og ') }})
+  <input type="text" name="phone" value="{{ reg.phone if reg else '' }}"
+         placeholder="fx +4520123456">
 </label>
 {% endif %}
 {% for item in fields %}

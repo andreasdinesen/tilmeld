@@ -10,8 +10,14 @@
   {% if mail_on %}
     <label>E-mail <input type="email" name="email" value="{{ r.email if r else '' }}"></label>
   {% endif %}
-  {% if wa_on %}
-    <label>Mobilnummer (WhatsApp)
+  {% if tlf_on %}
+    {# Ét nummer, op til to kanaler. Parentesen fortæller, hvad nummeret bliver
+       brugt til i netop denne gruppe — ellers ved admin ikke, om et nummer uden
+       WhatsApp er spildt. #}
+    {% set nr_kanaler = [] %}
+    {% if wa_on %}{% set _ = nr_kanaler.append('WhatsApp') %}{% endif %}
+    {% if sms_on %}{% set _ = nr_kanaler.append('SMS') %}{% endif %}
+    <label>Mobilnummer ({{ nr_kanaler|join(' og ') }})
       <input type="text" name="whatsapp" value="{{ r.whatsapp if r else '' }}"
              placeholder="fx +4520123456">
     </label>
@@ -35,6 +41,7 @@
      {% set kanaler = [] %}
      {% if mail_on %}{% set _ = kanaler.append('mail') %}{% endif %}
      {% if wa_on %}{% set _ = kanaler.append('WhatsApp') %}{% endif %}
+     {% if sms_on %}{% set _ = kanaler.append('SMS') %}{% endif %}
      {% if push_on %}{% set _ = kanaler.append('push') %}{% endif %}
      <strong>{{ kanaler|join(', ') }}</strong>.</p>
   {% if push_on %}
@@ -69,7 +76,7 @@
 
 <div class="card narrow">
   <h2 id="modtagere">Modtagere</h2>
-{% if not (mail_on or wa_on) %}
+{% if not (mail_on or tlf_on) %}
   {# Modtagere ER mailadresser og mobilnumre. Er ingen af de to kanaler sat op,
      kan formularen ikke udfyldes — så vis hvorfor i stedet for et felt, der
      aldrig kan gemmes. Push står for sig selv: de enheder melder sig selv til. #}
@@ -77,9 +84,9 @@
      <strong>mobilnummer</strong> — og ingen af de to kanaler kan sende endnu, så der er
      ikke noget at skrive ind her.</p>
   <p class="muted small">Sæt <strong>SMTP</strong> op under
-     <em>master → Opsætning</em> (eller WhatsApp-gatewayen samme sted), så dukker felterne
-     op af sig selv. Gruppen har allerede fået lov til at bruge kanalen; det er den globale
-     opsætning, der mangler.</p>
+     <em>master → Opsætning</em> — eller WhatsApp-gatewayen eller SMS'en samme sted — så
+     dukker felterne op af sig selv. Gruppen har allerede fået lov til at bruge kanalen;
+     det er den globale opsætning, der mangler.</p>
   <p class="muted small">Push virker uafhængigt af det. De enheder, der har slået
      notifikationer til på <a href="{{ url_for('user_home', slug=group.slug) }}">bruger-siden</a>,
      får både de automatiske varslinger og »Send nu« nedenfor — de melder sig selv til og
@@ -97,8 +104,8 @@
           {% if not r.active %}<span class="tag finished">på pause</span>{% endif %}
           <div class="muted small">
             {% if mail_on %}{{ r.email or '— ingen mail' }}{% endif %}
-            {% if mail_on and wa_on %} · {% endif %}
-            {% if wa_on %}{{ r.whatsapp or '— intet nummer' }}{% endif %}
+            {% if mail_on and tlf_on %} · {% endif %}
+            {% if tlf_on %}{{ r.whatsapp or '— intet nummer' }}{% endif %}
           </div>
         </div>
         {% if r.source == 'manual' %}
@@ -149,6 +156,11 @@
   {# Bekræftelsen skal nævne BEGGE dele: med kun push er »0 modtagere« sandt og
      alligevel misvisende — beskeden når jo enhederne. #}
   {% set maal %}{{ reach }} modtager(e){% if push_on %} og {{ push_devices }} enhed(er){% endif %}{% endset %}
+  {% if sms_on %}
+    <p class="muted small">SMS koster et klip pr. modtager hos Gigahost — en lang besked
+       koster flere. Saldoen står under
+       <em>master → Opsætning → Tjek saldo og afsendernumre</em>.</p>
+  {% endif %}
   {% if events %}
     <h3>Varsling om et event</h3>
     <p class="muted small">Sender skabelonen »Nyt event« til hele listen med det samme.

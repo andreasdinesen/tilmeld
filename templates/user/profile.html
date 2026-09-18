@@ -13,12 +13,12 @@
 
   <h2>Mine oplysninger</h2>
   <p class="muted small">Navnet bruges automatisk når du tilmelder dig — så du ikke skal
-     taste det hver gang. Mail/WhatsApp bruges til kvittering/påmindelse.</p>
+     taste det hver gang. Mail og mobilnummer bruges til kvittering/påmindelse — nummeret på WhatsApp, SMS eller begge, alt efter hvad gruppen har slået til.</p>
   <form method="post">
     <input type="hidden" name="action" value="contact">
     <label>Navn <input type="text" name="name" value="{{ u.name }}"></label>
     <label>E-mail <input type="email" name="email" value="{{ u.email }}"></label>
-    <label>WhatsApp-nummer <input type="text" name="whatsapp" value="{{ u.whatsapp }}"></label>
+    <label>Mobilnummer <input type="text" name="whatsapp" value="{{ u.whatsapp }}" placeholder="fx +4520123456"></label>
     <button type="submit">Gem</button>
   </form>
 

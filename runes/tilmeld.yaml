@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, notifikationsliste, push-notifikationer, lyst/mørkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 18
+  version: 20
   icon: "app"
 
   docker:
@@ -90,10 +90,10 @@ gameskill:
   # Standard-overvaagning (Kvasir-watchers). Laegges ind ved oprettelse og ved
   # Reinstall - en eksisterende server faar dem foerst efter en Reinstall.
   watchers:
-    # notifications.py og db.py skriver [MAIL-FEJL], [WHATSAPP-FEJL],
+    # notifications.py og db.py skriver [MAIL-FEJL], [WHATSAPP-FEJL], [SMS-FEJL],
     # [SCHEDULER-FEJL] og [LOG-FEJL]. Hver linje er en besked, der ikke kom ud,
-    # eller en paamindelsesrunde, der fejlede.
-    # [MAIL-FEJL], [WHATSAPP-FEJL], [PUSH-FEJL], [SCHEDULER-FEJL], [LOG-FEJL]
+    # eller en paamindelsesrunde, der fejlede. Moenstret nedenfor fanger dem alle.
+    # [MAIL-FEJL], [WHATSAPP-FEJL], [SMS-FEJL], [PUSH-FEJL], [SCHEDULER-FEJL], [LOG-FEJL]
     - name: "Notifikationer eller baggrundsjob fejler"
       pattern: '\[[A-Z]+-FEJL\]'
       threshold: 1
@@ -110,7 +110,7 @@ gameskill:
   # er -journal (efter et nedbrud hoerer en efterladt journal til den GAMLE
   # database og skal vaek sammen med den); -wal/-shm er med, hvis WAL slaas til.
   # Vaek er: alle grupper, events, tilmeldinger, brugere, passkeys og opsaetning
-  # (SMTP, WhatsApp). Ved naeste start oprettes databasen igen, og
+  # (SMTP, WhatsApp, SMS). Ved naeste start oprettes databasen igen, og
   # MASTER_PASSWORD gaelder paa ny (det er "allerfoerste opstart" igen).
   # uploads/ (brugernes billeder) roeres IKKE - de ligger tilbage uden noget,
   # der peger paa dem, og kan slettes under Files. Tag en backup foerst;

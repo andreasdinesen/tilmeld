@@ -8,13 +8,50 @@
     <a class="btn primary" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
   </div>
   <p class="count">Deltagere: <strong>{{ count }}</strong> / {{ ev.expected_count }} forventet{% if total > count %} <span class="muted small">({{ total - count }} afbud/venteliste)</span>{% endif %}{% if attended_count %} · Mødt op: <strong>{{ attended_count }}</strong>{% endif %}</p>
+  {% if meal_fields %}
+    <p class="count">Spiser med: <strong>{{ tal.meals }}</strong>{% if tal.no_meals %}
+       <span class="muted small">({{ tal.no_meals }} har meldt fra til spisning)</span>{% endif %}</p>
+  {% endif %}
+
+  {# Madbestillingen ligger UDEN for fremmøde-formularen nedenfor: indlejrede
+     <form> er ugyldig HTML, og de to har intet med hinanden at gøre. #}
+  {% if ev.notify_catering or cat_mail or cat_tlf %}
+  <div class="fielditem">
+    <div class="row">
+      <div>
+        <strong>Madbestilling</strong>
+        {% if ev.catering_sent %}<span class="tag cat-signup">sendt</span>{% endif %}
+        <div class="muted small">
+          {% if cat_mail or cat_tlf %}
+            Går til {{ [cat_mail, cat_tlf]|select|join(' og ') }} — mad til
+            <strong>{{ tal.meals }}</strong>.
+          {% else %}
+            Ingen madbestiller sat. Sæt en under
+            <a href="{{ url_for('admin_settings', slug=group.slug) }}#kontakt">Opsætning</a>
+            eller på eventet.
+          {% endif %}
+        </div>
+      </div>
+      {% if cat_mail or cat_tlf %}
+      <div class="actions">
+        <form method="post"
+              onsubmit="return confirm('Send madbestilling på {{ tal.meals }} kuvert(er) nu?')">
+          <input type="hidden" name="action" value="catering">
+          <button class="small">{{ 'Send igen' if ev.catering_sent else 'Send nu' }}</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {% if not regs %}<p>Ingen tilmeldinger endnu.</p>{% else %}
   <form method="post">
   <input type="hidden" name="action" value="attendance">
   <div class="tablewrap">
   <table>
     <thead><tr>
-      <th>Navn</th><th>E-mail</th><th>WhatsApp</th>
+      <th>Navn</th><th>E-mail</th><th>Mobilnummer</th>
       {% for f in fields %}<th>{{ f.label }}</th>{% endfor %}
       <th>Tilmeldt</th><th>Mødt</th><th></th>
     </tr></thead>

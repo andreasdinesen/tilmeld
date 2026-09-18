@@ -33,7 +33,7 @@
     {% endfor %}
     {% endif %}
 
-    {% if mail_on or wa_on or push_on %}
+    {% if mail_on or wa_on or sms_on or push_on %}
     <h2>Notifikationer</h2>
     <label class="chk"><input type="checkbox" name="notify_new_signup" {{ 'checked' if ev and ev.notify_new_signup }}> Besked til admin ved ny tilmelding</label>
     <label class="chk"><input type="checkbox" name="notify_change" {{ 'checked' if ev and ev.notify_change }}> Besked til admin ved ændring</label>
@@ -51,6 +51,32 @@
     {% endif %}
     {% if mail_on %}
     <label class="chk"><input type="checkbox" name="csv_after_deadline" {{ 'checked' if ev and ev.csv_after_deadline }}> Send deltagerliste (CSV) til admin-mail 2 timer efter frist</label>
+    {% endif %}
+
+    <h3>Madbestilling</h3>
+    <label class="chk"><input type="checkbox" name="notify_catering" {{ 'checked' if ev and ev.notify_catering }}>
+      Besked til madbestilleren når fristen er nået (med antal kuverter)</label>
+    <p class="muted small">Sendes én gang, når tilmeldingen lukker. Antallet er deltagere
+       + gæster minus dem, der har krydset et »spiser ikke med«-punkt af. Teksten rettes
+       under <em>Opsætning → Mail-skabeloner</em> (»Madbestilling«).</p>
+    {# Tomme felter = gruppens standard. Pladsholderen viser den, så man kan se HVEM
+       beskeden går til uden at slå op et andet sted. #}
+    {% if mail_on %}
+    <label>Madbestillerens e-mail (tom = gruppens standard)
+      <input type="email" name="catering_email" value="{{ ev.catering_email if ev else '' }}"
+             placeholder="{{ group.catering_email or 'ingen sat på gruppen' }}">
+    </label>
+    {% endif %}
+    {% if tlf_on %}
+    <label>Madbestillerens mobilnummer (tom = gruppens standard)
+      <input type="text" name="catering_phone" value="{{ ev.catering_phone if ev else '' }}"
+             placeholder="{{ group.catering_phone or 'ingen sat på gruppen' }}">
+    </label>
+    {% endif %}
+    {% if not group.catering_email and not group.catering_phone %}
+      <p class="muted small">Gruppen har ingen fast madbestiller — sæt en under
+         <a href="{{ url_for('admin_settings', slug=group.slug) }}#kontakt">Opsætning →
+         Kontakt</a>, eller skriv modtageren ind her på eventet.</p>
     {% endif %}
     {% endif %}
 

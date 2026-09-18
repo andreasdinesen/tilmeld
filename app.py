@@ -28,6 +28,7 @@ from werkzeug.utils import secure_filename
 
 import auth
 import db
+import gigasms
 import notifications
 import passkeys
 import push
@@ -119,8 +120,9 @@ def all_group_fields(conn, group_id):
 
 
 def group_channels(conn, group):
-    """Kan gruppen reelt sende mail/WhatsApp? Kræver global opsætning OG at master har
-    aktiveret kanalen for gruppen. Bruges til at skjule felter/valg når intet er sat op.
+    """(mail, whatsapp, sms, push): kan gruppen reelt sende? Kræver global opsætning OG
+    at master har aktiveret kanalen for gruppen. Bruges til at skjule felter/valg når
+    intet er sat op.
 
     Selve opslaget bor i `notifications.channels`, så UI'et og afsendelsen ikke kan
     drifte fra hinanden."""
@@ -409,15 +411,18 @@ def master_group_new():
             conn = db.get_db()
             conn.execute(
                 "INSERT INTO groups (slug, name, user_password, admin_password_hash, "
-                "mail_enabled, whatsapp_enabled, admin_email, whatsapp_recipient, "
+                "mail_enabled, whatsapp_enabled, sms_enabled, admin_email, "
+                "whatsapp_recipient, sms_recipient, "
                 "templates_enabled, user_accounts_enabled, push_enabled, files_enabled, "
-                "calendar_token, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "calendar_token, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, request.form.get("user_password", ""),
                  auth.hash_password(admin_pw),
                  1 if request.form.get("mail_enabled") else 0,
                  1 if request.form.get("whatsapp_enabled") else 0,
+                 1 if request.form.get("sms_enabled") else 0,
                  request.form.get("admin_email", "").strip(),
                  request.form.get("whatsapp_recipient", "").strip(),
+                 request.form.get("sms_recipient", "").strip(),
                  1 if request.form.get("templates_enabled") else 0,
                  1 if request.form.get("user_accounts_enabled") else 0,
                  1 if request.form.get("push_enabled") else 0,
@@ -441,10 +446,12 @@ def master_group_toggle(slug):
         abort(404)
     conn = db.get_db()
     conn.execute(
-        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, templates_enabled = ?, "
-        "user_accounts_enabled = ?, push_enabled = ?, files_enabled = ? WHERE id = ?",
+        "UPDATE groups SET mail_enabled = ?, whatsapp_enabled = ?, sms_enabled = ?, "
+        "templates_enabled = ?, user_accounts_enabled = ?, push_enabled = ?, "
+        "files_enabled = ? WHERE id = ?",
         (1 if request.form.get("mail_enabled") else 0,
          1 if request.form.get("whatsapp_enabled") else 0,
+         1 if request.form.get("sms_enabled") else 0,
          1 if request.form.get("templates_enabled") else 0,
          1 if request.form.get("user_accounts_enabled") else 0,
          1 if request.form.get("push_enabled") else 0,
@@ -528,6 +535,35 @@ def master_whatsapp_groups():
                            url=groups_url)
 
 
+@app.route("/master/sms/status")
+@master_required
+def master_sms_status():
+    """Slå Gigahost-kontoen op: saldo og godkendte afsendernumre.
+
+    Det er prøve-knappen for SMS-kanalen. Svarer siden, er brugernavn og
+    API-adgangskode rigtige; står afsendernummeret ikke på listen, giver
+    gatewayen 403 på hver eneste besked, uanset hvor rigtigt alt andet er.
+    """
+    conn = db.get_db()
+    s = db.get_settings(conn)
+    conn.close()
+    bruger = (s["sms_username"] or "").strip()
+    if not bruger or not (s["sms_password"] or ""):
+        return render_template("master/sms_status.html",
+                               error="SMS er ikke sat op endnu — udfyld brugernavn "
+                                     "og API-adgangskode under Opsætning.",
+                               konto=None, numre=None, afsender="", gateways=[])
+    try:
+        konto = gigasms.credits(bruger, s["sms_password"])
+        numre = gigasms.numbers(bruger, s["sms_password"])
+        fejl = None
+    except gigasms.SmsError as e:
+        konto, numre, fejl = None, None, str(e)
+    return render_template("master/sms_status.html", konto=konto, numre=numre,
+                           error=fejl, afsender=(s["sms_sender"] or "").strip(),
+                           gateways=gigasms.gateways())
+
+
 @app.route("/master/settings", methods=["GET", "POST"])
 @master_required
 def master_settings():
@@ -541,6 +577,7 @@ def master_settings():
         conn.execute(
             "UPDATE settings SET smtp_host=?, smtp_port=?, smtp_user=?, smtp_password=?, "
             "smtp_from=?, smtp_use_tls=?, whatsapp_api_url=?, whatsapp_api_key=?, "
+            "sms_username=?, sms_password=?, sms_sender=?, "
             "base_url=?, default_deadline_days=?, github_repo=?, update_branch=? WHERE id = 1",
             (request.form.get("smtp_host", "").strip(),
              int(request.form.get("smtp_port") or 587),
@@ -550,6 +587,9 @@ def master_settings():
              1 if request.form.get("smtp_use_tls") else 0,
              request.form.get("whatsapp_api_url", "").strip(),
              request.form.get("whatsapp_api_key", "").strip(),
+             request.form.get("sms_username", "").strip(),
+             request.form.get("sms_password", ""),
+             request.form.get("sms_sender", "").strip(),
              request.form.get("base_url", "").strip(),
              int(request.form.get("default_deadline_days") or 4),
              request.form.get("github_repo", "").strip(),
@@ -786,10 +826,10 @@ def admin_home(slug):
         }
         (past if state == "finished" else rows).append(item)
     past.reverse()  # afholdte: nyeste øverst
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("admin/home.html", group=group, events=rows, past=past,
-                           notify_on=mail_on or wa_on or push_on)
+                           notify_on=mail_on or wa_on or sms_on or push_on)
 
 
 @app.route("/<slug>/admin/settings", methods=["GET", "POST"])
@@ -818,6 +858,16 @@ def admin_settings(slug):
             if "whatsapp_recipient" in request.form:
                 conn.execute("UPDATE groups SET whatsapp_recipient = ? WHERE id = ?",
                              (request.form.get("whatsapp_recipient", "").strip(), group["id"]))
+            if "sms_recipient" in request.form:
+                conn.execute("UPDATE groups SET sms_recipient = ? WHERE id = ?",
+                             (request.form.get("sms_recipient", "").strip(), group["id"]))
+            # Madbestilleren er gruppens standard; et event kan overskrive den.
+            if "catering_email" in request.form:
+                conn.execute("UPDATE groups SET catering_email = ? WHERE id = ?",
+                             (request.form.get("catering_email", "").strip(), group["id"]))
+            if "catering_phone" in request.form:
+                conn.execute("UPDATE groups SET catering_phone = ? WHERE id = ?",
+                             (request.form.get("catering_phone", "").strip(), group["id"]))
             flash("Kontaktoplysninger gemt.", "ok")
         elif action == "add_field":
             f = _field_from_form(request.form)
@@ -829,9 +879,10 @@ def admin_settings(slug):
                     "WHERE group_id = ?", (group["id"],)).fetchone()["n"])
                 conn.execute(
                     "INSERT INTO group_fields (group_id, label, field_type, options, required, "
-                    "is_decline, multiline, sort_order) VALUES (?,?,?,?,?,?,?,?)",
+                    "is_decline, is_meal_decline, multiline, sort_order) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
                     (group["id"], f["label"], f["field_type"], f["options"], f["required"],
-                     f["is_decline"], f["multiline"], nxt),
+                     f["is_decline"], f["is_meal_decline"], f["multiline"], nxt),
                 )
                 flash("Punkt tilføjet.", "ok")
         elif action == "edit_field":
@@ -846,9 +897,11 @@ def admin_settings(slug):
             else:
                 conn.execute(
                     "UPDATE group_fields SET label = ?, field_type = ?, options = ?, "
-                    "required = ?, is_decline = ?, multiline = ? WHERE id = ? AND group_id = ?",
+                    "required = ?, is_decline = ?, is_meal_decline = ?, multiline = ? "
+                    "WHERE id = ? AND group_id = ?",
                     (f["label"], f["field_type"], f["options"], f["required"],
-                     f["is_decline"], f["multiline"], fid, group["id"]))
+                     f["is_decline"], f["is_meal_decline"], f["multiline"],
+                     fid, group["id"]))
                 flash(f"Punktet »{f['label']}« er opdateret.", "ok")
                 # Selve ændringen blokeres aldrig — en tastefejl skal kunne rettes — men
                 # admin skal vide, hvis den rører ved svar, der allerede er gemt.
@@ -898,7 +951,7 @@ def admin_settings(slug):
         return redirect(url_for("admin_settings", slug=slug)
                         + _SETTINGS_ANCHOR.get(action, ""))
     fields = all_group_fields(conn, group["id"])
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     templates = []
     if group["templates_enabled"]:
         labels = {"new_signup": "Ny tilmelding (til admin)",
@@ -908,7 +961,8 @@ def admin_settings(slug):
                   "deadline": "Frist nået (til admin, med link)",
                   "waitlist_promoted": "Rykket op fra venteliste (til deltager)",
                   "event_reminder": "Påmindelse før eventet (til deltager)",
-                  "event_announce": "Nyt event (til notifikationslisten)"}
+                  "event_announce": "Nyt event (til notifikationslisten)",
+                  "catering": "Madbestilling (til madbestilleren, når fristen er nået)"}
         for tkey in notifications.DEFAULT_TEMPLATES:
             subj, body = notifications.template_for(conn, group, tkey)
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
@@ -925,7 +979,7 @@ def admin_settings(slug):
     return render_template("admin/settings.html", group=group, fields=parsed,
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request),
-                           notify_on=mail_on or wa_on or push_on, push_on=push_on)
+                           notify_on=mail_on or wa_on or sms_on or push_on, push_on=push_on)
 
 
 # Hvilket afsnit på opsætnings-siden hører en handling til. Bruges til ankeret i
@@ -944,13 +998,17 @@ def _field_from_form(form) -> dict:
     """Læs et tilmeldings-punkt fra formularen og normalisér det.
 
     Bruges af BÅDE »tilføj« og »redigér«, så de to ikke kan drifte fra hinanden:
-    reglerne (notefelt = flerlinjet tekst, »deltager ikke« = checkbox og aldrig
-    påkrævet) skal gælde begge steder.
+    reglerne (notefelt = flerlinjet tekst, »deltager ikke« og »spiser ikke med«
+    = checkbox og aldrig påkrævet) skal gælde begge steder.
+
+    De to fra-meldinger udelukker hinanden: et afbud spiser ikke med alligevel, så
+    »deltager ikke« vinder. Ellers ville punktet tælle med to steder på én gang.
     """
     is_decline = 1 if form.get("is_decline") else 0
+    is_meal_decline = 0 if is_decline else (1 if form.get("is_meal_decline") else 0)
     chosen = form.get("field_type", "text")
     multiline = 1 if chosen == "note" else 0
-    if is_decline:
+    if is_decline or is_meal_decline:
         ftype = "checkbox"
     elif chosen == "note":
         ftype = "text"
@@ -964,8 +1022,10 @@ def _field_from_form(form) -> dict:
     return {"label": form.get("label", "").strip(),
             "field_type": ftype,
             "options": json.dumps(opts),
-            "required": 0 if is_decline else (1 if form.get("required") else 0),
+            "required": 0 if (is_decline or is_meal_decline)
+                          else (1 if form.get("required") else 0),
             "is_decline": is_decline,
+            "is_meal_decline": is_meal_decline,
             "multiline": multiline}
 
 
@@ -1021,12 +1081,13 @@ def _render_event_form(group, ev):
     fields = all_group_fields(conn, group["id"])
     hidden = hidden_field_ids(conn, ev["id"]) if ev else set()
     days = db.get_settings(conn)["default_deadline_days"]
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     filer = event_files(conn, ev["id"]) if ev else []
     conn.close()
     return render_template("admin/event_form.html", group=group, ev=ev,
                            fields=fields, hidden=hidden, default_deadline_days=days,
-                           mail_on=mail_on, wa_on=wa_on, push_on=push_on,
+                           mail_on=mail_on, wa_on=wa_on, sms_on=sms_on,
+                           push_on=push_on, tlf_on=wa_on or sms_on,
                            filer=filer, maks_mb=MAX_UPLOAD_MB,
                            filtyper=", ".join(sorted(e[1:] for e in ALLOWED_FILE_EXT)))
 
@@ -1142,6 +1203,15 @@ def _save_event(group, ev):
         1 if request.form.get("allow_guests") else 0,
         1 if request.form.get("notify_event_reminder") else 0,
         1 if request.form.get("notify_list") else 0,
+        1 if request.form.get("notify_catering") else 0,
+        # Felterne vises kun, når den tilsvarende kanal er sat op. Var de skjult, står
+        # de ikke i formularen — og så skal den gemte værdi BEVARES, ikke tømmes.
+        # `form.get(key, default)` rammer præcis det: tomt felt = "" (admin ryddede
+        # det), felt slet ikke med = den gamle værdi.
+        request.form.get("catering_email",
+                         ev["catering_email"] if ev else "").strip(),
+        request.form.get("catering_phone",
+                         ev["catering_phone"] if ev else "").strip(),
     )
     if ev:
         # Tæl kun revisionen op, hvis noget kalender-relevant er ændret — så bliver
@@ -1153,7 +1223,8 @@ def _save_event(group, ev):
             "description=?, expected_count=?, signup_deadline=?, notify_new_signup=?, "
             "notify_change=?, notify_receipt=?, notify_reminder=?, csv_after_deadline=?, "
             "capacity_limit=?, notify_deadline=?, waitlist_enabled=?, allow_guests=?, "
-            "notify_event_reminder=?, notify_list=?, updated_at=?, revision=? WHERE id = ?",
+            "notify_event_reminder=?, notify_list=?, notify_catering=?, catering_email=?, "
+            "catering_phone=?, updated_at=?, revision=? WHERE id = ?",
             vals + (db.now_iso() if ics_ændret else (ev["updated_at"] or ev["created_at"]),
                     (ev["revision"] or 0) + (1 if ics_ændret else 0),
                     ev["id"]))
@@ -1191,8 +1262,9 @@ EVENT_INSERT_SQL = (
     "expected_count, signup_deadline, notify_new_signup, notify_change, notify_receipt, "
     "notify_reminder, csv_after_deadline, capacity_limit, notify_deadline, "
     "waitlist_enabled, allow_guests, notify_event_reminder, notify_list, "
+    "notify_catering, catering_email, catering_phone, "
     "group_id, created_at) "
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
 
 
 def _set_hidden_fields(conn, event_id, field_ids):
@@ -1296,7 +1368,8 @@ def admin_event_copy(slug, event_id):
             ev["notify_new_signup"], ev["notify_change"], ev["notify_receipt"],
             ev["notify_reminder"], ev["csv_after_deadline"], ev["capacity_limit"],
             ev["notify_deadline"], ev["waitlist_enabled"], ev["allow_guests"],
-            ev["notify_event_reminder"], ev["notify_list"])
+            ev["notify_event_reminder"], ev["notify_list"],
+            ev["notify_catering"], ev["catering_email"], ev["catering_phone"])
     cur = conn.execute(EVENT_INSERT_SQL, vals + (group["id"], db.now_iso()))
     new_id = cur.lastrowid
     _set_hidden_fields(conn, new_id, list(hidden_field_ids(conn, ev["id"])))
@@ -1328,16 +1401,34 @@ def admin_event_list(slug, event_id):
                          (1 if request.form.get(f"att_{rid}") else 0, rid))
         conn.commit()
         flash("Fremmøde gemt.", "ok")
+    elif request.method == "POST" and request.form.get("action") == "catering":
+        # »Send madbestilling nu«: samme besked som scheduleren sender, men når
+        # admin selv trykker. Fristen behøver ikke være nået — man kan have brug
+        # for at melde et tal ind i forvejen, eller sende det samme igen.
+        sendt, fejl = notifications.notify_catering(conn, group, ev, note="manuelt")
+        if sendt:
+            conn.execute("UPDATE events SET catering_sent = 1 WHERE id = ?", (ev["id"],))
+            conn.commit()
+            flash(f"Madbestillingen er sendt ({sendt} besked(er)).", "ok")
+        for f in fejl[:5]:
+            flash(f"Ikke sendt — {f}", "error")
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
     attending = count_attending(conn, group["id"], ev["id"])
     decline_ids = [f["id"] for f in fields if f["is_decline"]]
     attended_count = sum(1 for r in regs if r["attended"])
+    # Madtal og -modtager: vises kun hvis gruppen faktisk har et »spiser ikke med«-
+    # punkt eller en madbestiller — ellers er det bare støj på listen.
+    tal = notifications.event_counts(conn, group, ev)
+    cat_mail, cat_tlf = notifications.catering_contact(group, ev)
+    meal_fields = any(f["is_meal_decline"] for f in all_group_fields(conn, group["id"]))
     conn.close()
     return render_template("admin/event_list.html", group=group, ev=ev,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
-                           state=event_state(ev), attended_count=attended_count)
+                           state=event_state(ev), attended_count=attended_count,
+                           tal=tal, meal_fields=meal_fields,
+                           cat_mail=cat_mail, cat_tlf=cat_tlf)
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/export.csv")
@@ -1367,7 +1458,7 @@ def build_csv(conn, group, ev):
     buf = io.StringIO()
     buf.write("﻿")  # BOM så Excel viser æøå korrekt
     writer = csv.writer(buf, delimiter=";")
-    writer.writerow(["Navn", "E-mail", "WhatsApp", "Pladser", "Status", "Mødt op"]
+    writer.writerow(["Navn", "E-mail", "Mobilnummer", "Pladser", "Status", "Mødt op"]
                     + [f["label"] for f in fields] + ["Tilmeldt"])
     for r in regs:
         status = "Venteliste" if r["waitlist"] else "Deltager"
@@ -1652,7 +1743,7 @@ def user_home(slug):
                      "count": count_attending(conn, group["id"], ev["id"])})
     cal_url = url_for("group_calendar_ics", slug=group["slug"],
                       token=ensure_calendar_token(conn, group), _external=True)
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("user/home.html", group=group, events=rows, cal_url=cal_url,
                            accounts=bool(group["user_accounts_enabled"]),
@@ -1679,7 +1770,7 @@ def user_event(slug, event_slug):
     attending = count_attending(conn, group["id"], ev["id"])
     full = bool(ev["capacity_limit"] and ev["expected_count"]
                 and attending >= ev["expected_count"])
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     decline_ids = [f["id"] for f in fields if f["is_decline"]]
     is_admin = bool(session.get(f"admin_{group['slug']}"))
     accounts = bool(group["user_accounts_enabled"])
@@ -1710,7 +1801,7 @@ def user_event(slug, event_slug):
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("user/event.html", group=group, ev=ev, state=state,
                            fields=parsed_fields, regs=regs, count=attending, full=full,
-                           mail_on=mail_on, wa_on=wa_on, decline_ids=decline_ids,
+                           mail_on=mail_on, wa_on=wa_on, sms_on=sms_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
                            group_users=group_users, my_name=my_name, filer=filer)
 
@@ -1749,13 +1840,13 @@ def user_edit(slug, event_slug, reg_id):
     vals = conn.execute(
         "SELECT field_id, value FROM registration_values WHERE registration_id = ?",
         (reg_id,)).fetchall()
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     conn.close()
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     current = {v["field_id"]: v["value"] for v in vals}
     return render_template("user/signup_form.html", group=group, ev=ev,
                            fields=parsed_fields, reg=reg, current=current,
-                           state=event_state(ev), mail_on=mail_on, wa_on=wa_on,
+                           state=event_state(ev), mail_on=mail_on, wa_on=wa_on, sms_on=sms_on,
                            accounts=bool(group["user_accounts_enabled"]),
                            is_admin=bool(session.get(f"admin_{group['slug']}")))
 
@@ -1984,7 +2075,7 @@ def user_profile(slug):
         "WHERE r.user_id = ? AND e.event_date >= ? ORDER BY e.event_date, e.start_time",
         (uid, datetime.now().strftime("%Y-%m-%d"))).fetchall()
     creds = passkeys.list_credentials(conn, "user", user_id=uid)
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("user/profile.html", group=group, u=u, mine=mine, creds=creds,
                            passkey_blocked=passkeys.blocked_reason(request),
@@ -2112,10 +2203,10 @@ def admin_users(slug):
     users = conn.execute(
         "SELECT u.* FROM users u JOIN user_groups ug ON ug.user_id = u.id "
         "WHERE ug.group_id = ? ORDER BY u.username", (group["id"],)).fetchall()
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("admin/users.html", group=group, users=users,
-                           notify_on=mail_on or wa_on or push_on)
+                           notify_on=mail_on or wa_on or sms_on or push_on)
 
 
 # --------------------------------------------------------------------------- #
@@ -2309,7 +2400,7 @@ def push_key(slug):
     if not group:
         abort(404)
     conn = db.get_db()
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     if not push_on:
         conn.close()
         return {"error": "push er ikke slået til for gruppen"}, 403
@@ -2329,7 +2420,7 @@ def push_subscribe(slug):
         return {"error": "forventer JSON"}, 400
     data = request.get_json(silent=True) or {}
     conn = db.get_db()
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     if not push_on:
         conn.close()
         return {"error": "push er ikke slået til for gruppen"}, 403
@@ -2392,7 +2483,7 @@ def push_test(slug):
         return {"error": "forventer JSON"}, 400
     data = request.get_json(silent=True) or {}
     conn = db.get_db()
-    mail_on, wa_on, push_on = group_channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     if not push_on:
         conn.close()
         return {"error": "push er ikke slået til for gruppen"}, 403
@@ -2414,12 +2505,15 @@ def push_test(slug):
 # --------------------------------------------------------------------------- #
 # Gruppe-admin: notifikationsliste
 # --------------------------------------------------------------------------- #
-def _recipient_from_form(form, mail_on, wa_on) -> tuple:
+def _recipient_from_form(form, mail_on, tlf_on) -> tuple:
     """(modtager, fejltekst). Kun de kanaler, der er aktiveret på systemet, læses —
-    ellers kunne admin skrive et nummer ind, som aldrig bliver brugt til noget."""
+    ellers kunne admin skrive et nummer ind, som aldrig bliver brugt til noget.
+
+    `tlf_on` er WhatsApp ELLER SMS: modtageren har ét mobilnummer, og det er nok, at
+    én af de to kanaler kan bruge det."""
     name = form.get("name", "").strip()
     email = form.get("email", "").strip() if mail_on else ""
-    whatsapp = form.get("whatsapp", "").strip() if wa_on else ""
+    whatsapp = form.get("whatsapp", "").strip() if tlf_on else ""
     if not email and not whatsapp:
         return None, "Skriv mindst en e-mail eller et mobilnummer."
     if email and ("@" not in email or " " in email):
@@ -2438,10 +2532,13 @@ def admin_notify(slug):
     if not admin_has_access(group):
         return redirect(url_for("admin_login", slug=slug))
     conn = db.get_db()
-    mail_on, wa_on, push_on = group_channels(conn, group)
-    if not (mail_on or wa_on or push_on):
+    mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
+    # Ét mobilnummer dækker begge nummer-kanaler; listen skal kunne redigeres, så
+    # snart én af dem kan bruge det.
+    tlf_on = wa_on or sms_on
+    if not (mail_on or tlf_on or push_on):
         conn.close()
-        flash("Hverken mail, WhatsApp eller push er sat op for gruppen — "
+        flash("Hverken mail, WhatsApp, SMS eller push er sat op for gruppen — "
               "en notifikationsliste kan ikke sende noget.", "error")
         return redirect(url_for("admin_home", slug=slug))
 
@@ -2459,7 +2556,7 @@ def admin_notify(slug):
                  1 if request.form.get("notify_list_users") else 0, group["id"]))
             flash("Indstillinger for notifikationslisten gemt.", "ok")
         elif action == "add":
-            r, err = _recipient_from_form(request.form, mail_on, wa_on)
+            r, err = _recipient_from_form(request.form, mail_on, tlf_on)
             if err:
                 flash(err, "error")
             else:
@@ -2469,7 +2566,7 @@ def admin_notify(slug):
                     (group["id"], r["name"], r["email"], r["whatsapp"], db.now_iso()))
                 flash("Modtager tilføjet.", "ok")
         elif action == "edit":
-            r, err = _recipient_from_form(request.form, mail_on, wa_on)
+            r, err = _recipient_from_form(request.form, mail_on, tlf_on)
             if err:
                 flash(err, "error")
             else:
@@ -2479,7 +2576,7 @@ def admin_notify(slug):
                 if mail_on:
                     sets.append("email = ?")
                     vals.append(r["email"])
-                if wa_on:
+                if tlf_on:
                     sets.append("whatsapp = ?")
                     vals.append(r["whatsapp"])
                 conn.execute(
@@ -2502,21 +2599,21 @@ def admin_notify(slug):
             if not ev:
                 flash("Vælg et event.", "error")
             else:
-                mails, was, pushes, errors = notifications.announce_event(
+                mails, was, smses, pushes, errors = notifications.announce_event(
                     conn, group, ev, note="manuelt")
                 # Markér som varslet, så scheduleren ikke sender det samme igen om lidt.
                 conn.execute("UPDATE events SET notify_list_sent = 1 WHERE id = ?",
                              (ev["id"],))
-                _flash_send_result(mails, was, pushes, errors)
+                _flash_send_result(mails, was, smses, pushes, errors)
         elif action == "send_text":
             subject = request.form.get("subject", "").strip()
             body = request.form.get("body", "").strip()
             if not subject and not body:
                 flash("Skriv en besked først.", "error")
             else:
-                mails, was, pushes, errors = notifications.send_to_list(
+                mails, was, smses, pushes, errors = notifications.send_to_list(
                     conn, group, subject, body, {"group": group["name"]}, note="manuelt")
-                _flash_send_result(mails, was, pushes, errors)
+                _flash_send_result(mails, was, smses, pushes, errors)
         conn.commit()
         conn.close()
         return redirect(url_for("admin_notify", slug=slug)
@@ -2528,23 +2625,26 @@ def admin_notify(slug):
                                  (group["id"],)).fetchall()
          if event_state(e) != "finished"], key=event_sort_key)
     reach = sum(1 for r in recipients
-                if r["active"] and ((mail_on and r["email"]) or (wa_on and r["whatsapp"])))
+                if r["active"] and ((mail_on and r["email"]) or (tlf_on and r["whatsapp"])))
     push_devices = conn.execute(
         "SELECT COUNT(*) AS n FROM push_subscriptions WHERE group_id = ? AND scope = 'list'",
         (group["id"],)).fetchone()["n"]
     conn.close()
     return render_template("admin/notify.html", group=group, recipients=recipients,
-                           events=events, mail_on=mail_on, wa_on=wa_on, push_on=push_on,
+                           events=events, mail_on=mail_on, wa_on=wa_on, sms_on=sms_on,
+                           tlf_on=tlf_on, push_on=push_on,
                            reach=reach, push_devices=push_devices)
 
 
-def _flash_send_result(mails, whatsapps, pushes, errors):
-    if mails or whatsapps or pushes:
+def _flash_send_result(mails, whatsapps, smses, pushes, errors):
+    if mails or whatsapps or smses or pushes:
         dele = []
         if mails:
             dele.append(f"{mails} mail")
         if whatsapps:
             dele.append(f"{whatsapps} WhatsApp")
+        if smses:
+            dele.append(f"{smses} SMS")
         if pushes:
             dele.append(f"{pushes} push")
         flash("Sendt: " + " og ".join(dele) + ".", "ok")

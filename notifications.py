@@ -1,4 +1,4 @@
-"""E-mail (SMTP), WhatsApp (HTTP-bro/gateway) og påmindelses-scheduler.
+"""E-mail (SMTP), WhatsApp (HTTP-bro/gateway), SMS (Gigahost) og påmindelses-scheduler.
 
 Uden konfiguration logges beskeder blot til konsollen, så lokal test virker
 uden rigtige udbydere.
@@ -12,13 +12,15 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import db
+import gigasms
 import push as webpush
 
 # Sættes af app.py: funktion (conn, group, event) -> csv-tekst. Undgår cirkulær import.
 csv_builder = None
 
 # Standard-mail-skabeloner. Admin kan overskrive dem pr. gruppe (hvis master tillader).
-# Pladsholdere: {event} {name} {date} {group} {deadline}
+# Pladsholdere: {event} {name} {date} {group} {deadline} {start} {link}
+# Kun i »catering« og »deadline«: {count} {meals} {no_meals} {signups} {waitlist}
 DEFAULT_TEMPLATES = {
     "new_signup": ("Ny tilmelding: {event}",
                    "{name} har tilmeldt sig {event}."),
@@ -38,6 +40,13 @@ DEFAULT_TEMPLATES = {
     "event_reminder": ("Påmindelse: {event} er i morgen",
                        "Hej {name}. Husk at du er tilmeldt {event} d. {date}"
                        "{start}. Vi ses!"),
+    # Madbestilling: går til den, der skal bestille maden — ikke til deltagerne.
+    # Pladsholderne {meals}/{count}/{no_meals} findes KUN her og i »deadline«;
+    # de andre skabeloner har ingen tal at sætte ind.
+    "catering": ("Madbestilling: {event} d. {date}",
+                 "Tilmeldingen til {event} d. {date}{start} er lukket.\n"
+                 "Der skal bestilles mad til {meals}.\n"
+                 "I alt {count} deltagere inkl. gæster, heraf {no_meals} uden mad."),
     # Uden »Hej {name}«: varslingen går også til modtagere UDEN navn — en adresse
     # admin har tastet ind, eller en telefon der har abonneret. »Hej .« er værre
     # end ingen hilsen. Admin kan selv sætte {name} ind, hvis listen har navne.
@@ -77,9 +86,13 @@ def render_message(conn, group, tkey, ctx):
 
 
 def channels(conn, group):
-    """(mail, whatsapp, push): kan gruppen reelt sende? Hver kanal kræver BÅDE global
-    opsætning og at master har slået den til for gruppen. `app.group_channels` kalder
-    den her, så UI og afsendelse aldrig kan være uenige om, hvad der er aktiveret.
+    """(mail, whatsapp, sms, push): kan gruppen reelt sende? Hver kanal kræver BÅDE
+    global opsætning og at master har slået den til for gruppen. `app.group_channels`
+    kalder den her, så UI og afsendelse aldrig kan være uenige om, hvad der er aktiveret.
+
+    SMS' »globale opsætning« er brugernavn + API-adgangskode + afsendernummer hos
+    Gigahost. Alle tre skal være der: uden et verificeret afsendernummer svarer
+    gatewayen 403, og så ville kanalen se aktiv ud og aldrig levere noget.
 
     Push' »globale opsætning« er den offentlige URL. VAPID-nøglerne laver appen selv,
     men nyttelasten skal indeholde ABSOLUTTE adresser — en relativ adresse får en
@@ -89,6 +102,7 @@ def channels(conn, group):
     s = db.get_settings(conn)
     return (bool(s["smtp_host"]) and bool(group["mail_enabled"]),
             bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"]),
+            gigasms.configured(s) and bool(group["sms_enabled"]),
             bool((s["base_url"] or "").strip()) and bool(group["push_enabled"]))
 
 
@@ -184,10 +198,40 @@ def send_whatsapp(settings, to: str, body: str) -> str:
         return str(e)[:300]
 
 
-def _reg_declined(conn, group_id, reg_id) -> bool:
-    """Har tilmeldingen krydset et 'deltager ikke'-felt af?"""
+def send_sms(settings, to: str, body: str) -> str:
+    """Send en SMS via Gigahosts Message Delivery Service. Returnér "" hvis sendt,
+    ellers en kort fejl-/årsagstekst.
+
+    Selve API'et bor i `gigasms.py`. Her ligger kun det, notifikationslaget skal
+    kunne: fejl må aldrig vælte en tilmelding, og en besked, der ikke kan sendes,
+    skal stadig kunne ses i konsollen under lokal test.
+
+    En SMS koster penge pr. afsendt del, så `gigasms.prepare()` holder teksten
+    indenfor 3 dele og oversætter de typografiske tegn, skabelonerne bruger.
+    """
+    if not to:
+        return "ingen modtager"
+    if not gigasms.configured(settings):
+        _log("SMS", to, "(sms)", body)
+        return "SMS ikke konfigureret"
+    try:
+        gigasms.send(settings["sms_username"], settings["sms_password"],
+                     settings["sms_sender"], to, body, tag="Tilmeld")
+        return ""
+    except Exception as e:  # robust: en notifikation må aldrig vælte en tilmelding
+        print(f"[SMS-FEJL] {e}", flush=True)
+        _log("SMS", to, "(sms)", body)
+        return str(e)[:300]
+
+
+def _reg_ticked(conn, group_id, reg_id, kolonne: str) -> bool:
+    """Har tilmeldingen krydset et felt af, der er mærket med `kolonne`?
+
+    `kolonne` er `is_decline` (»deltager ikke«) eller `is_meal_decline`
+    (»spiser ikke med«). Begge er checkbokse, og et kryds gemmes som 'Ja'.
+    """
     ids = [r["id"] for r in conn.execute(
-        "SELECT id FROM group_fields WHERE group_id = ? AND is_decline = 1",
+        f"SELECT id FROM group_fields WHERE group_id = ? AND {kolonne} = 1",
         (group_id,)).fetchall()]
     if not ids:
         return False
@@ -195,6 +239,46 @@ def _reg_declined(conn, group_id, reg_id) -> bool:
     return bool(conn.execute(
         f"SELECT 1 FROM registration_values WHERE registration_id = ? "
         f"AND field_id IN ({ph}) AND value = 'Ja' LIMIT 1", [reg_id] + ids).fetchone())
+
+
+def _reg_declined(conn, group_id, reg_id) -> bool:
+    """Har tilmeldingen krydset et 'deltager ikke'-felt af?"""
+    return _reg_ticked(conn, group_id, reg_id, "is_decline")
+
+
+def event_counts(conn, group, ev) -> dict:
+    """Tallene for ét event — de samme, som skabelonerne kan sætte ind.
+
+        count     deltagere + gæster (summen af pladser, uden afbud og venteliste)
+        signups   antal tilmeldinger bag `count` (personer, ikke pladser)
+        meals     hvor mange der skal have mad
+        no_meals  hvor mange af `count` der har meldt fra til spisning
+        waitlist  antal på venteliste
+        declined  antal afbud
+
+    »Spiser ikke med« gælder HELE tilmeldingen — også dens gæster. Krydser man af
+    for sig selv og to gæster, er det tre kuverter færre. Det er den eneste
+    fortolkning, der kan tastes entydigt i en checkboks; skal gæsterne kunne skille
+    sig ud, hører det til som et selvstændigt punkt.
+    """
+    regs = conn.execute("SELECT * FROM registrations WHERE event_id = ?",
+                        (ev["id"],)).fetchall()
+    tal = dict(count=0, signups=0, meals=0, no_meals=0, waitlist=0, declined=0)
+    for r in regs:
+        if r["waitlist"]:
+            tal["waitlist"] += 1
+            continue
+        if _reg_ticked(conn, group["id"], r["id"], "is_decline"):
+            tal["declined"] += 1
+            continue
+        pladser = max(1, r["seats"] or 1)
+        tal["count"] += pladser
+        tal["signups"] += 1
+        if _reg_ticked(conn, group["id"], r["id"], "is_meal_decline"):
+            tal["no_meals"] += pladser
+        else:
+            tal["meals"] += pladser
+    return tal
 
 
 def _note(err: str) -> str:
@@ -259,7 +343,7 @@ def send_push(conn, group, subs, subject: str, body: str, link: str = "") -> int
 def notify_admin(conn, group, subject: str, body: str, link: str = "") -> None:
     """Send til gruppe-admin via de kanaler master har slået til."""
     settings = db.get_settings(conn)
-    mail_on, wa_on, push_on = channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = channels(conn, group)
     if group["mail_enabled"] and group["admin_email"]:
         err = send_email(settings, group["admin_email"], subject, body)
         db.add_log(conn, "mail",
@@ -268,6 +352,13 @@ def notify_admin(conn, group, subject: str, body: str, link: str = "") -> None:
         err = send_whatsapp(settings, group["whatsapp_recipient"], f"{subject}: {body}")
         db.add_log(conn, "whatsapp",
                    f"WhatsApp til {group['whatsapp_recipient']}: {subject}{_note(err)}",
+                   group["slug"])
+    # SMS har sit eget modtagerfelt: `whatsapp_recipient` kan være en gruppechat,
+    # og et gruppe-id kan man ikke sende en SMS til.
+    if group["sms_enabled"] and group["sms_recipient"]:
+        err = send_sms(settings, group["sms_recipient"], f"{subject}: {body}")
+        db.add_log(conn, "sms",
+                   f"SMS til {group['sms_recipient']}: {subject}{_note(err)}",
                    group["slug"])
     if push_on:
         n = send_push(conn, group, push_targets(conn, group, "admin"), subject, body, link)
@@ -279,13 +370,19 @@ def notify_admin(conn, group, subject: str, body: str, link: str = "") -> None:
 def notify_participant(conn, group, email: str, whatsapp: str, subject: str, body: str,
                        user_id=None, link: str = "") -> None:
     settings = db.get_settings(conn)
-    mail_on, wa_on, push_on = channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = channels(conn, group)
     if group["mail_enabled"] and email:
         err = send_email(settings, email, subject, body)
         db.add_log(conn, "mail", f"Mail til {email}: {subject}{_note(err)}", group["slug"])
+    # Ét mobilnummer, to kanaler: er både WhatsApp og SMS slået til for gruppen,
+    # får deltageren begge dele. Det er master, der vælger kanalerne pr. gruppe.
     if group["whatsapp_enabled"] and whatsapp:
         err = send_whatsapp(settings, whatsapp, f"{subject}: {body}")
         db.add_log(conn, "whatsapp", f"WhatsApp til {whatsapp}: {subject}{_note(err)}",
+                   group["slug"])
+    if group["sms_enabled"] and whatsapp:
+        err = send_sms(settings, whatsapp, f"{subject}: {body}")
+        db.add_log(conn, "sms", f"SMS til {whatsapp}: {subject}{_note(err)}",
                    group["slug"])
     # Push følger BRUGERKONTOEN, ikke tilmeldingen: en deltager uden konto har
     # ingen identitet at binde en enhed til. De grupper når push gennem
@@ -296,6 +393,66 @@ def notify_participant(conn, group, email: str, whatsapp: str, subject: str, bod
         if n:
             db.add_log(conn, "push", f"Push til bruger ({n} enhed(er)): {subject}",
                        group["slug"])
+
+
+# ---- Madbestilling: én besked, én modtager, når tilmeldingen er lukket --------
+
+def catering_contact(group, ev) -> tuple:
+    """(mail, mobilnummer) til madbestilleren. Eventet vinder over gruppens standard.
+
+    De to felter vælges HVER FOR SIG: en gruppe kan have en fast mailmodtager og
+    et enkelt event en anden telefon, uden at det ene felt slår det andet ihjel.
+    """
+    return ((ev["catering_email"] or "").strip() or (group["catering_email"] or "").strip(),
+            (ev["catering_phone"] or "").strip() or (group["catering_phone"] or "").strip())
+
+
+def catering_message(conn, group, ev) -> tuple:
+    """(emne, tekst, tal) til madbestillingen. Tallene tælles på stedet."""
+    tal = event_counts(conn, group, ev)
+    ctx = dict(tal, event=ev["name"], date=ev["event_date"], group=group["name"],
+               deadline=ev["signup_deadline"] or "ingen",
+               start=f" kl. {ev['start_time']}" if ev["start_time"] else "")
+    subject, body = render_message(conn, group, "catering", ctx)
+    return subject, body, tal
+
+
+def notify_catering(conn, group, ev, note="") -> tuple:
+    """Send madbestillingen. Returnér (antal kanaler der tog imod, fejl-liste).
+
+    Modtageren er ÉN person — den der bestiller maden — ikke deltagerne og ikke
+    notifikationslisten. Derfor sin egen funktion: kanalerne er de samme, men
+    adressen kommer et andet sted fra.
+    """
+    settings = db.get_settings(conn)
+    email, phone = catering_contact(group, ev)
+    if not email and not phone:
+        return 0, ["ingen madbestiller sat på eventet eller gruppen"]
+
+    subject, body, tal = catering_message(conn, group, ev)
+    suffix = f" ({note})" if note else ""
+    sendt, errors = 0, []
+
+    def _kanal(kanal, modtager, err, etiket):
+        nonlocal sendt
+        if err:
+            errors.append(f"{modtager}: {err}")
+        else:
+            sendt += 1
+        db.add_log(conn, kanal,
+                   f"Madbestilling{suffix} til {modtager} ({etiket}): "
+                   f"{ev['name']} — mad til {tal['meals']}{_note(err)}", group["slug"])
+
+    if group["mail_enabled"] and email:
+        _kanal("mail", email, send_email(settings, email, subject, body), "mail")
+    if group["sms_enabled"] and phone:
+        _kanal("sms", phone, send_sms(settings, phone, f"{subject}: {body}"), "SMS")
+    if group["whatsapp_enabled"] and phone:
+        _kanal("whatsapp", phone, send_whatsapp(settings, phone, f"{subject}: {body}"),
+               "WhatsApp")
+    if not sendt and not errors:
+        errors.append("hverken mail, SMS eller WhatsApp er slået til for gruppen")
+    return sendt, errors
 
 
 # ---- Notifikationsliste: hvem står på den, og hvordan sendes der til dem ------
@@ -352,17 +509,37 @@ def list_recipients(conn, group):
 
 
 def send_to_list(conn, group, subject, body, ctx=None, note=""):
-    """Send én besked til hele notifikationslisten. Returnér (mails, whatsapps, push, fejl).
+    """Send én besked til hele notifikationslisten.
+    Returnér (mails, whatsapps, sms'er, push, fejl).
 
     `subject` og `body` er RÅ skabelontekst — pladsholderne udfyldes her, én gang pr.
     modtager, så {name} bliver modtagerens eget navn. Kanalerne følger det, master har
     aktiveret for gruppen: er mail slået fra, sendes der ikke mail, uanset hvad der står
     i listen.
+
+    Modtagerens mobilnummer bruges af BÅDE WhatsApp og SMS — det er ét nummer, og
+    hvilke kanaler det nås på, er masters valg pr. gruppe. Er begge slået til, får
+    modtageren begge dele; det er bevidst, ligesom mail ved siden af WhatsApp.
     """
-    mail_on, wa_on, push_on = channels(conn, group)
+    mail_on, wa_on, sms_on, push_on = channels(conn, group)
     settings = db.get_settings(conn)
-    mails = whatsapps = 0
+    mails = whatsapps = smses = 0
     errors = []
+    suffix = f" ({note})" if note else ""
+
+    def _fejl(kanal, modtager, err):
+        """Notér en fejl: én til flash-beskeden, én til aktivitetsloggen.
+
+        Loggen får den RIGTIGE kanal som kategori — ellers kan man ikke filtrere
+        på SMS og se, at det var SMS'erne, der ikke kom af sted. Og højst 10
+        linjer: en lang liste med en død udbyder ville ellers fylde hele loggen.
+        """
+        errors.append(f"{modtager}: {err}")
+        if len(errors) <= 10:
+            db.add_log(conn, kanal,
+                       f"Notifikationsliste{suffix} ikke leveret — {modtager}: {err}",
+                       group["slug"])
+
     for r in list_recipients(conn, group):
         if not r["active"]:
             continue
@@ -371,15 +548,21 @@ def send_to_list(conn, group, subject, body, ctx=None, note=""):
         if mail_on and r["email"]:
             err = send_email(settings, r["email"], subj, text)
             if err:
-                errors.append(f"{r['email']}: {err}")
+                _fejl("mail", r["email"], err)
             else:
                 mails += 1
         if wa_on and r["whatsapp"]:
             err = send_whatsapp(settings, r["whatsapp"], f"{subj}: {text}")
             if err:
-                errors.append(f"{r['whatsapp']}: {err}")
+                _fejl("whatsapp", f"{r['whatsapp']} (WhatsApp)", err)
             else:
                 whatsapps += 1
+        if sms_on and r["whatsapp"]:
+            err = send_sms(settings, r["whatsapp"], f"{subj}: {text}")
+            if err:
+                _fejl("sms", f"{r['whatsapp']} (SMS)", err)
+            else:
+                smses += 1
 
     # Push til de enheder, der har abonneret på gruppens varslinger. De har ingen
     # identitet — det ER pointen: en gruppe med delt adgangskode har ingen brugere
@@ -392,17 +575,17 @@ def send_to_list(conn, group, subject, body, ctx=None, note=""):
                            (ctx or {}).get("link", ""))
 
     # Én logline for hele udsendelsen — ikke én pr. modtager. Listen kan være lang,
-    # og aktivitetsloggen skal stadig kunne læses.
-    suffix = f" ({note})" if note else ""
-    if mails or whatsapps or pushes:
-        db.add_log(conn, "mail" if mails else ("whatsapp" if whatsapps else "push"),
+    # og aktivitetsloggen skal stadig kunne læses. Kategorien er den kanal, der nåede
+    # flest — loggen kan filtreres på den, og linjen rummer alle fire tal alligevel.
+    if mails or whatsapps or smses or pushes:
+        kategori = max((mails, "mail"), (whatsapps, "whatsapp"), (smses, "sms"),
+                       (pushes, "push"), key=lambda t: t[0])[1]
+        db.add_log(conn, kategori,
                    f"Notifikationsliste{suffix}: {mails} mail, {whatsapps} WhatsApp, "
-                   f"{pushes} push — »{_safe_format(subject, dict(ctx or {}, name=''))}«",
+                   f"{smses} SMS, {pushes} push — "
+                   f"»{_safe_format(subject, dict(ctx or {}, name=''))}«",
                    group["slug"])
-    for e in errors[:10]:
-        db.add_log(conn, "mail", f"Notifikationsliste{suffix} ikke leveret — {e}",
-                   group["slug"])
-    return mails, whatsapps, pushes, errors
+    return mails, whatsapps, smses, pushes, errors
 
 
 def announce_message(conn, group, ev, base_url=""):
@@ -535,6 +718,28 @@ def process_scheduled(now=None):
                 subject, body = render_message(conn, group, "deadline", ctx)
                 notify_admin(conn, group, subject, body)
                 conn.execute("UPDATE events SET deadline_sent = 1 WHERE id = ?", (ev["id"],))
+                conn.commit()
+
+        # Madbestilling når fristen er nået: ÉN besked til den, der bestiller maden,
+        # med antallet af kuverter. Står for sig selv ved siden af »frist nået«-
+        # beskeden til admin, fordi modtageren er en anden og teksten er en anden.
+        cat_rows = conn.execute(
+            "SELECT * FROM events WHERE notify_catering = 1 AND catering_sent = 0 "
+            "AND signup_deadline != ''").fetchall()
+        for ev in cat_rows:
+            try:
+                deadline = datetime.fromisoformat(ev["signup_deadline"])
+            except ValueError:
+                continue
+            if now >= deadline:
+                group = conn.execute(
+                    "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
+                if group:
+                    notify_catering(conn, group, ev, note="frist nået")
+                # Markér som sendt uanset udfald. En madbestilling, der ikke kunne
+                # leveres, skal fejle ÉN gang og stå i loggen — ikke prøve igen hvert
+                # 10. minut og sende maden af sted tre dage senere.
+                conn.execute("UPDATE events SET catering_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()
 
         # CSV til admin 2 timer efter frist

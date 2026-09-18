@@ -25,6 +25,10 @@
     Skal udfyldes</label>
   <label class="chk"><input type="checkbox" name="is_decline" {{ 'checked' if f and f.is_decline }}>
     "Deltager ikke"-felt (checkbox — hvis afkrydset ved tilmelding kræves kun navn)</label>
+  <label class="chk"><input type="checkbox" name="is_meal_decline" {{ 'checked' if f and f.is_meal_decline }}>
+    "Spiser ikke med"-felt (checkbox — deltageren kommer, men trækkes fra madbestillingen)</label>
+  <p class="muted small">De to udelukker hinanden: et afbud spiser ikke med alligevel.
+     Krydset gælder <strong>hele tilmeldingen</strong> — også dens gæster.</p>
 {% endmacro %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}
@@ -53,13 +57,20 @@
     <button type="submit" class="danger">Slet password</button>
   </form>
 
-  {% if group.mail_enabled or group.whatsapp_enabled %}
+  {% if group.mail_enabled or group.whatsapp_enabled or group.sms_enabled %}
   <h2 id="kontakt">Kontakt for notifikationer</h2>
   <p class="muted small">Modtagere som master admin satte ved oprettelsen — du kan rette dem her.</p>
   <form method="post">
     <input type="hidden" name="action" value="contact">
     {% if group.mail_enabled %}<label>Admin e-mail <input type="email" name="admin_email" value="{{ group.admin_email }}"></label>{% endif %}
     {% if group.whatsapp_enabled %}<label>WhatsApp-modtager (bruger-nummer eller gruppe-id) <input type="text" name="whatsapp_recipient" value="{{ group.whatsapp_recipient }}"></label>{% endif %}
+    {% if group.sms_enabled %}<label>SMS-modtager (mobilnummer med landekode) <input type="text" name="sms_recipient" value="{{ group.sms_recipient }}" placeholder="+4520123456"></label>{% endif %}
+    <h3>Madbestiller</h3>
+    <p class="muted small">Den, der skal bestille mad. Får antallet af kuverter, når
+       tilmeldingen lukker — slås til pr. event under <em>Notifikationer</em>. Et event
+       kan sætte en anden modtager end den her.</p>
+    {% if group.mail_enabled %}<label>Madbestillerens e-mail <input type="email" name="catering_email" value="{{ group.catering_email }}"></label>{% endif %}
+    {% if group.sms_enabled or group.whatsapp_enabled %}<label>Madbestillerens mobilnummer <input type="text" name="catering_phone" value="{{ group.catering_phone }}" placeholder="+4520123456"></label>{% endif %}
     <button type="submit">Gem kontakt</button>
   </form>
   {% endif %}
@@ -73,7 +84,10 @@
     <div class="fielditem">
       <div class="row">
         <div>
-          {% set typelabel = 'notefelt' if item.f.multiline else ('deltager ikke' if item.f.is_decline else item.f.field_type) %}
+          {% set typelabel = 'notefelt' if item.f.multiline
+                             else ('deltager ikke' if item.f.is_decline
+                             else ('spiser ikke med' if item.f.is_meal_decline
+                             else item.f.field_type)) %}
           <strong>{{ loop.index }}. {{ item.f.label }}</strong>
           <span class="muted">({{ typelabel }}{% if item.f.required %}, påkrævet{% endif %})</span>
           {% if item.options %}<div class="muted small">Valg: {{ item.options|join(', ') }}</div>{% endif %}
@@ -152,6 +166,10 @@
      <code>{event}</code>, <code>{name}</code>, <code>{date}</code>,
      <code>{deadline}</code>, <code>{group}</code>, <code>{link}</code> (i "Frist nået"
      og "Nyt event"), <code>{start}</code> (klokkeslæt).</p>
+  <p class="muted small">Kun i <strong>Madbestilling</strong>: <code>{meals}</code> (hvor
+     mange der skal have mad), <code>{count}</code> (deltagere + gæster i alt),
+     <code>{no_meals}</code> (har meldt fra til spisning), <code>{signups}</code> (antal
+     tilmeldinger) og <code>{waitlist}</code> (på venteliste).</p>
   <form method="post">
     <input type="hidden" name="action" value="templates">
     {% for t in templates %}
