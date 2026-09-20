@@ -10,14 +10,26 @@
        ikke sin egen adresse udefra.</p>
   {% else %}
     <p class="muted small">Facebook lukkede i april 2024 for, at apps kan slå op i en
-       <strong>gruppe</strong> — så det sidste klik er dit. Knappen åbner Facebook med
-       linket klar, og du vælger selv gruppen.</p>
+       <strong>gruppe</strong>, og der findes ingen del-knap, der kan ramme en gruppe —
+       heller ikke Facebooks egen. Vejen er at sætte teksten ind i gruppens eget
+       skrivefelt; så bygger Facebook selv kortet ud fra linket.</p>
+    <ol class="delsteps">
+      <li><strong>Kopiér teksten</strong> herunder.</li>
+      <li>{% if share.gruppe %}<strong>Åbn gruppen</strong> og klik i skrivefeltet.{% else %}Åbn din Facebook-gruppe og klik i skrivefeltet.{% endif %}</li>
+      <li>Sæt ind (⌘V) og tryk <strong>Slå op</strong>. Kortet med navn, dato og billede
+          kommer af sig selv — så kan du slette selve linket fra teksten, hvis du vil.</li>
+    </ol>
     <div class="actions">
-      <a class="btn primary" href="{{ share.facebook }}" target="_blank" rel="noopener">Del på Facebook</a>
-      <button type="button" class="small" data-kopi="delingstekst">Kopiér teksten</button>
+      <button type="button" class="primary" data-kopi="delingstekst">Kopiér teksten</button>
+      {% if share.gruppe %}
+        <a class="btn" href="{{ share.gruppe }}" target="_blank" rel="noopener">Åbn Facebook-gruppen</a>
+      {% endif %}
     </div>
-    <p class="muted small">Facebooks del-dialog kan ikke få tekst med udefra, så teksten
-       indsætter du selv i opslaget:</p>
+    {% if not share.gruppe %}
+      <p class="muted small">Sæt gruppens adresse ind under
+         <a href="{{ url_for('admin_settings', slug=group.slug) }}#facebook">Opsætning</a>,
+         så kan du åbne den herfra med ét klik.</p>
+    {% endif %}
     <textarea id="delingstekst" rows="7" readonly onclick="this.select()">{{ share.text }}</textarea>
     <p class="formnote" data-kopi-note="delingstekst"></p>
   {% endif %}

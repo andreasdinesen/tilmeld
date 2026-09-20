@@ -128,6 +128,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("groups", "notify_list_users", "INTEGER DEFAULT 1")
     add("groups", "push_enabled", "INTEGER DEFAULT 0")
     add("groups", "files_enabled", "INTEGER DEFAULT 0")
+    add("groups", "facebook_url", "TEXT DEFAULT ''")
     add("groups", "catering_email", "TEXT DEFAULT ''")
     add("groups", "catering_phone", "TEXT DEFAULT ''")
     add("registrations", "user_id", "INTEGER DEFAULT NULL")

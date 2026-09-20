@@ -11,6 +11,30 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 24
+
+**Rettelse: del-knappen kunne ikke ramme en gruppe.**
+
+Version 23 lovede, at »Del på Facebook« åbnede en dialog, hvor man valgte sin gruppe.
+Det gør den ikke. Facebooks del-dialog slår op på **din egen væg** — der findes ingen
+gruppe-destination, hverken i `sharer.php` eller i Metas Share Dialog. Det er ikke noget,
+der er blevet lukket; det har aldrig været der.
+
+Kortet viser nu den vej, der virker — og som er den eneste tilbage, siden Groups API
+lukkede:
+
+1. **Kopiér teksten** (navn, tidspunkt, frist, beskrivelse og link).
+2. **Åbn Facebook-gruppen** og klik i skrivefeltet.
+3. Sæt ind og slå op. Facebook bygger selv link-kortet ud fra Open Graph-taggene fra
+   version 23 — så navn, dato og billede kommer med. Bagefter kan du slette selve linket
+   fra teksten, hvis du vil.
+
+Gruppens adresse sættes under **gruppe-admin → Opsætning → Facebook-gruppe**, så knappen
+åbner den direkte. Feltet tager kun adresser på `facebook.com`: det bliver til en knap i
+admin-UI'et, og et felt, der kan pege hvor som helst, er en åben dør til et falsk login.
+
+Uden en adresse er der ingen knap — kun en henvisning til, hvor den sættes.
+
 ## Version 23
 
 **Del et event på Facebook — og et ordentligt link-kort, når nogen deler linket.**
@@ -31,6 +55,10 @@ Under **Vis liste** (og via »Del« på event-oversigten) er der nu et *Del even
 
 - **Del på Facebook** åbner Facebooks del-dialog med eventets link klar. Du vælger selv
   gruppen.
+  > **RETTET i version 24 — det passer ikke.** Facebooks del-dialog kan kun slå op på
+  > din egen væg; der er ingen gruppe-vælger, hverken i `sharer.php` eller i Metas
+  > Share Dialog (dokumentationen beskriver kun tidslinjen). Knappen er erstattet —
+  > se version 24.
 - **Kopiér teksten** giver en færdig tekst — navn, tidspunkt, frist, beskrivelse og link
   — som du indsætter i opslaget. Facebooks dialog kan ikke få tekst med udefra.
   Markdown i beskrivelsen renses til ren tekst, så der ikke står `**fed**` i opslaget.

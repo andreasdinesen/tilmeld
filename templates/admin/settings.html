@@ -57,6 +57,18 @@
     <button type="submit" class="danger">Slet password</button>
   </form>
 
+  <h2 id="facebook">Facebook-gruppe</h2>
+  <p class="muted small">Adressen på klubbens Facebook-gruppe. Så kan du åbne den med ét klik
+     fra »Del eventet«, når du vil slå et event op.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="facebook">
+    <label>Adresse (tom = ingen knap)
+      <input type="url" name="facebook_url" value="{{ group.facebook_url }}"
+             placeholder="https://www.facebook.com/groups/...">
+    </label>
+    <button type="submit">Gem</button>
+  </form>
+
   {% if group.mail_enabled or group.whatsapp_enabled or group.sms_enabled %}
   <h2 id="kontakt">Kontakt for notifikationer</h2>
   <p class="muted small">Modtagere som master admin satte ved oprettelsen — du kan rette dem her.</p>

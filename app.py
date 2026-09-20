@@ -10,7 +10,6 @@ import time
 import urllib.request
 from datetime import datetime, timedelta
 from functools import wraps
-from urllib.parse import quote
 
 # Tidszone: alle datoer/frister er "vægur-tid". Uden dette kører containeren i UTC,
 # så en frist kl. 12:00 ville reelt være 14:00 dansk tid. Sættes før datetime bruges.
@@ -870,6 +869,17 @@ def admin_settings(slug):
                 conn.execute("UPDATE groups SET catering_phone = ? WHERE id = ?",
                              (request.form.get("catering_phone", "").strip(), group["id"]))
             flash("Kontaktoplysninger gemt.", "ok")
+        elif action == "facebook":
+            url = request.form.get("facebook_url", "").strip()
+            # Kun facebook.com. Adressen bliver til en knap i admin-UI'et, og et
+            # felt, der kan pege hvor som helst, er en åben dør til et falsk login.
+            if url and not re.match(r"^https://(www\.|m\.|web\.)?facebook\.com/", url):
+                flash("Adressen skal starte med https://www.facebook.com/", "error")
+            else:
+                conn.execute("UPDATE groups SET facebook_url = ? WHERE id = ?",
+                             (url, group["id"]))
+                flash("Facebook-gruppen er gemt." if url else "Facebook-gruppen er fjernet.",
+                      "ok")
         elif action == "add_field":
             f = _field_from_form(request.form)
             if not f["label"]:
@@ -988,6 +998,7 @@ def admin_settings(slug):
 _SETTINGS_ANCHOR = {
     "password": "#adgang", "delete_password": "#adgang",
     "contact": "#kontakt",
+    "facebook": "#facebook",
     "add_field": "#punkter", "edit_field": "#punkter",
     "delete_field": "#punkter", "move_field": "#punkter",
     "branding": "#udseende",
@@ -1643,11 +1654,14 @@ def event_share(conn, group, ev) -> dict:
         "site_name": group["name"],
         "description": " · ".join(x for x in (naar, frist) if x) + (f" — {uddrag}" if uddrag else ""),
         "image": billede,
-        # Teksten admin kopierer ind i opslaget. Facebooks del-dialog kan ikke få
-        # tekst med udefra (»quote« blev droppet), så den skal indsættes i hånden.
+        # Teksten admin indsætter i gruppens skrivefelt. Linket SKAL med: det er
+        # dét, Facebook bygger link-kortet ud fra.
         "text": "\n".join(linjer),
-        "facebook": ("https://www.facebook.com/sharer/sharer.php?u=" + quote(url, safe="")
-                     if url else ""),
+        # Adressen på klubbens Facebook-gruppe. Der findes ingen del-dialog, der kan
+        # ramme en gruppe — hverken sharer.php eller Share Dialog har en
+        # gruppe-destination (Meta dokumenterer kun tidslinjen). Vejen er at åbne
+        # gruppen og sætte teksten ind i dens eget skrivefelt.
+        "gruppe": (group["facebook_url"] or "").strip(),
     }
 
 

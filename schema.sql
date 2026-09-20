@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS groups (
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
     push_enabled        INTEGER DEFAULT 0,         -- push-notifikationer (slået til af master)
+    facebook_url        TEXT DEFAULT '',           -- adressen på klubbens Facebook-gruppe,
+                                                   -- så »Del«-kortet kan åbne den direkte
     files_enabled       INTEGER DEFAULT 0,         -- må admin vedhæfte filer på events (master styrer
                                                    -- det: filerne fylder på SERVERENS disk)
     created_at          TEXT NOT NULL

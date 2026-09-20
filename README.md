@@ -179,12 +179,17 @@ givet gruppen lov). Ud over de sædvanlige pladsholdere har den fem tal:
 
 ## Del et event (Facebook m.fl.)
 
-Under **Vis liste** på et event kan admin dele det: en knap der åbner Facebooks del-dialog
-med linket klar, og en færdig tekst til at indsætte i opslaget.
+Under **Vis liste** på et event kan admin dele det: en færdig tekst at kopiere og en knap,
+der åbner klubbens Facebook-gruppe.
 
-**Der er ingen Facebook-bruger at koble på.** Meta lukkede Groups API 22. april 2024 og
-fjernede `publish_to_groups` — ingen app kan slå op i en Facebook-gruppe på dine vegne.
-Det sidste klik er derfor dit; alt andet er gjort klar.
+**Der er ingen Facebook-bruger at koble på, og ingen del-knap der rammer en gruppe.** Meta
+lukkede Groups API 22. april 2024 og fjernede `publish_to_groups`, så ingen app kan slå op
+i en gruppe på dine vegne. Og Facebooks egen del-dialog kan kun slå op på din egen væg —
+der har aldrig været en gruppe-destination i den.
+
+Vejen der virker: kopiér teksten, åbn gruppen, sæt ind i skrivefeltet. Facebook bygger selv
+link-kortet ud fra Open Graph-taggene. Gruppens adresse sættes under **gruppe-admin →
+Opsætning → Facebook-gruppe** (kun `facebook.com`-adresser).
 
 Et delt link viser titel, tidspunkt, frist og et uddrag (Open Graph). Da Facebooks robot
 ikke kan logge ind, har et event bag adgangskode en **åben forside** med netop de
