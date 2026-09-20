@@ -177,6 +177,20 @@ givet gruppen lov). Ud over de sædvanlige pladsholdere har den fem tal:
 | `{signups}` | Antal tilmeldinger (personer) |
 | `{waitlist}` | Antal på venteliste |
 
+## Del et event (Facebook m.fl.)
+
+Under **Vis liste** på et event kan admin dele det: en knap der åbner Facebooks del-dialog
+med linket klar, og en færdig tekst til at indsætte i opslaget.
+
+**Der er ingen Facebook-bruger at koble på.** Meta lukkede Groups API 22. april 2024 og
+fjernede `publish_to_groups` — ingen app kan slå op i en Facebook-gruppe på dine vegne.
+Det sidste klik er derfor dit; alt andet er gjort klar.
+
+Et delt link viser titel, tidspunkt, frist og et uddrag (Open Graph). Da Facebooks robot
+ikke kan logge ind, har et event bag adgangskode en **åben forside** med netop de
+oplysninger og en »Log ind«-knap — deltagerlisten og tilmeldingen forbliver lukket.
+Kræver en **offentlig URL** under master → Opsætning.
+
 ## Filer på et event
 
 Gruppe-admin kan vedhæfte filer til et event — program, kort, menu — under **Redigér

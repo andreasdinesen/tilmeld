@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ ev.name }} · {{ group.name }}{% endblock %}
+
+{# Open Graph: det Facebook og de fleste chat-apps læser. Kun navn, tidspunkt,
+   frist og et uddrag — aldrig deltagerlisten. #}
+{% block meta %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ share.site_name }}">
+  <meta property="og:title" content="{{ share.title }}">
+  <meta property="og:description" content="{{ share.description }}">
+  {% if share.url %}<meta property="og:url" content="{{ share.url }}">{% endif %}
+  {% if share.image %}
+    <meta property="og:image" content="{{ share.image }}">
+    <meta name="twitter:card" content="summary_large_image">
+  {% else %}
+    <meta name="twitter:card" content="summary">
+  {% endif %}
+  <meta name="description" content="{{ share.description }}">
+{% endblock %}
+
+{% block brand %}{{ group.name }}{% endblock %}
+{% block content %}
+{% if group.image_path %}
+  <img class="group-image" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
+{% endif %}
+<div class="card state-{{ state }}">
+  <h1>{{ ev.name }}</h1>
+  {% if state == 'locked' %}<div class="tag locked big">Tilmelding er lukket — fristen er passeret</div>{% endif %}
+  <div class="muted">
+    {{ ev.event_date|d }}{% if ev.start_time %} kl. {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
+    {% if ev.signup_deadline %}· Tilmeldingsfrist: {{ ev.signup_deadline|dt }}{% endif %}
+  </div>
+  {% if ev.description %}<div class="description">{{ ev.description | md }}</div>{% endif %}
+
+  <p style="margin-top:16px">
+    <a class="btn primary" href="{{ url_for('user_login', slug=group.slug, event=ev.slug) }}">Log ind for at tilmelde dig</a>
+  </p>
+  <p class="muted small">Deltagerlisten og tilmeldingen kræver adgang til {{ group.name }}.</p>
+</div>
+{% endblock %}

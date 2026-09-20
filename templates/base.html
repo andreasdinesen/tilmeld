@@ -25,6 +25,9 @@
   {# Begge: den første er Apples gamle navn, som iOS stadig er den eneste der læser. #}
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  {# Open Graph: det Facebook, Messenger og de fleste chat-apps læser, når nogen
+     deler et link. Uden det bliver opslaget et nøgent link uden titel. #}
+  {% block meta %}{% endblock %}
 </head>
 <body>
   <header class="topbar">

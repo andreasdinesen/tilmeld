@@ -11,6 +11,48 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 23
+
+**Del et event på Facebook — og et ordentligt link-kort, når nogen deler linket.**
+
+### Hvorfor der ikke er en Facebook-bruger at koble på
+
+Meta lukkede **Groups API** den 22. april 2024 og fjernede både `publish_to_groups`,
+`groups_access_member_info` og muligheden for, at en gruppe-admin installerer en app i
+gruppen. Der findes ikke længere en tilladelse at søge om: ingen app kan slå op i en
+Facebook-gruppe på dine vegne. Buffer, Hootsuite og Zoho droppede deres gruppe-funktioner
+af samme grund.
+
+Derfor er det sidste klik dit — men alt andet er gjort klar.
+
+### Del eventet
+
+Under **Vis liste** (og via »Del« på event-oversigten) er der nu et *Del eventet*-kort:
+
+- **Del på Facebook** åbner Facebooks del-dialog med eventets link klar. Du vælger selv
+  gruppen.
+- **Kopiér teksten** giver en færdig tekst — navn, tidspunkt, frist, beskrivelse og link
+  — som du indsætter i opslaget. Facebooks dialog kan ikke få tekst med udefra.
+  Markdown i beskrivelsen renses til ren tekst, så der ikke står `**fed**` i opslaget.
+- Uden en **offentlig URL** under master → Opsætning er der intet at dele, og kortet
+  siger det i stedet for at vise en knap, der ikke virker.
+
+### Link-kortet
+
+Et delt link viser nu titel, tidspunkt, frist og et uddrag i stedet for at være et nøgent
+link. Facebooks robot kan ikke logge ind, så et event bag adgangskode viser nu en **åben
+forside**: navn, hvornår, frist, beskrivelse — og knappen »Log ind for at tilmelde dig«.
+
+**Deltagerlisten og tilmeldings-formularen er stadig lukket.** Kun det, der alligevel
+står i opslaget, er synligt.
+
+Klikker man linket og logger ind, lander man tilbage på **eventet** — ikke på forsiden.
+Event-navnet slås op i gruppen først, så parameteren ikke kan bruges til at sende folk
+ud af appen.
+
+Ikonet findes nu også i 512 px og bruges som billede på link-kortet, når gruppen ikke
+selv har uploadet et: Facebook viser ikke et kort med et billede under 200 px.
+
 ## Version 22
 
 **Rettelse: »Opdater Tilmeld« kunne ikke hente koden første gang.**

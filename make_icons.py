@@ -57,12 +57,17 @@ def tegn(px):
 
 
 def main():
-    sti = os.path.join(UD, "icon-192.png")
-    # Paletteret PNG: et fladt firfarvet mærke behøver ikke truecolor, og
-    # filen skal med i Docker-imaget.
-    tegn(192).convert("RGB").quantize(colors=32, method=Image.MEDIANCUT).save(
-        sti, optimize=True)
-    print(f"  {os.path.basename(sti)}  {os.path.getsize(sti):,} b")
+    # 192 til manifestet og iOS' apple-touch-icon.
+    # 512 til manifestet OG som og:image, når gruppen ikke selv har et billede:
+    # Facebook viser ikke et link-kort med et billede under 200 px, så 192 er
+    # lige under grænsen og ville give et kort helt uden billede.
+    for px in (192, 512):
+        sti = os.path.join(UD, f"icon-{px}.png")
+        # Paletteret PNG: et fladt firfarvet mærke behøver ikke truecolor, og
+        # filen skal med i Docker-imaget.
+        tegn(px).convert("RGB").quantize(colors=32, method=Image.MEDIANCUT).save(
+            sti, optimize=True)
+        print(f"  {os.path.basename(sti)}  {os.path.getsize(sti):,} b")
 
 
 if __name__ == "__main__":

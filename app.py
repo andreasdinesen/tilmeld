@@ -10,6 +10,7 @@ import time
 import urllib.request
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import quote
 
 # Tidszone: alle datoer/frister er "vægur-tid". Uden dette kører containeren i UTC,
 # så en frist kl. 12:00 ville reelt være 14:00 dansk tid. Sættes før datetime bruges.
@@ -1422,13 +1423,14 @@ def admin_event_list(slug, event_id):
     tal = notifications.event_counts(conn, group, ev)
     cat_mail, cat_tlf = notifications.catering_contact(group, ev)
     meal_fields = any(f["is_meal_decline"] for f in all_group_fields(conn, group["id"]))
+    share = event_share(conn, group, ev)
     conn.close()
     return render_template("admin/event_list.html", group=group, ev=ev,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
                            state=event_state(ev), attended_count=attended_count,
                            tal=tal, meal_fields=meal_fields,
-                           cat_mail=cat_mail, cat_tlf=cat_tlf)
+                           cat_mail=cat_mail, cat_tlf=cat_tlf, share=share)
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/export.csv")
@@ -1594,6 +1596,61 @@ def public_base_url(conn) -> str:
     return (db.get_settings(conn)["base_url"] or "").strip()
 
 
+def event_share(conn, group, ev) -> dict:
+    """Alt hvad der skal bruges, når et event deles.
+
+    Samme kilde til BÅDE Open Graph-taggene (det Facebook selv læser) og den
+    tekst, admin kan kopiere ind i sit opslag — så kortet og teksten ikke kan
+    komme til at sige noget forskelligt.
+    """
+    base = public_base_url(conn)
+    url = f"{base}/{group['slug']}/{ev['slug']}" if base else ""
+
+    naar = fmt_d(ev["event_date"])
+    if ev["start_time"]:
+        naar += f" kl. {ev['start_time']}"
+        if ev["end_time"]:
+            naar += f"–{ev['end_time']}"
+    frist = f"Tilmeldingsfrist: {fmt_dt(ev['signup_deadline'])}" if ev["signup_deadline"] else ""
+
+    # Beskrivelsen er Markdown. Renset til ren tekst — ellers står der »**fed**«
+    # midt i et Facebook-opslag og i link-kortet.
+    uddrag = ""
+    raw = (ev["description"] or "").strip()
+    if raw:
+        uddrag = " ".join(bleach.clean(markdown_lib.markdown(raw), tags=[], strip=True).split())
+        if len(uddrag) > 200:
+            uddrag = uddrag[:200].rsplit(" ", 1)[0] + " …"
+
+    billede = ""
+    if base:
+        billede = base + (url_for("group_image", slug=group["slug"]) if group["image_path"]
+                          else url_for("static", filename="icon-512.png"))
+
+    linjer = [ev["name"], naar]
+    if frist:
+        linjer.append(frist)
+    if uddrag:
+        linjer.append("")
+        linjer.append(uddrag)
+    if url:
+        linjer.append("")
+        linjer.append(url)
+
+    return {
+        "url": url,
+        "title": ev["name"],
+        "site_name": group["name"],
+        "description": " · ".join(x for x in (naar, frist) if x) + (f" — {uddrag}" if uddrag else ""),
+        "image": billede,
+        # Teksten admin kopierer ind i opslaget. Facebooks del-dialog kan ikke få
+        # tekst med udefra (»quote« blev droppet), så den skal indsættes i hånden.
+        "text": "\n".join(linjer),
+        "facebook": ("https://www.facebook.com/sharer/sharer.php?u=" + quote(url, safe="")
+                     if url else ""),
+    }
+
+
 def ensure_calendar_token(conn, group):
     """Sørg for at gruppen har en kalender-token (til .ics-abonnement)."""
     if group["calendar_token"]:
@@ -1656,7 +1713,7 @@ def user_login(slug):
             if u and member and auth.verify_password(request.form.get("password", ""),
                                                       u["password_hash"]):
                 session[f"uid_{slug}"] = u["id"]
-                return redirect(url_for("user_home", slug=slug))
+                return redirect(_efter_login(group))
             flash("Forkert brugernavn eller adgangskode.", "error")
         conn = db.get_db()
         # Vis kun passkey-knappen hvis nogen i gruppen faktisk har registreret en.
@@ -1665,16 +1722,36 @@ def user_login(slug):
             "WHERE c.scope = 'user' AND ug.group_id = ?", (group["id"],)).fetchone())
         conn.close()
         return render_template("user/login.html", group=group, accounts=True,
-                               passkey_on=has_keys and passkeys.is_secure_origin(request))
+                               passkey_on=has_keys and passkeys.is_secure_origin(request),
+                               event_slug=request.args.get("event", ""))
     # Delt gruppe-password (eller åben gruppe)
     if not group["user_password"]:
         return redirect(url_for("user_home", slug=slug))
     if request.method == "POST":
         if request.form.get("password", "") == group["user_password"]:
             session[f"user_{slug}"] = True
-            return redirect(url_for("user_home", slug=slug))
+            return redirect(_efter_login(group))
         flash("Forkert password.", "error")
-    return render_template("user/login.html", group=group, accounts=False, passkey_on=False)
+    return render_template("user/login.html", group=group, accounts=False, passkey_on=False,
+                           event_slug=request.args.get("event", ""))
+
+
+def _efter_login(group):
+    """Hvor skal man hen efter login?
+
+    Kommer man fra et delt link, står eventet i `?event=` — så skal man tilbage
+    DERTIL, ikke til forsiden. Slug'en slås op i gruppen, før den bruges: så kan
+    parameteren aldrig blive til et åbent redirect ud af appen.
+    """
+    ev_slug = (request.values.get("event") or "").strip()
+    if ev_slug:
+        conn = db.get_db()
+        findes = conn.execute("SELECT 1 FROM events WHERE group_id = ? AND slug = ?",
+                              (group["id"], ev_slug)).fetchone()
+        conn.close()
+        if findes:
+            return url_for("user_event", slug=group["slug"], event_slug=ev_slug)
+    return url_for("user_home", slug=group["slug"])
 
 
 @app.route("/<slug>/logout")
@@ -1756,14 +1833,26 @@ def user_event(slug, event_slug):
     group = get_group(slug)
     if not group:
         abort(404)
-    if not user_has_access(group):
-        return redirect(url_for("user_login", slug=slug))
     conn = db.get_db()
     ev = conn.execute("SELECT * FROM events WHERE group_id = ? AND slug = ?",
                       (group["id"], event_slug)).fetchone()
     if not ev:
         conn.close()
         abort(404)
+    if not user_has_access(group):
+        # Uden adgang vises en ÅBEN forside af eventet — navn, tidspunkt, frist og
+        # et uddrag — i stedet for et blankt redirect til login.
+        #
+        # Det er dét, der gør et delt link brugbart: Facebooks robot kan ikke logge
+        # ind, så uden den her ville et opslag blive et nøgent link uden titel. Og
+        # den, der klikker, kan se hvad han inviteres til, før han taster en kode.
+        #
+        # Deltagerlisten og tilmeldings-formularen er IKKE med. Kun det, der står
+        # i selve opslaget i forvejen.
+        share = event_share(conn, group, ev)
+        conn.close()
+        return render_template("user/event_public.html", group=group, ev=ev,
+                               share=share, state=event_state(ev))
     state = event_state(ev)
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
@@ -1795,11 +1884,12 @@ def user_event(slug, event_slug):
         mu = get_user(conn, my_uid)
         my_name = (mu["name"] or mu["username"]) if mu else ""
     filer = event_files(conn, ev["id"]) if group["files_enabled"] else []
+    share = event_share(conn, group, ev)
     conn.close()
     # Med konti: brugere ser kun tilmeldings-formularen hvis de ikke allerede er tilmeldt
     show_signup = (state == "open") and (is_admin or not accounts or not has_own)
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
-    return render_template("user/event.html", group=group, ev=ev, state=state,
+    return render_template("user/event.html", group=group, ev=ev, state=state, share=share,
                            fields=parsed_fields, regs=regs, count=attending, full=full,
                            mail_on=mail_on, wa_on=wa_on, sms_on=sms_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
@@ -2366,6 +2456,8 @@ def group_manifest(slug):
             {"src": url_for("static", filename="favicon.svg"), "sizes": "any",
              "type": "image/svg+xml", "purpose": "any maskable"},
             {"src": icon, "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": url_for("static", filename="icon-512.png"), "sizes": "512x512",
+             "type": "image/png", "purpose": "any"},
         ],
     }
     return Response(json.dumps(data, ensure_ascii=False),

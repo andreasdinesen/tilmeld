@@ -2,6 +2,27 @@
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}<a href="{{ url_for('admin_home', slug=group.slug) }}">Tilbage</a>{% endblock %}
 {% block content %}
+<div class="card" id="del">
+  <h2>Del eventet</h2>
+  {% if not share.url %}
+    <p class="muted small">Der er ingen <strong>offentlig URL</strong> sat op under
+       master → Opsætning, så der er ikke noget link at dele. Uden den kender appen
+       ikke sin egen adresse udefra.</p>
+  {% else %}
+    <p class="muted small">Facebook lukkede i april 2024 for, at apps kan slå op i en
+       <strong>gruppe</strong> — så det sidste klik er dit. Knappen åbner Facebook med
+       linket klar, og du vælger selv gruppen.</p>
+    <div class="actions">
+      <a class="btn primary" href="{{ share.facebook }}" target="_blank" rel="noopener">Del på Facebook</a>
+      <button type="button" class="small" data-kopi="delingstekst">Kopiér teksten</button>
+    </div>
+    <p class="muted small">Facebooks del-dialog kan ikke få tekst med udefra, så teksten
+       indsætter du selv i opslaget:</p>
+    <textarea id="delingstekst" rows="7" readonly onclick="this.select()">{{ share.text }}</textarea>
+    <p class="formnote" data-kopi-note="delingstekst"></p>
+  {% endif %}
+</div>
+
 <div class="card">
   <div class="row">
     <h1>{{ ev.name }} — deltagere</h1>
@@ -90,4 +111,26 @@
   {% endfor %}
   {% endif %}
 </div>
+
+<script>
+  /* Kopiér-knappen. Clipboard-API'et findes KUN i et sikkert kontekst (https eller
+     localhost) — på panelets IP:port gør det ikke. Derfor er tekstfeltet synligt i
+     forvejen, og knappen falder tilbage til at markere teksten, så den kan kopieres
+     i hånden. En knap, der bare ikke gør noget, er det værste svar. */
+  document.querySelectorAll('[data-kopi]').forEach(function (knap) {
+    var felt = document.getElementById(knap.dataset.kopi);
+    var note = document.querySelector('[data-kopi-note="' + knap.dataset.kopi + '"]');
+    knap.addEventListener('click', function () {
+      function sig(t, daarlig) { note.textContent = t; note.classList.toggle('bad', !!daarlig); }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(felt.value)
+          .then(function () { sig('Teksten er kopieret — indsæt den i opslaget.'); })
+          .catch(function () { felt.select(); sig('Kunne ikke kopiere — teksten er markeret, tryk ⌘C.', true); });
+      } else {
+        felt.select();
+        sig('Teksten er markeret — tryk ⌘C for at kopiere.');
+      }
+    });
+  });
+</script>
 {% endblock %}
