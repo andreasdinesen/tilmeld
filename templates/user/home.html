@@ -10,6 +10,11 @@
 {% if group.image_path %}
   <img class="group-image" src="{{ url_for('group_image', slug=group.slug) }}" alt="{{ group.name }}">
 {% endif %}
+{% if group.home_text %}
+<div class="card">
+  <div class="description">{{ group.home_text | md }}</div>
+</div>
+{% endif %}
 <div class="card">
   <h1>Kommende events</h1>
   {% if not events %}<p>Ingen kommende events.</p>{% endif %}
@@ -51,6 +56,20 @@
   </script>
   {% endif %}
 </div>
+
+{% if dokumenter %}
+<div class="card" id="dokumenter">
+  <h2>Dokumenter</h2>
+  <ul class="filliste">
+    {% for f in dokumenter %}
+      <li>
+        <a href="{{ url_for('group_file_download', slug=group.slug, file_id=f.id) }}">{{ f.original_name }}</a>
+        <span class="muted small">{{ f.size|filstr }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 
 {% if push_on %}
 <div class="card">

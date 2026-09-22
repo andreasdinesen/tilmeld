@@ -153,8 +153,7 @@
 
 <div class="card narrow">
   <h2 id="udseende">Bruger-sidens udseende</h2>
-  <p class="muted small">Billede vises på login-skærmen og i toppen af bruger-siden.
-     Teksten vises på login-skærmen.</p>
+  <p class="muted small">Billedet vises på login-skærmen og i toppen af bruger-siden.</p>
   <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="action" value="branding">
     {% if group.image_path %}
@@ -164,12 +163,54 @@
     <label>Upload billede (png/jpg/gif/webp)
       <input type="file" name="image" accept="image/*">
     </label>
+    <label>Tekst over »Kommende events« på forsiden
+      <textarea name="home_text" rows="6"
+                placeholder="Velkommen til ... — nyheder, praktisk info, regler">{{ group.home_text }}</textarea>
+    </label>
+    <p class="muted small">Understøtter Markdown: <code>**fed**</code>, <code>*kursiv*</code>,
+       <code># overskrift</code>, <code>- punktliste</code>, <code>[link](https://...)</code>.
+       Tom = ingen boks. Kun dem, der er logget ind, ser den.</p>
     <label>Tekst på login-skærmen
       <textarea name="login_text" rows="4">{{ group.login_text }}</textarea>
     </label>
     <button type="submit">Gem</button>
   </form>
 </div>
+
+{% if group.files_enabled %}
+{# Egen formular OG eget kort: upload kræver enctype="multipart/form-data", og
+   indlejrede <form> er ugyldig HTML (faldgrube 7). #}
+<div class="card narrow">
+  <h2 id="dokumenter">Dokumenter på forsiden</h2>
+  <p class="muted small">Vedtægter, jagtplan, kort … De vises nederst på forsiden og kan
+     hentes af dem, der har adgang til gruppen.</p>
+  {% if not dokumenter %}<p>Ingen dokumenter endnu.</p>{% endif %}
+  {% for f in dokumenter %}
+    <div class="row">
+      <div>
+        <strong>{{ f.original_name }}</strong>
+        <div class="muted small">{{ f.size|filstr }} · lagt på {{ f.created_at|dt }}</div>
+      </div>
+      <div class="actions">
+        <a class="btn small" href="{{ url_for('group_file_download', slug=group.slug, file_id=f.id) }}">Hent</a>
+        <form method="post" class="inline" action="{{ url_for('admin_group_files', slug=group.slug) }}"
+              onsubmit="return confirm('Fjern »{{ f.original_name }}« fra forsiden?')">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="file_id" value="{{ f.id }}">
+          <button class="danger small">Fjern</button>
+        </form>
+      </div>
+    </div>
+  {% endfor %}
+  <h3>Tilføj dokumenter</h3>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_group_files', slug=group.slug) }}">
+    <label>Vælg en eller flere filer <input type="file" name="files" multiple></label>
+    <p class="muted small">Samme regler som filer på et event: højst 25 MB pr. forsendelse,
+       kun almindelige dokument- og billedtyper.</p>
+    <button type="submit">Læg på forsiden</button>
+  </form>
+</div>
+{% endif %}
 
 {% if templates %}
 <div class="card narrow">

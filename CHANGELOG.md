@@ -11,6 +11,31 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 25
+
+**Velkomsttekst og dokumenter på gruppens forside.**
+
+### Tekst over »Kommende events«
+
+Under **gruppe-admin → Opsætning → Bruger-sidens udseende** er der et nyt felt til en
+tekst, der står øverst på forsiden — velkomst, praktisk info, regler, nyheder. Den
+understøtter Markdown (overskrifter, fed, punktlister, links), og alt andet end de
+tilladte tags fjernes, så teksten ikke kan indeholde scripts. Tomt felt = ingen boks.
+Kun dem, der er logget ind, ser den.
+
+### Dokumenter
+
+Et nyt kort, **Dokumenter på forsiden**, samme sted. Vedtægter, jagtplan, kort — de vises
+nederst på forsiden under events og kan hentes af dem, der har adgang til gruppen.
+
+Samme regler som filer på et event: højst 25 MB pr. forsendelse, kun almindelige
+dokument- og billedtyper, altid leveret som download, og danske filnavne overlever
+(»Vedtægter 2026.pdf« hedder stadig det, når den hentes). Styres af det samme
+master-flueben **Filer**.
+
+Reglerne for at gemme en upload ligger nu ét sted i koden og bruges af både event-filer
+og dokumenter, så de ikke kan komme til at opføre sig forskelligt.
+
 ## Version 24
 
 **Rettelse: del-knappen kunne ikke ramme en gruppe.**

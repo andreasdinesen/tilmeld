@@ -196,6 +196,14 @@ ikke kan logge ind, har et event bag adgangskode en **åben forside** med netop 
 oplysninger og en »Log ind«-knap — deltagerlisten og tilmeldingen forbliver lukket.
 Kræver en **offentlig URL** under master → Opsætning.
 
+## Forsiden: velkomsttekst og dokumenter
+
+Under **gruppe-admin → Opsætning → Bruger-sidens udseende** kan admin skrive en tekst, der
+står over »Kommende events« på forsiden (Markdown), og lægge dokumenter op, der vises
+nederst på forsiden — vedtægter, jagtplan, kort. Begge dele ses kun af dem, der er logget
+ind. Dokumenterne følger samme regler og samme master-flueben (**Filer**) som filer på et
+event, og ligger i `data/uploads/<gruppe>/dokumenter/`.
+
 ## Filer på et event
 
 Gruppe-admin kan vedhæfte filer til et event — program, kort, menu — under **Redigér

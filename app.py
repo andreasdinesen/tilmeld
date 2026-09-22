@@ -927,6 +927,8 @@ def admin_settings(slug):
                         request.form.get("direction"))
         elif action == "branding":
             login_text = request.form.get("login_text", "").strip()
+            conn.execute("UPDATE groups SET home_text = ? WHERE id = ?",
+                         (request.form.get("home_text", "").strip(), group["id"]))
             image_path = group["image_path"]
             file = request.files.get("image")
             if file and file.filename:
@@ -979,6 +981,7 @@ def admin_settings(slug):
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
                               "subject": subj, "body": body})
     creds = passkeys.list_credentials(conn, "admin", group_id=group["id"])
+    dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
     # Hvor mange tilmeldinger har allerede et svar på hvert punkt — vises i redigér-
     # formularen, så man kan se konsekvensen FØR man ændrer type eller dropdown-valg.
     used = {r["field_id"]: r["n"] for r in conn.execute(
@@ -990,7 +993,8 @@ def admin_settings(slug):
     return render_template("admin/settings.html", group=group, fields=parsed,
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request),
-                           notify_on=mail_on or wa_on or sms_on or push_on, push_on=push_on)
+                           notify_on=mail_on or wa_on or sms_on or push_on, push_on=push_on,
+                           dokumenter=dokumenter)
 
 
 # Hvilket afsnit på opsætnings-siden hører en handling til. Bruges til ankeret i
@@ -1835,8 +1839,10 @@ def user_home(slug):
     cal_url = url_for("group_calendar_ics", slug=group["slug"],
                       token=ensure_calendar_token(conn, group), _external=True)
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
+    dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
     conn.close()
     return render_template("user/home.html", group=group, events=rows, cal_url=cal_url,
+                           dokumenter=dokumenter,
                            accounts=bool(group["user_accounts_enabled"]),
                            is_admin=bool(session.get(f"admin_{group['slug']}")),
                            push_on=push_on)
@@ -2316,6 +2322,40 @@ def admin_users(slug):
 # --------------------------------------------------------------------------- #
 # Filer vedhæftet et event
 # --------------------------------------------------------------------------- #
+def _gem_uploads(mappe) -> tuple:
+    """Gem de uploadede filer (feltet »files«) i `mappe`. Returnér (gemte, afviste).
+
+    ÉN funktion for både event-filer og forsidens dokumenter, så reglerne ikke
+    kan drifte fra hinanden: hvidlisten, og at navnet på disken er et tilfældigt
+    token — brugerens navn kan indeholde æ/ø/å (som secure_filename æder) og kan
+    kollidere med en fil, der ligger der i forvejen.
+    `gemte` er en liste af (stored_name, original_name, size).
+    """
+    gemte, afvist = [], []
+    os.makedirs(mappe, exist_ok=True)
+    for f in request.files.getlist("files"):
+        if not f or not f.filename:
+            continue
+        ext = os.path.splitext(f.filename)[1].lower()
+        if ext not in ALLOWED_FILE_EXT:
+            afvist.append(f.filename)
+            continue
+        stored = secrets.token_hex(8) + ext
+        sti = os.path.join(mappe, stored)
+        f.save(sti)
+        gemte.append((stored, f.filename[:200], os.path.getsize(sti)))
+    return gemte, afvist
+
+
+def _flash_uploads(antal, afvist, hvor):
+    if antal:
+        flash(f"{antal} fil(er) lagt {hvor}.", "ok")
+    if afvist:
+        flash("Ikke gemt (filtypen er ikke tilladt): " + ", ".join(afvist[:5]), "error")
+    if not antal and not afvist:
+        flash("Vælg en fil først.", "error")
+
+
 def event_files_dir(group, event_id) -> str:
     return os.path.join(db.DATA_DIR, "uploads", group["slug"], "events", str(event_id))
 
@@ -2371,34 +2411,17 @@ def admin_event_files(slug, event_id):
             conn.commit()
             flash(f"»{row['original_name']}« er fjernet.", "ok")
     else:
-        gemt, afvist = 0, []
-        mappe = event_files_dir(group, event_id)
-        os.makedirs(mappe, exist_ok=True)
-        for f in request.files.getlist("files"):
-            if not f or not f.filename:
-                continue
-            ext = os.path.splitext(f.filename)[1].lower()
-            if ext not in ALLOWED_FILE_EXT:
-                afvist.append(f.filename)
-                continue
-            # Navnet på disken er et token: brugerens filnavn kan indeholde æ/ø/å
-            # (som secure_filename æder) og kan kollidere med en fil, der ligger der.
-            stored = secrets.token_hex(8) + ext
-            sti = os.path.join(mappe, stored)
-            f.save(sti)
+        gemte, afvist = _gem_uploads(event_files_dir(group, event_id))
+        for stored, navn, size in gemte:
             conn.execute(
                 "INSERT INTO event_files (event_id, stored_name, original_name, size, "
                 "created_at) VALUES (?,?,?,?,?)",
-                (event_id, stored, f.filename[:200], os.path.getsize(sti), db.now_iso()))
-            gemt += 1
+                (event_id, stored, navn, size, db.now_iso()))
         conn.commit()
-        if gemt:
-            flash(f"{gemt} fil(er) lagt på eventet.", "ok")
-            db.add_log(conn, "event", f"{gemt} fil(er) lagt på '{ev['name']}'", group["slug"])
-        if afvist:
-            flash("Ikke gemt (filtypen er ikke tilladt): " + ", ".join(afvist[:5]), "error")
-        if not gemt and not afvist:
-            flash("Vælg en fil først.", "error")
+        if gemte:
+            db.add_log(conn, "event", f"{len(gemte)} fil(er) lagt på '{ev['name']}'",
+                       group["slug"])
+        _flash_uploads(len(gemte), afvist, "på eventet")
     conn.close()
     return redirect(url_for("admin_event_edit", slug=slug, event_id=event_id) + "#filer")
 
@@ -2425,6 +2448,84 @@ def event_file_download(slug, event_slug, file_id):
     # Altid som download, aldrig vist i siden: så kan en vedhæftet .svg eller .html
     # ikke køre scripts på appens eget domæne. nosniff spærrer for at browseren
     # gætter en anden type end den, vi sender.
+    resp = send_file(sti, as_attachment=True, download_name=row["original_name"])
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return resp
+
+
+# --------------------------------------------------------------------------- #
+# Dokumenter på gruppens forside
+# --------------------------------------------------------------------------- #
+def group_files_dir(group) -> str:
+    return os.path.join(db.DATA_DIR, "uploads", group["slug"], "dokumenter")
+
+
+def group_files(conn, group_id) -> list:
+    return conn.execute(
+        "SELECT * FROM group_files WHERE group_id = ? ORDER BY original_name COLLATE NOCASE",
+        (group_id,)).fetchall()
+
+
+@app.route("/<slug>/admin/dokumenter", methods=["POST"])
+def admin_group_files(slug):
+    """Læg dokumenter på forsiden, eller fjern ét. Samme regler og samme
+    master-flueben (»Filer«) som filerne på et event."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        return redirect(url_for("admin_login", slug=slug))
+    tilbage = url_for("admin_settings", slug=slug) + "#dokumenter"
+    if not group["files_enabled"]:
+        flash("Filer er ikke slået til for gruppen (master styrer det).", "error")
+        return redirect(tilbage)
+    conn = db.get_db()
+    if request.form.get("action") == "delete":
+        row = conn.execute("SELECT * FROM group_files WHERE id = ? AND group_id = ?",
+                           (request.form.get("file_id"), group["id"])).fetchone()
+        if row:
+            try:
+                os.remove(os.path.join(group_files_dir(group), row["stored_name"]))
+            except OSError:
+                pass   # filen er væk i forvejen — rækken skal stadig slettes
+            conn.execute("DELETE FROM group_files WHERE id = ?", (row["id"],))
+            conn.commit()
+            flash(f"»{row['original_name']}« er fjernet fra forsiden.", "ok")
+    else:
+        gemte, afvist = _gem_uploads(group_files_dir(group))
+        for stored, navn, size in gemte:
+            conn.execute(
+                "INSERT INTO group_files (group_id, stored_name, original_name, size, "
+                "created_at) VALUES (?,?,?,?,?)",
+                (group["id"], stored, navn, size, db.now_iso()))
+        conn.commit()
+        if gemte:
+            db.add_log(conn, "group", f"{len(gemte)} dokument(er) lagt på forsiden",
+                       group["slug"])
+        _flash_uploads(len(gemte), afvist, "på forsiden")
+    conn.close()
+    return redirect(tilbage)
+
+
+@app.route("/<slug>/dokument/<int:file_id>")
+def group_file_download(slug, file_id):
+    """Hent et dokument. Kræver adgang til gruppen — dokumenterne er ikke offentlige."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    row = conn.execute("SELECT * FROM group_files WHERE id = ? AND group_id = ?",
+                       (file_id, group["id"])).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    sti = os.path.join(group_files_dir(group), row["stored_name"])
+    if not os.path.exists(sti):
+        abort(404)
+    # Altid som download (se event_file_download): en vedhæftet .svg eller .html må
+    # ikke kunne køre på appens eget domæne.
     resp = send_file(sti, as_attachment=True, download_name=row["original_name"])
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp

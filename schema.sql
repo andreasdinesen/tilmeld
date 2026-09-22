@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS groups (
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
     push_enabled        INTEGER DEFAULT 0,         -- push-notifikationer (slået til af master)
+    home_text           TEXT DEFAULT '',           -- Markdown over »Kommende events« på forsiden
     facebook_url        TEXT DEFAULT '',           -- adressen på klubbens Facebook-gruppe,
                                                    -- så »Del«-kortet kan åbne den direkte
     files_enabled       INTEGER DEFAULT 0,         -- må admin vedhæfte filer på events (master styrer
@@ -208,6 +209,17 @@ CREATE TABLE IF NOT EXISTS event_files (
     event_id            INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     stored_name         TEXT NOT NULL,             -- <token>.<ext> i uploads/<slug>/events/<event_id>/
     original_name       TEXT NOT NULL,             -- vises i UI og bruges som download-navn
+    size                INTEGER DEFAULT 0,
+    created_at          TEXT NOT NULL
+);
+
+-- Dokumenter på gruppens forside (vedtægter, jagtplan ...). Samme regler som
+-- event_files: tilfældigt navn på disken, det rigtige i original_name.
+CREATE TABLE IF NOT EXISTS group_files (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    stored_name         TEXT NOT NULL,             -- <token>.<ext> i uploads/<slug>/dokumenter/
+    original_name       TEXT NOT NULL,
     size                INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL
 );
