@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS groups (
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
     push_enabled        INTEGER DEFAULT 0,         -- push-notifikationer (slået til af master)
+    signup_from_members INTEGER DEFAULT 0,         -- tilmelding vælger navn fra
+                                                   -- medlemslisten i stedet for fritekst
     members_visible     INTEGER DEFAULT 0,         -- må medlemmerne se hinandens
                                                    -- kontaktoplysninger? Slås til af admin.
     home_text           TEXT DEFAULT '',           -- Markdown over »Kommende events« på forsiden
@@ -144,6 +146,7 @@ CREATE TABLE IF NOT EXISTS events (
     result_game         TEXT DEFAULT '',           -- antal skudt vildt (tekst: »12« eller
                                                    -- »8 fasaner, 2 harer«)
     result_winner       TEXT DEFAULT '',           -- vinder af bengættet
+    result_legs         INTEGER DEFAULT 0,         -- bengættets facit: samlet antal ben
     result_note         TEXT DEFAULT '',           -- Markdown: alt andet værd at nævne
     created_at          TEXT NOT NULL,
     updated_at          TEXT DEFAULT '',           -- iCal LAST-MODIFIED
@@ -228,6 +231,24 @@ CREATE TABLE IF NOT EXISTS event_files (
     original_name       TEXT NOT NULL,             -- vises i UI og bruges som download-navn
     size                INTEGER DEFAULT 0,
     created_at          TEXT NOT NULL
+);
+
+-- Vildtarter pr. gruppe. Admin bestemmer selv listen — et konsortium skyder ikke
+-- det samme som et andet — og så kan udbyttet tælles op på tværs af året.
+CREATE TABLE IF NOT EXISTS game_species (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    name                TEXT NOT NULL,
+    sort_order          INTEGER DEFAULT 0
+);
+
+-- Udbyttet pr. event pr. art. Kun rækker med et tal gemmes, så en jagt uden
+-- råvildt ikke fylder en nul-række.
+CREATE TABLE IF NOT EXISTS event_game (
+    event_id            INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    species_id          INTEGER NOT NULL REFERENCES game_species(id) ON DELETE CASCADE,
+    antal               INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (event_id, species_id)
 );
 
 -- Dokumenter på gruppens forside (vedtægter, jagtplan ...). Samme regler som

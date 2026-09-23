@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "user/_tal.html" as tal_makro %}
 {% block title %}{{ ev.name }} · {{ group.name }}{% endblock %}
 {# Samme kort som den åbne forside (user/event_public.html) — ellers ville et link
    delt herfra se anderledes ud end et delt derfra. #}
@@ -21,6 +22,7 @@
   {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
   {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
   {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>{% endif %}
+  {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
   <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
   {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
@@ -36,8 +38,8 @@
     {{ ev.event_date|d }}{% if ev.start_time %} kl. {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
     {% if ev.signup_deadline %}· Tilmeldingsfrist: {{ ev.signup_deadline|dt }}{% endif %}
   </div>
-  <div class="count big">{{ count }} / {{ ev.expected_count }} deltagere
-    {% if full %}<span class="tag locked">FULDT</span>{% endif %}</div>
+  {{ tal_makro.tal_linje(tal, ev, stor=true) }}
+  {% if full %}<div class="tag locked big">FULDT</div>{% endif %}
   {% if ledere %}
     <div class="ledere">
       <span class="muted small">{{ 'Jagtleder' if ledere|length == 1 else 'Jagtledere' }}:</span>
@@ -77,14 +79,28 @@
      med, når noget ændrer sig.</p>
 </div>
 
-{% if ev.result_game or ev.result_winner or ev.result_note %}
+{% if udbytte or ev.result_game or ev.result_winner or ev.result_legs or ev.result_note %}
 <div class="card">
   <h2>Resultat</h2>
-  {% if ev.result_game %}
-    <p class="count big">Skudt vildt: <strong>{{ ev.result_game }}</strong></p>
+  {% if udbytte %}
+    <table class="udbytte">
+      <tbody>
+        {% for navn, antal in udbytte %}
+          <tr><td>{{ navn }}</td><td class="nowrap"><strong>{{ antal }}</strong></td></tr>
+        {% endfor %}
+        <tr class="ialt"><td>I alt</td>
+          <td class="nowrap"><strong>{{ udbytte | sum(attribute=1) }}</strong></td></tr>
+      </tbody>
+    </table>
   {% endif %}
-  {% if ev.result_winner %}
-    <p class="count big">Vinder af bengættet: <strong>{{ ev.result_winner }}</strong></p>
+  {% if ev.result_game %}
+    <p class="count">Desuden: <strong>{{ ev.result_game }}</strong></p>
+  {% endif %}
+  {% if ev.result_winner or ev.result_legs %}
+    <p class="count big">Bengæt:
+      {% if ev.result_legs %}<strong>{{ ev.result_legs }}</strong> ben{% endif %}
+      {% if ev.result_winner %}{% if ev.result_legs %} · {% endif %}vundet af
+        <strong>{{ ev.result_winner }}</strong>{% endif %}</p>
   {% endif %}
   {% if ev.result_note %}<div class="description">{{ ev.result_note | md }}</div>{% endif %}
 </div>
@@ -147,6 +163,8 @@
     {% endif %}
     {% set hide_name = accounts and not is_admin %}
     {% if hide_name %}<p class="muted small">Du tilmeldes som <strong>{{ my_name }}</strong>.</p>{% endif %}
+    {# Admin taster frit: han skal kunne tilmelde en gæsteskytte eller rette et navn. #}
+    {% set navne = [] if is_admin else navne %}
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Tilmeld</button>
   </form>

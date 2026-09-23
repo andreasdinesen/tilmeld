@@ -11,6 +11,110 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 29
+
+**Gæster tælles for sig — og tælleren viser hvad tallet består af.**
+
+### Feltet spørger om gæster, ikke pladser
+
+»Antal pladser (dig + gæster)« hed før 1, når man kom alene, og alle skulle regne
+baglæns for at finde antallet af gæster. Nu hedder feltet **»Antal gæster«** og starter
+på **0**. Det er en rullemenu, så det kan rammes med tommelfingeren på en telefon.
+
+Databasen regner stadig i pladser, fordi kapaciteten handler om mennesker i skoven —
+oversættelsen sker ét sted på serveren (pladser = gæster + 1) i stedet for i hovedet på
+den, der tilmelder sig. Eksisterende tilmeldinger er uberørte, og har en af dem flere end
+10 gæster, kommer tallet med i listen, så et klik på »Gem« ikke sætter den ned.
+
+### Tælleren er delt op
+
+Under **6 / 12 deltagere** står der nu, hvad de seks består af:
+
+> 3 tilmeldt · 3 gæster · 1 afbud
+
+- **Gæster** tælles for sig, så man kan se hvor mange af pladserne der er gæster.
+- **Afbud** vises, når nogen har krydset »deltager ikke« af — før kunne man kun se det
+  ved at læse hele listen igennem.
+- Er nogen på venteliste, står de også.
+
+Det samme står på forsiden ved hvert event, fra én fælles skabelon, så de to sider ikke
+kan vise forskellige tal.
+
+### Påmindelsen før fristen: 48 timer, og til hele listen
+
+**Fra 24 til 48 timer.** En påmindelse dagen før fanger ikke den, der er på arbejde. To
+døgn giver en weekend eller en fridag imellem.
+
+**Den går nu til notifikationslisten**, ikke kun til dem, der allerede er tilmeldt. Det er
+hele pointen: den, der ikke har svaret endnu, står pr. definition ikke på deltagerlisten —
+og det er præcis ham, der skal mindes om fristen. Gruppe-admin får den fortsat også.
+
+Påmindelsen indeholder nu **et link til eventet**, så man kan handle på den med det samme.
+
+> **Bemærk:** en deltager, der er tilmeldt uden at stå på notifikationslisten, får ikke
+> længere påmindelsen. Er listen jeres medlemsliste, er alle dækket — ellers hører de
+> pågældende hjemme på listen.
+
+### Vælg navn fra medlemslisten
+
+Et nyt flueben under **Notifikationsliste → Indstillinger** gør navnefeltet ved tilmelding
+til en **rullemenu** med navnene fra listen. Et navn, der allerede er tilmeldt eventet, er
+taget ud, så den samme person ikke kan stå to gange — og der bliver ingen stavevarianter
+af det samme navn.
+
+Serveren håndhæver det samme, ikke kun formularen: et navn, der ikke er ledigt, afvises
+også, hvis nogen retter feltet i browseren.
+
+To ting med vilje:
+
+- **Den, der har skjult sig på medlemslisten, står stadig i menuen.** »Skjult« betyder
+  »vis ikke mine kontaktoplysninger« — ikke »jeg er ikke medlem«.
+- **Admin taster stadig frit.** En gæsteskytte eller en stavefejl skal kunne klares uden
+  først at oprette et medlem.
+
+Fluebenet er slået **fra** som udgangspunkt, så intet ændrer sig af sig selv. Det har
+ingen virkning i grupper med individuelle bruger-konti, hvor navnet kommer fra profilen.
+
+### Udbytte pr. vildtart — og statistik for sæsonen
+
+»Antal skudt vildt« var ét fritekstfelt, som ikke kunne tælles sammen. Nu opretter admin
+gruppens **vildtarter** under Opsætning (en knap sætter en dansk standardliste ind, som
+frit kan rettes), og resultatet på hver jagt får et talfelt pr. art.
+
+Det giver en ny side, **Udbytte**, hvor sæsonens jagter lægges sammen art for art. Sæsonen
+går **1. april – 31. marts**, så en jagt i januar hører til den sæson, der begyndte året
+før — ellers ville hvert forår skære sæsonen midt over. Arter uden nedlagt vildt står med
+0, så to sæsoner kan sammenlignes linje for linje.
+
+Fritekstfeltet er beholdt som **»Andet udbytte«** til det, der ikke står på listen.
+
+### Bengæt
+
+Feltet er rettet til det, det er: et gæt på **samlet antal ben** skudt på jagten. Der er
+nu både et felt til facit og et til vinderen.
+
+### Gem som PDF
+
+Medlemslisten, ordensreglerne og udbyttet har fået en **Gem som PDF**-knap. Der genereres
+ikke en PDF på serveren — browserens egen udskrift laver en rigtig PDF med rigtige
+skrifttyper og sideombrydning, og det koster hverken en ny afhængighed eller et bibliotek,
+der skal holdes ved lige. Filnavnet bliver dokumentets navn og datoen.
+
+Print-arket er sat op til formålet: sort på hvidt uanset tema, menuer og knapper væk,
+tabeloverskrifter gentaget på hver side, og ingen rækker brækket over to sider.
+
+### Rettelse: en gruppe uden kanaler kunne ikke slå medlemslisten til
+
+Notifikations-siden afviste grupper, hvor hverken mail, SMS, WhatsApp eller push var sat
+op — men det er netop dér, medlemslisten slås til. En ny gruppe kunne derfor ikke komme
+til indstillingen. Siden er nu altid åben for admin og forklarer i stedet selv, hvad der
+mangler.
+
+### Resultat-knap
+
+Resultatet lå nederst på deltagerlisten uden at noget pegede derhen. Hvert event har nu en
+**Resultat**-knap ved siden af »Vis liste« og »Del«.
+
 ## Version 28
 
 **Jagtledere, resultat efter jagten — og en vej tilbage fra admin.**

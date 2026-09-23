@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "user/_print.html" as pr %}
+{% block title %}Udbytte · {{ group.name }}{% endblock %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
+  {% if accounts %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
+  {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
+  {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>{% endif %}
+  <a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>
+{% endblock %}
+{% block content %}
+<a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til forsiden</a>
+<div class="card">
+  <div class="row">
+    <h1>Udbytte {{ valgt }}/{{ valgt + 1 }}</h1>
+    {% if aar|length > 1 %}
+      <form method="get" class="inline">
+        <select name="aar" onchange="this.form.submit()">
+          {% for a in aar %}
+            <option value="{{ a }}" {{ 'selected' if a == valgt }}>{{ a }}/{{ a + 1 }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button class="small">Vis</button></noscript>
+      </form>
+    {% endif %}
+  </div>
+  <p class="muted small">Jagtsæsonen går 1. april – 31. marts. Tallene er summen af det,
+     der er noteret på sæsonens jagter{% if jagter %} — {{ jagter }} jagt{{ '' if jagter == 1 else 'er' }} med udbytte{% endif %}.</p>
+
+  <div class="tablewrap">
+    <table class="udbytte">
+      <thead><tr><th>Art</th><th>Antal</th></tr></thead>
+      <tbody>
+        {% for navn, antal in raekker %}
+          <tr class="{{ '' if antal else 'tom' }}">
+            <td>{{ navn }}</td><td class="nowrap"><strong>{{ antal }}</strong></td>
+          </tr>
+        {% endfor %}
+        <tr class="ialt"><td>I alt</td><td class="nowrap"><strong>{{ i_alt }}</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  {{ pr.pdf_knap('Udbytte-' ~ group.name ~ '-' ~ valgt) }}
+  {% if not i_alt %}
+    <p class="muted small">Der er ikke noteret udbytte på nogen jagt i denne sæson endnu.
+       Det udfyldes under <em>Resultat</em> på den enkelte jagt.</p>
+  {% endif %}
+</div>
+{% endblock %}

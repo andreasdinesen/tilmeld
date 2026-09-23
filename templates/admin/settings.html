@@ -58,6 +58,42 @@
     <button type="submit" class="danger">Slet password</button>
   </form>
 
+  <h2 id="vildtarter">Vildtarter</h2>
+  <p class="muted small">Arterne I noterer udbytte på. De bliver til et talfelt hver under
+     <em>Resultat</em> på jagten, og tælles sammen for hele sæsonen på
+     <a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>.</p>
+  {% if not arter %}
+    <p>Ingen arter endnu.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="default_species">
+      <button type="submit">Indsæt en standardliste</button>
+    </form>
+    <p class="muted small">Sætter en almindelig dansk liste ind, som du frit kan rette
+       bagefter.</p>
+  {% else %}
+    {% for a in arter %}
+      <div class="row">
+        <div><strong>{{ a.name }}</strong></div>
+        <div class="actions">
+          <form method="post" class="inline"
+                onsubmit="return confirm('Fjern »{{ a.name }}«? Udbyttet på de jagter, hvor arten er noteret, ryger med.')">
+            <input type="hidden" name="action" value="delete_species">
+            <input type="hidden" name="species_id" value="{{ a.id }}">
+            <button class="danger small">Fjern</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+  <h3>Tilføj art</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="add_species">
+    <label>Navn <input type="text" name="species" placeholder="fx Sneppe"></label>
+    <button type="submit">Tilføj</button>
+  </form>
+</div>
+
+<div class="card narrow">
   <h2 id="facebook">Facebook-gruppe</h2>
   <p class="muted small">Adressen på klubbens Facebook-gruppe. Så kan du åbne den med ét klik
      fra »Del eventet«, når du vil slå et event op.</p>

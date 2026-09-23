@@ -383,6 +383,16 @@ h2[id], h3[id] { scroll-margin-top: 80px; }
 
 /* --- Gruppebillede og login-tekst --------------------------------------- */
 
+/* Udbytte: art og antal. Tallet skal kunne skimmes, derfor højre-stillet og fed. */
+.udbytte { width: auto; min-width: 240px; }
+.udbytte td:last-child, .udbytte th:last-child { text-align: right; }
+.udbytte tr.tom td { color: var(--muted); }
+.udbytte tr.ialt td { border-top: 2px solid var(--line); font-size: 1.02rem; }
+
+/* Talfelterne pr. art: to kolonner, så en lang liste ikke bliver en rulletur. */
+.artgitter { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 14px; }
+.artgitter label { font-size: 0.82rem; }
+
 /* Jagtledere på et event: navnet er en knap, der folder kontaktoplysningerne ud.
    Ingen JavaScript — <details> gør det selv. */
 .ledere { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 10px 0; }
@@ -476,4 +486,45 @@ details.help[open] summary { border-bottom: 1px solid var(--line); }
   .count { white-space: normal; }
   .row { flex-direction: column; align-items: flex-start; }
   th, td { padding: 7px 8px; }
+}
+
+/* --- Print / »Gem som PDF« --------------------------------------------- */
+/* @page margin 0 fjerner browserens eget sidehoved og sidefod (dato, URL,
+   sidetal) — der er så ingen margen-boks at tegne dem i. Papirmargenen
+   lægges som padding på selve arket i stedet (RUNE-ERFARINGER §4). Brugerens
+   print-dialog har også et »Sidehoved og sidefod«-flueben, som vinder over CSS. */
+@page { margin: 0; }
+
+@media print {
+  /* Altid sort på hvidt: et mørkt tema ville bruge en hel blækpatron, og
+     dokumentet skal kunne læses på papir. */
+  :root, :root[data-theme="dark"], :root[data-theme="light"] {
+    --bg: #fff; --card: #fff; --ink: #000; --ink2: #333; --muted: #555;
+    --line: #bbb; --hairline: #ddd; --accent: #000; --sunken: #fff;
+    --shadow: none;
+  }
+  html, body { background: #fff !important; color: #000; }
+  body { padding: 14mm 12mm; font-size: 11pt; }
+
+  /* Væk med alt, der kun giver mening på skærmen. */
+  .topbar, .tilbage, .actions, form, button, .btn, .noprint,
+  .flash, .pushbox, .delsteps, details { display: none !important; }
+
+  /* Kortene bliver til afsnit uden ramme — rammer koster blæk og siger intet. */
+  .card { border: none; box-shadow: none; padding: 0; margin: 0 0 10mm; }
+  .wrap { max-width: none; padding: 0; }
+  h1 { font-size: 17pt; margin: 0 0 2mm; }
+  h2 { font-size: 13pt; }
+
+  /* En tabelrække må ikke brækkes over to sider. */
+  tr, li { break-inside: avoid; }
+  thead { display: table-header-group; }   /* gentag overskriften på hver side */
+  a { color: #000; text-decoration: none; }
+
+  /* Kun på print: vis adressen bag et link, så et udskrevet dokument ikke
+     efterlader læseren med et »klik her«, der ikke kan klikkes. Mailto og tel
+     skrives uden protokol-præfiks. */
+  .printlink a[href^="mailto:"]::after { content: ""; }
+  .tablewrap { overflow: visible; }
+  .tablewrap > table { min-width: 0; }
 }

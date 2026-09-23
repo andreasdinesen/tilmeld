@@ -152,11 +152,33 @@
   <p class="muted small">Udfyldes efter jagten. Det, du skriver her, vises på eventets side
      for medlemmerne. Tomme felter vises ikke.</p>
   <form method="post" action="{{ url_for('admin_event_result', slug=group.slug, event_id=ev.id) }}">
-    <label>Antal skudt vildt
+    <h3>Udbytte</h3>
+    {% if not arter %}
+      <p class="muted small">Der er ingen vildtarter oprettet endnu. Opret dem under
+         <a href="{{ url_for('admin_settings', slug=group.slug) }}#vildtarter">Opsætning
+         → Vildtarter</a>, så kan udbyttet tælles op for hele sæsonen.</p>
+    {% else %}
+      <div class="artgitter">
+        {% for a in arter %}
+          <label>{{ a.name }}
+            <input type="number" name="art_{{ a.id }}" min="0" max="10000"
+                   value="{{ udbytte.get(a.id, '') }}" placeholder="0">
+          </label>
+        {% endfor %}
+      </div>
+      <p class="muted small">Tomt felt og 0 er det samme — arten vises ikke på jagten.</p>
+    {% endif %}
+    <label>Andet udbytte (fritekst)
       <input type="text" name="result_game" value="{{ ev.result_game }}"
-             placeholder="fx 12 — eller »8 fasaner, 2 harer«">
+             placeholder="noget der ikke står på listen">
     </label>
-    <label>Vinder af bengættet
+
+    <h3>Bengæt</h3>
+    <label>Samlet antal ben (facit)
+      <input type="number" name="result_legs" min="0" max="100000"
+             value="{{ ev.result_legs or '' }}" placeholder="fx 46">
+    </label>
+    <label>Vinder
       <input type="text" name="result_winner" value="{{ ev.result_winner }}"
              placeholder="fx Brian">
     </label>

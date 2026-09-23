@@ -65,7 +65,7 @@
     <label class="chk"><input type="checkbox" name="notify_new_signup" {{ 'checked' if ev and ev.notify_new_signup }}> Besked til admin ved ny tilmelding</label>
     <label class="chk"><input type="checkbox" name="notify_change" {{ 'checked' if ev and ev.notify_change }}> Besked til admin ved ændring</label>
     <label class="chk"><input type="checkbox" name="notify_receipt" {{ 'checked' if ev and ev.notify_receipt }}> Kvittering til deltager</label>
-    <label class="chk"><input type="checkbox" name="notify_reminder" {{ 'checked' if ev and ev.notify_reminder }}> Påmindelse 24t før frist</label>
+    <label class="chk"><input type="checkbox" name="notify_reminder" {{ 'checked' if ev and ev.notify_reminder }}> Påmindelse 48t før frist (til notifikationslisten)</label>
     <label class="chk"><input type="checkbox" name="notify_event_reminder" {{ 'checked' if ev and ev.notify_event_reminder }}> Påmindelse til deltagere 24t før selve eventet</label>
     <label class="chk"><input type="checkbox" name="notify_deadline" {{ 'checked' if ev and ev.notify_deadline }}> Besked til admin når fristen er nået (med link til deltagerliste)</label>
     <label class="chk"><input type="checkbox" name="notify_list"

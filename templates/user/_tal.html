@@ -1,0 +1,22 @@
+{# Deltagere, gæster og afbud — samme opskrift på forsiden og på event-siden, så de
+   to aldrig kan vise forskellige tal.
+
+   `tal.count` er PLADSER (tilmeldte + deres gæster), fordi kapaciteten regner i
+   mennesker i skoven. Opdelingen står nedenunder, så man kan se, hvad tallet
+   består af — det var netop dét, man ikke kunne før. #}
+{% macro tal_linje(tal, ev, stor=false) %}
+  {% set gaester = tal.count - tal.signups %}
+  <div class="count{{ ' big' if stor }}">{{ tal.count }} / {{ ev.expected_count }} deltagere</div>
+  {% set dele = [] %}
+  {% if ev.allow_guests %}
+    {% set _ = dele.append('%d tilmeldt' % tal.signups) %}
+    {% set _ = dele.append('%d gæst%s' % (gaester, '' if gaester == 1 else 'er')) %}
+  {% endif %}
+  {% if tal.declined %}
+    {% set _ = dele.append('%d afbud' % tal.declined) %}
+  {% endif %}
+  {% if tal.waitlist %}
+    {% set _ = dele.append('%d på venteliste' % tal.waitlist) %}
+  {% endif %}
+  {% if dele %}<div class="muted small">{{ dele|join(' · ') }}</div>{% endif %}
+{% endmacro %}

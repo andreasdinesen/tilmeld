@@ -29,8 +29,8 @@ DEFAULT_TEMPLATES = {
     "receipt": ("Kvittering: {event}",
                 "Tak for din tilmelding til {event} d. {date}."),
     "reminder": ("Påmindelse: tilmeldingsfrist for {event}",
-                 "Tilmeldingsfristen for '{event}' er {deadline}. "
-                 "Husk at tilmelde dig eller opdatere din tilmelding."),
+                 "Tilmeldingsfristen for {event} er {deadline}.\n"
+                 "Husk at tilmelde dig eller opdatere din tilmelding.\n{link}"),
     "deadline": ("Tilmeldingsfrist nået: {event}",
                  "Tilmeldingsfristen for {event} er nået.\n"
                  "Se deltagerlisten og hent CSV her: {link}"),
@@ -692,17 +692,21 @@ def process_scheduled(now=None):
                 deadline = datetime.fromisoformat(ev["signup_deadline"])
             except ValueError:
                 continue
-            if now <= deadline <= now + timedelta(hours=24):
+            # 48 timer, ikke 24: en påmindelse dagen før fanger ikke den, der er
+            # på arbejde. To døgn giver en weekend eller en fridag imellem.
+            if now <= deadline <= now + timedelta(hours=48):
                 group = conn.execute(
                     "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
-                regs = conn.execute(
-                    "SELECT * FROM registrations WHERE event_id = ?", (ev["id"],)).fetchall()
+                base = (db.get_settings(conn)["base_url"] or "").strip().rstrip("/")
                 ctx = {"event": ev["name"], "date": ev["event_date"],
-                       "group": group["name"], "deadline": ev["signup_deadline"]}
-                subject, body = render_message(conn, group, "reminder", ctx)
-                notify_admin(conn, group, subject, body)
-                for r in regs:
-                    notify_participant(conn, group, r["email"], r["phone"], subject, body)
+                       "group": group["name"], "deadline": ev["signup_deadline"],
+                       "link": f"{base}/{group['slug']}/{ev['slug']}" if base else ""}
+                # Påmindelsen går til NOTIFIKATIONSLISTEN, ikke kun til dem der
+                # allerede er tilmeldt. Pointen er at fange dem, der IKKE har svaret
+                # endnu — de står pr. definition ikke på deltagerlisten.
+                subject, body = template_for(conn, group, "reminder")
+                send_to_list(conn, group, subject, body, ctx, note="48t før frist")
+                notify_admin(conn, group, *render_message(conn, group, "reminder", ctx))
                 conn.execute("UPDATE events SET reminder_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()
 

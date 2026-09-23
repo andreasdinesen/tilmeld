@@ -1,0 +1,37 @@
+{# »Gem som PDF«-knap.
+
+   Der genereres ikke en PDF på serveren. Browserens egen print-funktion laver en
+   rigtig PDF med rigtige skrifttyper, rigtig sideombrydning og æ/ø/å der ser ud
+   som de skal — og det koster hverken en ny afhængighed eller et bibliotek, der
+   skal holdes ved lige. I dialogen vælger man »Gem som PDF« (Mac/Windows) eller
+   Del → Arkiver i Filer (iPhone).
+
+   Filnavnet bliver dokumentets titel, så den sættes lige før udskriften og stilles
+   tilbage bagefter. Navnet renses med \p{L}\p{N} og IKKE \w: \w er kun ASCII, så
+   »Svallinggaard« ville overleve, men »Jægerråd« blev til »Jgerrd«
+   (RUNE-ERFARINGER, Beanledger v68). #}
+
+{% macro pdf_knap(filnavn) %}
+<div class="actions noprint">
+  <button type="button" data-print="{{ filnavn }}">Gem som PDF</button>
+</div>
+<p class="muted small noprint">Åbner printvinduet — vælg <strong>Gem som PDF</strong>.
+   På iPhone: Del → Arkiver i Filer.</p>
+<script>
+(function () {
+  var knap = document.querySelector('[data-print]');
+  if (!knap) return;
+  knap.addEventListener('click', function () {
+    var gammel = document.title;
+    var dato = new Date().toISOString().slice(0, 10);
+    var navn = (knap.dataset.print + '-' + dato).replace(/[^\p{L}\p{N}_-]+/gu, '-');
+    document.title = navn;
+    // Titlen skal stilles tilbage, uanset hvordan dialogen lukkes.
+    var tilbage = function () { document.title = gammel; };
+    window.addEventListener('afterprint', tilbage, { once: true });
+    setTimeout(tilbage, 8000);
+    window.print();
+  });
+})();
+</script>
+{% endmacro %}

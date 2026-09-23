@@ -45,7 +45,10 @@
      {% if wa_on %}{% set _ = kanaler.append('WhatsApp') %}{% endif %}
      {% if sms_on %}{% set _ = kanaler.append('SMS') %}{% endif %}
      {% if push_on %}{% set _ = kanaler.append('push') %}{% endif %}
-     <strong>{{ kanaler|join(', ') }}</strong>.</p>
+     {% if kanaler %}<strong>{{ kanaler|join(', ') }}</strong>.{% else %}
+       <strong>ingen endnu</strong> — sæt SMTP, WhatsApp eller SMS op under
+       <em>master → Opsætning</em>. Listen kan stadig vedligeholdes og bruges som
+       medlemsliste imens.{% endif %}</p>
   {% if push_on %}
     <p class="muted small"><strong>{{ push_devices }}</strong> enhed(er) har slået
        push-notifikationer til for gruppens varslinger. De melder sig selv til nede på
@@ -81,6 +84,13 @@
        bygget på de samme oplysninger som herunder.
        <a href="{{ url_for('user_members', slug=group.slug) }}">Se hvordan den ser ud</a>
        (det kan du også, før du slår den til).</p>
+    <label class="chk"><input type="checkbox" name="signup_from_members"
+      {{ 'checked' if group.signup_from_members }}> Vælg navn fra listen ved tilmelding</label>
+    <p class="muted small">Så bliver navnefeltet en rullemenu i stedet for fritekst, og et
+       navn, der allerede er tilmeldt, kan ikke vælges igen — så står den samme person ikke
+       to gange. Den, der ikke står på listen, kan ikke melde sig til; admin taster stadig
+       frit. Gælder ikke grupper med individuelle bruger-konti, hvor navnet kommer fra
+       profilen.</p>
     <p class="muted small">Den enkelte kan holdes udenfor: brug <em>Skjul</em> ved en modtager,
        og brugere med konto kan selv sætte fluebenet under <em>Min profil</em>. Det gælder kun
        visningen — de får stadig deres notifikationer.</p>

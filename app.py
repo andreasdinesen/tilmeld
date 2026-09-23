@@ -885,6 +885,42 @@ def admin_settings(slug):
                 conn.execute("UPDATE groups SET catering_phone = ? WHERE id = ?",
                              (request.form.get("catering_phone", "").strip(), group["id"]))
             flash("Kontaktoplysninger gemt.", "ok")
+        elif action == "add_species":
+            navn = request.form.get("species", "").strip()[:60]
+            if not navn:
+                flash("Skriv artens navn.", "error")
+            else:
+                nxt = conn.execute(
+                    "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM game_species "
+                    "WHERE group_id = ?", (group["id"],)).fetchone()["n"]
+                conn.execute(
+                    "INSERT INTO game_species (group_id, name, sort_order) VALUES (?,?,?)",
+                    (group["id"], navn, nxt))
+                flash(f"»{navn}« tilføjet.", "ok")
+        elif action == "default_species":
+            nxt = conn.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM game_species "
+                "WHERE group_id = ?", (group["id"],)).fetchone()["n"]
+            # Findes arten i forvejen, springes den over — knappen kan trykkes to
+            # gange uden at lave dubletter.
+            haves = {r["name"].lower() for r in game_species(conn, group["id"])}
+            tilfoejet = 0
+            for navn in STANDARD_VILDT:
+                if navn.lower() in haves:
+                    continue
+                conn.execute(
+                    "INSERT INTO game_species (group_id, name, sort_order) VALUES (?,?,?)",
+                    (group["id"], navn, nxt))
+                nxt += 1
+                tilfoejet += 1
+            flash(f"{tilfoejet} art(er) tilføjet." if tilfoejet
+                  else "De står der allerede.", "ok")
+        elif action == "delete_species":
+            # Udbyttet på de afholdte jagter ryger med (CASCADE) — derfor advarslen
+            # i UI'et. Tallet giver ingen mening uden den art, det hører til.
+            conn.execute("DELETE FROM game_species WHERE id = ? AND group_id = ?",
+                         (request.form.get("species_id"), group["id"]))
+            flash("Arten er fjernet — også fra de jagter, hvor den var noteret.", "ok")
         elif action == "facebook":
             url = request.form.get("facebook_url", "").strip()
             # Kun facebook.com. Adressen bliver til en knap i admin-UI'et, og et
@@ -987,7 +1023,7 @@ def admin_settings(slug):
         labels = {"new_signup": "Ny tilmelding (til admin)",
                   "change": "Ændret tilmelding (til admin)",
                   "receipt": "Kvittering (til deltager)",
-                  "reminder": "Påmindelse før frist",
+                  "reminder": "Påmindelse 48t før frist (til notifikationslisten)",
                   "deadline": "Frist nået (til admin, med link)",
                   "waitlist_promoted": "Rykket op fra venteliste (til deltager)",
                   "event_reminder": "Påmindelse før eventet (til deltager)",
@@ -999,6 +1035,7 @@ def admin_settings(slug):
                               "subject": subj, "body": body})
     creds = passkeys.list_credentials(conn, "admin", group_id=group["id"])
     dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
+    arter = game_species(conn, group["id"])
     # Hvor mange tilmeldinger har allerede et svar på hvert punkt — vises i redigér-
     # formularen, så man kan se konsekvensen FØR man ændrer type eller dropdown-valg.
     used = {r["field_id"]: r["n"] for r in conn.execute(
@@ -1011,7 +1048,7 @@ def admin_settings(slug):
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request),
                            notify_on=mail_on or wa_on or sms_on or push_on, push_on=push_on,
-                           dokumenter=dokumenter)
+                           dokumenter=dokumenter, arter=arter)
 
 
 # Hvilket afsnit på opsætnings-siden hører en handling til. Bruges til ankeret i
@@ -1020,6 +1057,8 @@ _SETTINGS_ANCHOR = {
     "password": "#adgang", "delete_password": "#adgang",
     "contact": "#kontakt",
     "facebook": "#facebook",
+    "add_species": "#vildtarter", "delete_species": "#vildtarter",
+    "default_species": "#vildtarter",
     "add_field": "#punkter", "edit_field": "#punkter",
     "delete_field": "#punkter", "move_field": "#punkter",
     "branding": "#udseende",
@@ -1471,8 +1510,10 @@ def admin_event_list(slug, event_id):
     cat_mail, cat_tlf = notifications.catering_contact(group, ev)
     meal_fields = any(f["is_meal_decline"] for f in all_group_fields(conn, group["id"]))
     share = event_share(conn, group, ev)
+    arter = game_species(conn, group["id"])
+    udbytte = event_game(conn, ev["id"])
     conn.close()
-    return render_template("admin/event_list.html", group=group, ev=ev,
+    return render_template("admin/event_list.html", arter=arter, udbytte=udbytte, group=group, ev=ev,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
                            state=event_state(ev), attended_count=attended_count,
@@ -1500,13 +1541,30 @@ def admin_event_result(slug, event_id):
     if not ev:
         conn.close()
         abort(404)
+    try:
+        ben = max(0, min(100000, int(request.form.get("result_legs") or 0)))
+    except ValueError:
+        ben = 0
     conn.execute(
-        "UPDATE events SET result_game = ?, result_winner = ?, result_note = ? "
-        "WHERE id = ? AND group_id = ?",
+        "UPDATE events SET result_game = ?, result_winner = ?, result_legs = ?, "
+        "result_note = ? WHERE id = ? AND group_id = ?",
         (request.form.get("result_game", "").strip()[:200],
-         request.form.get("result_winner", "").strip()[:200],
+         request.form.get("result_winner", "").strip()[:200], ben,
          request.form.get("result_note", "").strip(),
          event_id, group["id"]))
+
+    # Udbyttet pr. art. Kun tal > 0 gemmes: en jagt uden råvildt skal ikke fylde
+    # en nul-række, og statistikken skal kunne skelne »ingen« fra »ikke noteret«.
+    conn.execute("DELETE FROM event_game WHERE event_id = ?", (event_id,))
+    for art in game_species(conn, group["id"]):
+        try:
+            n = max(0, min(10000, int(request.form.get(f"art_{art['id']}") or 0)))
+        except ValueError:
+            n = 0
+        if n:
+            conn.execute(
+                "INSERT INTO event_game (event_id, species_id, antal) VALUES (?,?,?)",
+                (event_id, art["id"], n))
     conn.commit()
     db.add_log(conn, "event", f"Resultat opdateret for '{ev['name']}'", group["slug"])
     conn.close()
@@ -1902,14 +1960,16 @@ def user_home(slug):
         state = event_state(ev)
         if state == "finished":
             continue  # afsluttede events skjules for brugere
-        rows.append({"ev": ev, "state": state,
-                     "count": count_attending(conn, group["id"], ev["id"])})
+        tal = notifications.event_counts(conn, group, ev)
+        rows.append({"ev": ev, "state": state, "count": tal["count"], "tal": tal})
     cal_url = url_for("group_calendar_ics", slug=group["slug"],
                       token=ensure_calendar_token(conn, group), _external=True)
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
+    har_vildt = bool(game_species(conn, group["id"]))
     conn.close()
     return render_template("user/home.html", group=group, events=rows, cal_url=cal_url,
+                           har_vildt=har_vildt,
                            dokumenter=dokumenter,
                            accounts=bool(group["user_accounts_enabled"]),
                            is_admin=bool(session.get(f"admin_{group['slug']}")),
@@ -1972,6 +2032,10 @@ def user_event(slug, event_slug):
         mu = get_user(conn, my_uid)
         my_name = (mu["name"] or mu["username"]) if mu else ""
     filer = event_files(conn, ev["id"]) if group["files_enabled"] else []
+    tal = notifications.event_counts(conn, group, ev)
+    udbytte_rows = event_game_rows(conn, group, ev)
+    har_vildt = bool(game_species(conn, group["id"]))
+    navne = signup_names(conn, group, ev) if group["signup_from_members"] else []
     share = event_share(conn, group, ev)
     ledere = event_leaders(conn, group, ev)
     conn.close()
@@ -1979,7 +2043,8 @@ def user_event(slug, event_slug):
     show_signup = (state == "open") and (is_admin or not accounts or not has_own)
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("user/event.html", group=group, ev=ev, state=state, share=share,
-                           ledere=ledere,
+                           ledere=ledere, tal=tal, udbytte=udbytte_rows,
+                           har_vildt=har_vildt, navne=navne,
                            fields=parsed_fields, regs=regs, count=attending, full=full,
                            mail_on=mail_on, wa_on=wa_on, sms_on=sms_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
@@ -2021,10 +2086,11 @@ def user_edit(slug, event_slug, reg_id):
         "SELECT field_id, value FROM registration_values WHERE registration_id = ?",
         (reg_id,)).fetchall()
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
+    navne = signup_names(conn, group, ev, reg_id) if group["signup_from_members"] else []
     conn.close()
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     current = {v["field_id"]: v["value"] for v in vals}
-    return render_template("user/signup_form.html", group=group, ev=ev,
+    return render_template("user/signup_form.html", group=group, ev=ev, navne=navne,
                            fields=parsed_fields, reg=reg, current=current,
                            state=event_state(ev), mail_on=mail_on, wa_on=wa_on, sms_on=sms_on,
                            accounts=bool(group["user_accounts_enabled"]),
@@ -2076,17 +2142,30 @@ def _handle_registration(slug, event_slug, reg_id):
         flash("Navn er påkrævet.", "error")
         return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
 
+    # Vælges navnet fra medlemslisten, skal serveren også kræve det — ellers kan
+    # spærren omgås ved at rette feltet i browseren. Admin er undtaget: han skal
+    # kunne tilmelde en gæsteskytte eller rette en stavefejl.
+    if group["signup_from_members"] and not accounts and not session.get(f"admin_{slug}"):
+        ledige = signup_names(conn, group, ev, reg_id)
+        if name not in ledige:
+            conn.close()
+            flash(f"»{name}« kan ikke vælges — enten er navnet ikke på medlemslisten, "
+                  "eller også er det allerede tilmeldt.", "error")
+            return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
+
     fields = visible_fields(conn, group["id"], ev["id"])
 
     # Er et "deltager ikke"-felt afkrydset? Så kræves kun navn.
     declining = any(
         f["is_decline"] and request.form.get(f"field_{f['id']}") for f in fields)
 
-    # Antal pladser (dig + gæster)
+    # Formularen spørger om ANTAL GÆSTER (0 = kommer alene). Databasen regner i
+    # pladser, fordi kapaciteten handler om mennesker i skoven — så pladser =
+    # gæster + 1. Ét sted at oversætte, i stedet for at alle skal regne baglæns.
     seats = 1
     if ev["allow_guests"]:
         try:
-            seats = max(1, min(50, int(request.form.get("seats") or 1)))
+            seats = 1 + max(0, min(50, int(request.form.get("guests") or 0)))
         except ValueError:
             seats = 1
     if declining:
@@ -2539,6 +2618,101 @@ def event_file_download(slug, event_slug, file_id):
 
 
 # --------------------------------------------------------------------------- #
+# Vildtarter og udbytte
+# --------------------------------------------------------------------------- #
+# Et startsæt, så en ny gruppe ikke skal taste 15 arter for at komme i gang.
+# Listen er et FORSLAG — admin retter frit bagefter.
+STANDARD_VILDT = [
+    "Råvildt", "Dåvildt", "Kronvildt", "Hare", "Fasan", "Agerhøne",
+    "Gråand", "Skovdue/ringdue", "Ræv", "Grævling", "Husmår", "Krage", "Skade",
+]
+
+
+def game_species(conn, group_id) -> list:
+    return conn.execute(
+        "SELECT * FROM game_species WHERE group_id = ? ORDER BY sort_order, id",
+        (group_id,)).fetchall()
+
+
+def event_game(conn, event_id) -> dict:
+    """{species_id: antal} for ét event. Kun arter med et tal står der."""
+    return {r["species_id"]: r["antal"] for r in conn.execute(
+        "SELECT species_id, antal FROM event_game WHERE event_id = ?", (event_id,))}
+
+
+def event_game_rows(conn, group, ev) -> list:
+    """[(artens navn, antal)] for de arter, der FAKTISK blev skudt — til visning."""
+    tal = event_game(conn, ev["id"])
+    return [(a["name"], tal[a["id"]]) for a in game_species(conn, group["id"])
+            if tal.get(a["id"])]
+
+
+def game_totals(conn, group, fra: str, til: str) -> tuple:
+    """(rækker, i_alt, antal_jagter) for perioden [fra, til).
+
+    Tælles på tværs af events i perioden, så man kan se, hvad der er skudt i
+    løbet af en sæson. Arter uden nedlagt vildt kommer med som 0, så listen ser
+    ens ud fra år til år — det er dét, der gør to sæsoner sammenlignelige.
+    """
+    rows = conn.execute(
+        "SELECT g.species_id, SUM(g.antal) AS antal FROM event_game g "
+        "JOIN events e ON e.id = g.event_id "
+        "WHERE e.group_id = ? AND e.event_date >= ? AND e.event_date < ? "
+        "GROUP BY g.species_id", (group["id"], fra, til)).fetchall()
+    pr_art = {r["species_id"]: r["antal"] or 0 for r in rows}
+    jagter = conn.execute(
+        "SELECT COUNT(DISTINCT g.event_id) AS n FROM event_game g "
+        "JOIN events e ON e.id = g.event_id "
+        "WHERE e.group_id = ? AND e.event_date >= ? AND e.event_date < ? AND g.antal > 0",
+        (group["id"], fra, til)).fetchone()["n"]
+    ud = [(a["name"], pr_art.get(a["id"], 0)) for a in game_species(conn, group["id"])]
+    return ud, sum(n for _, n in ud), jagter
+
+
+def jagt_aar(dato: str) -> int:
+    """Jagtåret en dato hører til. Sæsonen går 1. april → 31. marts, så en jagt
+    i januar hører til den sæson, der begyndte året før — ellers ville hvert
+    forår skære sæsonen midt over."""
+    try:
+        d = datetime.strptime(dato, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return datetime.now().year
+    return d.year if d.month >= 4 else d.year - 1
+
+
+@app.route("/<slug>/vildt")
+def user_game(slug):
+    """Udbyttet for en sæson — summeret på tværs af jagterne."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    arter = game_species(conn, group["id"])
+    if not arter:
+        conn.close()
+        abort(404)
+    # Hvilke sæsoner findes der overhovedet tal for?
+    aar = sorted({jagt_aar(r["event_date"]) for r in conn.execute(
+        "SELECT DISTINCT e.event_date FROM events e JOIN event_game g ON g.event_id = e.id "
+        "WHERE e.group_id = ? AND g.antal > 0", (group["id"],))}, reverse=True)
+    if not aar:
+        aar = [jagt_aar(datetime.now().strftime("%Y-%m-%d"))]
+    try:
+        valgt = int(request.args.get("aar") or aar[0])
+    except ValueError:
+        valgt = aar[0]
+    raekker, i_alt, jagter = game_totals(
+        conn, group, f"{valgt}-04-01", f"{valgt + 1}-04-01")
+    conn.close()
+    return render_template("user/game.html", group=group, raekker=raekker,
+                           i_alt=i_alt, jagter=jagter, aar=aar, valgt=valgt,
+                           har_vildt=True,
+                           accounts=bool(group["user_accounts_enabled"]))
+
+
+# --------------------------------------------------------------------------- #
 # Medlemsliste (den medlemmerne selv kan se)
 # --------------------------------------------------------------------------- #
 def group_members(conn, group) -> list:
@@ -2564,6 +2738,30 @@ def group_members(conn, group) -> list:
     for r in folk:
         r["ref"] = f"u:{r['username']}" if r["source"] == "user" else f"m:{r['id']}"
     return sorted(folk, key=lambda r: (r["name"] or r["email"] or "").lower())
+
+
+def signup_names(conn, group, ev, reg_id=None) -> list:
+    """Navnene man kan vælge ved tilmelding — og kun dem, der er ledige.
+
+    Kilden er HELE notifikationslisten, ikke `group_members`: »skjult« betyder
+    »vis ikke mine kontaktoplysninger«, ikke »jeg er ikke medlem«. Den, der har
+    skjult sig, skal stadig kunne melde sig til.
+
+    Navne, der allerede er brugt på eventet, tages ud, så den samme person ikke
+    kan tilmeldes to gange. Ved REDIGERING beholdes ens eget navn — ellers kunne
+    man ikke gemme sin egen tilmelding igen.
+    """
+    brugt = {(r["name"] or "").strip().lower() for r in conn.execute(
+        "SELECT name FROM registrations WHERE event_id = ? AND id IS NOT ?",
+        (ev["id"], reg_id))}
+    ude, navne = set(), []
+    for m in notifications.list_recipients(conn, group):
+        navn = (m["name"] or "").strip()
+        if not navn or navn.lower() in ude or navn.lower() in brugt:
+            continue
+        ude.add(navn.lower())
+        navne.append(navn)
+    return sorted(navne, key=str.lower)
 
 
 def event_leaders(conn, group, ev) -> list:
@@ -2598,7 +2796,11 @@ def user_rules(slug):
     # den med en henvisning til, hvor teksten skrives.
     if not (group["rules_text"] or "").strip() and not is_admin:
         abort(404)
+    conn = db.get_db()
+    har_vildt = bool(game_species(conn, group["id"]))
+    conn.close()
     return render_template("user/rules.html", group=group, is_admin=is_admin,
+                           har_vildt=har_vildt,
                            accounts=bool(group["user_accounts_enabled"]))
 
 
@@ -2616,8 +2818,10 @@ def user_members(slug):
         abort(404)
     conn = db.get_db()
     medlemmer = group_members(conn, group)
+    har_vildt = bool(game_species(conn, group["id"]))
     conn.close()
     return render_template("user/members.html", group=group, medlemmer=medlemmer,
+                           har_vildt=har_vildt,
                            is_admin=is_admin,
                            accounts=bool(group["user_accounts_enabled"]))
 
@@ -2917,11 +3121,9 @@ def admin_notify(slug):
     # Ét mobilnummer dækker begge nummer-kanaler; listen skal kunne redigeres, så
     # snart én af dem kan bruge det.
     tlf_on = wa_on or sms_on
-    if not (mail_on or tlf_on or push_on or group["members_visible"]):
-        conn.close()
-        flash("Hverken mail, WhatsApp, SMS eller push er sat op for gruppen — "
-              "en notifikationsliste kan ikke sende noget.", "error")
-        return redirect(url_for("admin_home", slug=slug))
+    # Siden er ALTID åben for admin. Den var før spærret, når ingen kanal kunne
+    # sende — men det er også her, medlemslisten slås til, og så kunne en gruppe
+    # uden kanaler aldrig komme til den. Kortene forklarer selv, hvad der mangler.
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -2931,8 +3133,9 @@ def admin_notify(slug):
             except ValueError:
                 days = 14
             conn.execute(
-                "UPDATE groups SET members_visible = ? WHERE id = ?",
-                (1 if request.form.get("members_visible") else 0, group["id"]))
+                "UPDATE groups SET members_visible = ?, signup_from_members = ? WHERE id = ?",
+                (1 if request.form.get("members_visible") else 0,
+                 1 if request.form.get("signup_from_members") else 0, group["id"]))
             conn.execute(
                 "UPDATE groups SET notify_list_enabled = ?, notify_list_days = ?, "
                 "notify_list_users = ? WHERE id = ?",

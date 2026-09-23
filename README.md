@@ -132,6 +132,8 @@ ekstra modtagere i hånden, og dubletter sendes der kun til én gang.
 
 Listen bruges to steder:
 
+- **48 timer før tilmeldingsfristen**, hvis eventet har fluebenet »Påmindelse 48t før
+  frist«. Går til hele listen — også dem, der ikke har svaret endnu — med et link til eventet.
 - **Automatisk**, når der er et valgt antal dage (standard 14) til et events start. Et
   event oprettet tættere på end det varsles med det samme. Hvert event kan holdes ude
   med fluebenet under *Notifikationer* i event-formularen.
@@ -196,6 +198,22 @@ ikke kan logge ind, har et event bag adgangskode en **åben forside** med netop 
 oplysninger og en »Log ind«-knap — deltagerlisten og tilmeldingen forbliver lukket.
 Kræver en **offentlig URL** under master → Opsætning.
 
+## Gæster og deltagertal
+
+Tillader et event gæster, spørger tilmeldingen om **antal gæster** (0 = du kommer alene),
+og der kommer et navnefelt pr. gæst. Navnene er valgfri.
+
+Deltagertallet viser både helheden og delene: **6 / 12 deltagere** med
+»3 tilmeldt · 3 gæster · 1 afbud« nedenunder. Databasen regner i pladser
+(gæster + 1), fordi kapaciteten handler om mennesker — oversættelsen sker ét sted på
+serveren.
+
+## Vildtarter og udbytte
+
+Admin opretter gruppens **vildtarter** under Opsætning (en knap indsætter en dansk
+standardliste). Resultatet på hver jagt får et talfelt pr. art, og siden **Udbytte** lægger
+sæsonen sammen art for art. Jagtsæsonen regnes 1. april – 31. marts.
+
 ## Jagtledere og resultat
 
 Hvert event kan få én eller to **jagtledere** valgt fra medlemslisten (i event-formularen).
@@ -208,6 +226,12 @@ vildt, vinder af bengættet og en note. Det vises på eventets side.
 Begge dele gemmes uden for event-formularens øvrige felter, så en kopi af et event ikke
 arver hverken jagtledere eller resultat.
 
+## Gem som PDF
+
+Medlemslisten, ordensreglerne og udbyttet har en **Gem som PDF**-knap. Den bruger browserens
+egen udskrift (ingen PDF-pakke på serveren); print-arket er sat op til sort på hvidt uden
+menuer og knapper.
+
 ## Medlemsliste
 
 Notifikationslisten (navn, mail, mobilnummer) kan gøres synlig for medlemmerne: så får
@@ -217,6 +241,10 @@ Notifikationsliste → Indstillinger** og er som udgangspunkt slået fra.
 
 Den enkelte kan holdes udenfor visningen — admin med **Skjul**, en bruger med konto selv
 under **Min profil**. Begge dele påvirker kun listen; notifikationerne kommer stadig frem.
+
+Listen kan også bruges ved **tilmelding**: slås »Vælg navn fra listen« til, bliver
+navnefeltet en rullemenu, og et navn, der allerede er tilmeldt, kan ikke vælges igen.
+Admin taster stadig frit.
 
 Listen redigeres under **admin → Notifikationsliste → Modtagere**. Mail og numre er
 klikbare på medlemssiden (`mailto:`/`tel:`). Slås medlemslisten til, kan der skrives både

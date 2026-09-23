@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% import "_push.html" as push %}
+{% import "user/_tal.html" as tal_makro %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
   {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
   {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
   {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>{% endif %}
+  {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
   <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
   {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
@@ -30,7 +32,7 @@
           {{ ev.event_date|d }}{% if ev.start_time %} {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
         </div>
       </div>
-      <div class="count">{{ item.count }} / {{ ev.expected_count }} deltagere</div>
+      <div>{{ tal_makro.tal_linje(item.tal, ev) }}</div>
     </a>
   {% endfor %}
 
@@ -59,7 +61,7 @@
   {% endif %}
 </div>
 
-{% if group.members_visible or group.rules_text %}
+{% if group.members_visible or group.rules_text or har_vildt %}
 {# Linkene står OGSÅ her, ikke kun i topbaren: på en telefon er menuen det første,
    man scroller forbi, og så findes de reelt ikke. #}
 <div class="card">
@@ -69,6 +71,9 @@
     {% endif %}
     {% if group.rules_text %}
       <a class="btn" href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>
+    {% endif %}
+    {% if har_vildt %}
+      <a class="btn" href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>
     {% endif %}
   </div>
 </div>
