@@ -7,17 +7,18 @@
   <label>Navn (valgfrit — bruges som <code>{name}</code> i beskeden)
     <input type="text" name="name" value="{{ r.name if r else '' }}">
   </label>
-  {% if mail_on %}
+  {% if mail_on or group.members_visible %}
     <label>E-mail <input type="email" name="email" value="{{ r.email if r else '' }}"></label>
   {% endif %}
-  {% if tlf_on %}
+  {% if tlf_on or group.members_visible %}
     {# Ét nummer, op til to kanaler. Parentesen fortæller, hvad nummeret bliver
        brugt til i netop denne gruppe — ellers ved admin ikke, om et nummer uden
        WhatsApp er spildt. #}
     {% set nr_kanaler = [] %}
     {% if wa_on %}{% set _ = nr_kanaler.append('WhatsApp') %}{% endif %}
     {% if sms_on %}{% set _ = nr_kanaler.append('SMS') %}{% endif %}
-    <label>Mobilnummer ({{ nr_kanaler|join(' og ') }})
+    {% if group.members_visible %}{% set _ = nr_kanaler.append('medlemslisten') %}{% endif %}
+    <label>Mobilnummer{% if nr_kanaler %} ({{ nr_kanaler|join(' og ') }}){% endif %}
       <input type="text" name="whatsapp" value="{{ r.whatsapp if r else '' }}"
              placeholder="fx +4520123456">
     </label>
@@ -88,7 +89,7 @@
 
 <div class="card narrow">
   <h2 id="modtagere">Modtagere</h2>
-{% if not (mail_on or tlf_on) %}
+{% if not (mail_on or tlf_on or group.members_visible) %}
   {# Modtagere ER mailadresser og mobilnumre. Er ingen af de to kanaler sat op,
      kan formularen ikke udfyldes — så vis hvorfor i stedet for et felt, der
      aldrig kan gemmes. Push står for sig selv: de enheder melder sig selv til. #}
@@ -116,9 +117,9 @@
           {% if not r.active %}<span class="tag finished">på pause</span>{% endif %}
           {% if group.members_visible and r.hidden %}<span class="tag finished">skjult på medlemslisten</span>{% endif %}
           <div class="muted small">
-            {% if mail_on %}{{ r.email or '— ingen mail' }}{% endif %}
-            {% if mail_on and tlf_on %} · {% endif %}
-            {% if tlf_on %}{{ r.whatsapp or '— intet nummer' }}{% endif %}
+            {% if mail_on or group.members_visible %}{{ r.email or '— ingen mail' }}{% endif %}
+            {% if (mail_on or group.members_visible) and (tlf_on or group.members_visible) %} · {% endif %}
+            {% if tlf_on or group.members_visible %}{{ r.whatsapp or '— intet nummer' }}{% endif %}
           </div>
         </div>
         {% if r.source == 'manual' %}

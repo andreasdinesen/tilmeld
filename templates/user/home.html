@@ -4,6 +4,7 @@
 {% block nav %}
   {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
   {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
+  {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>{% endif %}
   <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
   {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
@@ -57,6 +58,21 @@
   </script>
   {% endif %}
 </div>
+
+{% if group.members_visible or group.rules_text %}
+{# Linkene står OGSÅ her, ikke kun i topbaren: på en telefon er menuen det første,
+   man scroller forbi, og så findes de reelt ikke. #}
+<div class="card">
+  <div class="actions">
+    {% if group.members_visible %}
+      <a class="btn" href="{{ url_for('user_members', slug=group.slug) }}">Medlemsliste</a>
+    {% endif %}
+    {% if group.rules_text %}
+      <a class="btn" href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 {% if dokumenter %}
 <div class="card" id="dokumenter">

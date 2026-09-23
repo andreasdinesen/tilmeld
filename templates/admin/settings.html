@@ -170,6 +170,13 @@
     <p class="muted small">Understøtter Markdown: <code>**fed**</code>, <code>*kursiv*</code>,
        <code># overskrift</code>, <code>- punktliste</code>, <code>[link](https://...)</code>.
        Tom = ingen boks. Kun dem, der er logget ind, ser den.</p>
+    <label>Ordensregler (får sin egen side med et link fra forsiden)
+      <textarea name="rules_text" rows="8"
+                placeholder="1. Sikkerhed går forud for alt&#10;2. Orange vest er påkrævet&#10;3. Afbud senest dagen før">{{ group.rules_text }}</textarea>
+    </label>
+    <p class="muted small">Samme Markdown som ovenfor. Tom = ingen side og intet link.
+       Siden har selv overskriften »Ordensregler«, så du behøver ikke skrive den igen.
+       <a href="{{ url_for('user_rules', slug=group.slug) }}">Se siden</a>.</p>
     <label>Tekst på login-skærmen
       <textarea name="login_text" rows="4">{{ group.login_text }}</textarea>
     </label>

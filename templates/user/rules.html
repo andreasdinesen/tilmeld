@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Ordensregler · {{ group.name }}{% endblock %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
+  {% if accounts %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
+  {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
+  <a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>
+{% endblock %}
+{% block content %}
+<a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til forsiden</a>
+<div class="card">
+  <h1>Ordensregler</h1>
+  {% if group.rules_text %}
+    <div class="description">{{ group.rules_text | md }}</div>
+  {% else %}
+    <div class="tag locked big">Der er ikke skrevet nogen ordensregler endnu — kun du kan se
+      denne side. Skriv dem under
+      <a href="{{ url_for('admin_settings', slug=group.slug) }}#udseende">Opsætning</a>.</div>
+  {% endif %}
+</div>
+{% endblock %}

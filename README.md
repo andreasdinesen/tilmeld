@@ -206,6 +206,16 @@ Notifikationsliste → Indstillinger** og er som udgangspunkt slået fra.
 Den enkelte kan holdes udenfor visningen — admin med **Skjul**, en bruger med konto selv
 under **Min profil**. Begge dele påvirker kun listen; notifikationerne kommer stadig frem.
 
+Listen redigeres under **admin → Notifikationsliste → Modtagere**. Mail og numre er
+klikbare på medlemssiden (`mailto:`/`tel:`). Slås medlemslisten til, kan der skrives både
+mail og mobilnummer ind, også selvom gruppen ikke har SMS eller WhatsApp — oplysningerne
+har et formål i sig selv der.
+
+## Ordensregler
+
+Admin skriver gruppens ordensregler under **Opsætning → Bruger-sidens udseende**. De får
+deres egen side med link fra forsiden og fra topbaren. Tomt felt = ingen side.
+
 ## Forsiden: velkomsttekst og dokumenter
 
 Under **gruppe-admin → Opsætning → Bruger-sidens udseende** kan admin skrive en tekst, der

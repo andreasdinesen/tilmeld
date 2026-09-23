@@ -11,6 +11,51 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 27
+
+**Ordensregler, synlige links på forsiden — og telefonnumre uden SMS.**
+
+### Ordensregler
+
+Et nyt felt under **Opsætning → Bruger-sidens udseende**, hvor admin skriver gruppens
+ordensregler i Markdown. De får deres egen side med et link fra forsiden. Tomt felt =
+ingen side og intet link.
+
+### Links på forsiden
+
+Medlemsliste og ordensregler stod kun i topbaren. På en telefon er menuen det første, man
+scroller forbi, så de findes nu også som knapper på forsiden — kun dem, der er noget at
+vise.
+
+### Rettelse: telefonnumre krævede SMS eller WhatsApp
+
+Nummerfeltet på notifikationslisten blev kun vist, hvis SMS eller WhatsApp var sat op.
+Det er rigtigt for en modtagerliste — men en **medlemsliste** har brug for nummeret
+uanset. En klub med kun mail kunne derfor ikke få telefonnumre i sin telefonbog.
+
+Nu åbner begge felter, så snart medlemslisten er slået til, og etiketten siger hvorfor
+(»Mobilnummer (medlemslisten)«). Er medlemslisten slået fra, er alt som før: der
+indsamles ikke oplysninger, der ikke skal bruges til noget.
+
+### En vej tilbage
+
+**Admin-login havde ingen.** Klikkede man »Admin« ved et uheld, stod man med en
+password-boks og intet andet — ingen menu, intet link. Nu er der et
+**← Tilbage til <gruppen>** øverst.
+
+Samme link er kommet på event-siden, medlemslisten og ordensreglerne. Det står i
+indholdet, ikke kun i topbaren: er man scrollet ned i en deltagerliste på en telefon,
+er menuen for længst væk.
+
+### Hvor redigeres medlemslisten?
+
+Medlemssiden siger det nu selv, når admin ser den: listen redigeres under
+**Notifikationsliste → Modtagere** — det er de samme mennesker, beskederne sendes til.
+Linket står direkte på siden.
+
+Mail og telefonnumre på medlemslisten har hele tiden været klikbare (`mailto:` og `tel:`),
+så et tryk åbner mail- eller telefonprogrammet.
+
 ## Version 26
 
 **Medlemsliste medlemmerne selv kan se — og navne på gæsterne.**

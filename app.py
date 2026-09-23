@@ -943,8 +943,9 @@ def admin_settings(slug):
                         request.form.get("direction"))
         elif action == "branding":
             login_text = request.form.get("login_text", "").strip()
-            conn.execute("UPDATE groups SET home_text = ? WHERE id = ?",
-                         (request.form.get("home_text", "").strip(), group["id"]))
+            conn.execute("UPDATE groups SET home_text = ?, rules_text = ? WHERE id = ?",
+                         (request.form.get("home_text", "").strip(),
+                          request.form.get("rules_text", "").strip(), group["id"]))
             image_path = group["image_path"]
             file = request.files.get("image")
             if file and file.filename:
@@ -2510,6 +2511,24 @@ def group_members(conn, group) -> list:
     return sorted(folk, key=lambda r: (r["name"] or r["email"] or "").lower())
 
 
+@app.route("/<slug>/ordensregler")
+def user_rules(slug):
+    """Gruppens ordensregler. Ren tekst admin skriver — ikke et dokument, så den
+    kan rettes uden at skulle uploade en ny PDF."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    is_admin = bool(session.get(f"admin_{group['slug']}"))
+    # Er der ikke skrevet noget, findes siden ikke for medlemmerne — men admin får
+    # den med en henvisning til, hvor teksten skrives.
+    if not (group["rules_text"] or "").strip() and not is_admin:
+        abort(404)
+    return render_template("user/rules.html", group=group, is_admin=is_admin,
+                           accounts=bool(group["user_accounts_enabled"]))
+
+
 @app.route("/<slug>/medlemmer")
 def user_members(slug):
     group = get_group(slug)
@@ -2789,15 +2808,20 @@ def push_test(slug):
 # --------------------------------------------------------------------------- #
 # Gruppe-admin: notifikationsliste
 # --------------------------------------------------------------------------- #
-def _recipient_from_form(form, mail_on, tlf_on) -> tuple:
-    """(modtager, fejltekst). Kun de kanaler, der er aktiveret på systemet, læses —
-    ellers kunne admin skrive et nummer ind, som aldrig bliver brugt til noget.
+def _recipient_from_form(form, mail_on, tlf_on, members_visible=False) -> tuple:
+    """(modtager, fejltekst). Kun de felter, der har et FORMÅL, læses — ellers kunne
+    admin skrive et nummer ind, som aldrig bliver brugt til noget.
 
     `tlf_on` er WhatsApp ELLER SMS: modtageren har ét mobilnummer, og det er nok, at
-    én af de to kanaler kan bruge det."""
+    én af de to kanaler kan bruge det.
+
+    `members_visible` åbner begge felter uanset kanaler: er listen også medlemsliste,
+    har nummeret og mailen et formål i sig selv — en klub uden SMS skal stadig kunne
+    have telefonnumre i sin telefonbog.
+    """
     name = form.get("name", "").strip()
-    email = form.get("email", "").strip() if mail_on else ""
-    whatsapp = form.get("whatsapp", "").strip() if tlf_on else ""
+    email = form.get("email", "").strip() if (mail_on or members_visible) else ""
+    whatsapp = form.get("whatsapp", "").strip() if (tlf_on or members_visible) else ""
     if not email and not whatsapp:
         return None, "Skriv mindst en e-mail eller et mobilnummer."
     if email and ("@" not in email or " " in email):
@@ -2820,7 +2844,7 @@ def admin_notify(slug):
     # Ét mobilnummer dækker begge nummer-kanaler; listen skal kunne redigeres, så
     # snart én af dem kan bruge det.
     tlf_on = wa_on or sms_on
-    if not (mail_on or tlf_on or push_on):
+    if not (mail_on or tlf_on or push_on or group["members_visible"]):
         conn.close()
         flash("Hverken mail, WhatsApp, SMS eller push er sat op for gruppen — "
               "en notifikationsliste kan ikke sende noget.", "error")
@@ -2843,7 +2867,8 @@ def admin_notify(slug):
                  1 if request.form.get("notify_list_users") else 0, group["id"]))
             flash("Indstillinger for notifikationslisten gemt.", "ok")
         elif action == "add":
-            r, err = _recipient_from_form(request.form, mail_on, tlf_on)
+            r, err = _recipient_from_form(request.form, mail_on, tlf_on,
+                                          bool(group["members_visible"]))
             if err:
                 flash(err, "error")
             else:
@@ -2853,17 +2878,19 @@ def admin_notify(slug):
                     (group["id"], r["name"], r["email"], r["whatsapp"], db.now_iso()))
                 flash("Modtager tilføjet.", "ok")
         elif action == "edit":
-            r, err = _recipient_from_form(request.form, mail_on, tlf_on)
+            r, err = _recipient_from_form(request.form, mail_on, tlf_on,
+                                          bool(group["members_visible"]))
             if err:
                 flash(err, "error")
             else:
                 # Kun de kanaler der vises, opdateres — ellers ville en slukket kanal
                 # tømme det felt, der allerede stod i databasen.
+                vis = bool(group["members_visible"])
                 sets, vals = ["name = ?"], [r["name"]]
-                if mail_on:
+                if mail_on or vis:
                     sets.append("email = ?")
                     vals.append(r["email"])
-                if tlf_on:
+                if tlf_on or vis:
                     sets.append("whatsapp = ?")
                     vals.append(r["whatsapp"])
                 conn.execute(

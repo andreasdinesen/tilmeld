@@ -131,6 +131,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("groups", "facebook_url", "TEXT DEFAULT ''")
     add("groups", "home_text", "TEXT DEFAULT ''")
     add("groups", "members_visible", "INTEGER DEFAULT 0")
+    add("groups", "rules_text", "TEXT DEFAULT ''")
     add("notify_recipients", "hidden", "INTEGER DEFAULT 0")
     add("users", "hide_from_members", "INTEGER DEFAULT 0")
     add("groups", "catering_email", "TEXT DEFAULT ''")

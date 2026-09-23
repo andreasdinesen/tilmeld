@@ -2,6 +2,10 @@
 {% import "_passkeys.html" as pk %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block content %}
+{# Login-siderne har bevidst tom topbar (som user/ og master/login), så linket står
+   i indholdet. Uden det var et fejlklik på »Admin« en blindgyde: siden havde ingen
+   vej tilbage overhovedet. #}
+<a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til {{ group.name }}</a>
 <div class="card narrow">
   <h1>Admin-login</h1>
   <p class="muted">{{ group.name }}</p>

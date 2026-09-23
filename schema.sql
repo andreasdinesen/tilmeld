@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS groups (
     members_visible     INTEGER DEFAULT 0,         -- må medlemmerne se hinandens
                                                    -- kontaktoplysninger? Slås til af admin.
     home_text           TEXT DEFAULT '',           -- Markdown over »Kommende events« på forsiden
+    rules_text          TEXT DEFAULT '',           -- Markdown: gruppens ordensregler (egen side)
     facebook_url        TEXT DEFAULT '',           -- adressen på klubbens Facebook-gruppe,
                                                    -- så »Del«-kortet kan åbne den direkte
     files_enabled       INTEGER DEFAULT 0,         -- må admin vedhæfte filer på events (master styrer
