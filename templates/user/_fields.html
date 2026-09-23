@@ -8,20 +8,31 @@
 {% set accounts = accounts|default(false) %}
 {% set hide_name = hide_name|default(false) %}
 {% set navne = navne|default([]) %}
+{% set is_admin = is_admin|default(false) %}
 {# Med individuelle konti bruges brugerens eget navn — feltet skjules #}
 {% if not hide_name %}
   {% if navne %}
     {# Navnet vælges fra medlemslisten. Allerede tilmeldte navne er taget ud, så
        den samme person ikke kan stå to gange. Admin får feltet som fritekst, så
        en gæsteskytte eller en stavefejl stadig kan klares. #}
+    {% set eget = reg and reg.name and reg.name not in navne %}
     <label>Navn *
-      <select name="name" required>
+      <select name="name" {{ '' if is_admin else 'required' }}>
         <option value="">— vælg dit navn —</option>
         {% for n in navne %}
           <option value="{{ n }}" {{ 'selected' if reg and reg.name == n }}>{{ n }}</option>
         {% endfor %}
       </select>
     </label>
+    {% if is_admin %}
+      {# Admin får rullemenuen som alle andre OG et fritekstfelt: en gæsteskytte
+         står ikke på medlemslisten, og et navn kan være stavet forkert. Skrives
+         der noget her, vinder det over menuen. #}
+      <label>… eller skriv et andet navn (kun admin)
+        <input type="text" name="name_fri" value="{{ reg.name if eget else '' }}"
+               placeholder="fx Finn Fremmed (gæsteskytte)">
+      </label>
+    {% endif %}
   {% else %}
     <label>Navn *
       <input type="text" name="name" value="{{ reg.name if reg else '' }}" required>

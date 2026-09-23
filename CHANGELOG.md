@@ -11,6 +11,26 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 31
+
+**Admin mistede rullemenuen ved tilmelding.**
+
+Da »Vælg navn fra listen« blev lavet, fik admin altid fritekst — så han kunne tilmelde en
+gæsteskytte. Men admin er også selv deltager, og dermed tog reglen netop ham den funktion,
+den skulle give.
+
+Nu får admin **rullemenuen som alle andre** og derunder et ekstra felt, *»… eller skriv et
+andet navn (kun admin)«*. Skrives der noget i det, vinder det over menuen. Så kan admin
+både melde sig selv til med ét klik og taste en gæsteskytte ind uden først at oprette
+vedkommende som medlem.
+
+Spærren er uændret for alle andre: et navn, der ikke er på listen eller allerede er
+tilmeldt, afvises — også hvis nogen retter feltet i browseren.
+
+> **Husk:** rullemenuen kræver, at fluebenet **»Vælg navn fra listen ved tilmelding«** er
+> slået til under Notifikationsliste → Indstillinger, og at der står navne på listen. Er
+> en af delene ikke opfyldt, er navnefeltet fritekst som før.
+
 ## Version 30
 
 **»Ordensregler« hedder nu »Regelsæt«.**

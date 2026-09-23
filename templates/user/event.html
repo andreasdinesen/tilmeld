@@ -163,8 +163,6 @@
     {% endif %}
     {% set hide_name = accounts and not is_admin %}
     {% if hide_name %}<p class="muted small">Du tilmeldes som <strong>{{ my_name }}</strong>.</p>{% endif %}
-    {# Admin taster frit: han skal kunne tilmelde en gæsteskytte eller rette et navn. #}
-    {% set navne = [] if is_admin else navne %}
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Tilmeld</button>
   </form>

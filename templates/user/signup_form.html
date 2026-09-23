@@ -10,8 +10,6 @@
   {% else %}
   <form id="edit-form" method="post">
     {% set hide_name = accounts and not is_admin %}
-    {# Admin taster frit: han skal kunne tilmelde en gæsteskytte eller rette et navn. #}
-    {% set navne = [] if is_admin else navne %}
     {% include "user/_fields.html" %}
     <button type="submit" class="primary">Gem ændringer</button>
   </form>

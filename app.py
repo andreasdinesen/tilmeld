@@ -2115,6 +2115,13 @@ def _handle_registration(slug, event_slug, reg_id):
         return redirect(url_for("user_event", slug=slug, event_slug=event_slug))
 
     name = request.form.get("name", "").strip()
+    # Admin får BÅDE rullemenuen og et fritekstfelt. Skriver han noget i det
+    # sidste, vinder det — sådan kan en gæsteskytte eller en stavefejl klares,
+    # uden at admin mister rullemenuen til sin egen tilmelding.
+    if session.get(f"admin_{slug}"):
+        fri = request.form.get("name_fri", "").strip()
+        if fri:
+            name = fri
     email = request.form.get("email", "").strip()
     phone = request.form.get("phone", "").strip()
 
