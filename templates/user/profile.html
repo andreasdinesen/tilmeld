@@ -19,6 +19,13 @@
     <label>Navn <input type="text" name="name" value="{{ u.name }}"></label>
     <label>E-mail <input type="email" name="email" value="{{ u.email }}"></label>
     <label>Mobilnummer <input type="text" name="whatsapp" value="{{ u.whatsapp }}" placeholder="fx +4520123456"></label>
+    {% if members_visible %}
+      <label class="chk"><input type="checkbox" name="hide_from_members"
+        {{ 'checked' if u.hide_from_members }}> Vis mig <strong>ikke</strong> på
+        <a href="{{ url_for('user_members', slug=group.slug) }}">medlemslisten</a></label>
+      <p class="muted small">Gruppens medlemmer kan se hinandens navn, mail og mobilnummer.
+         Sætter du flueben her, står du ikke på listen — du får stadig alle beskeder.</p>
+    {% endif %}
     <button type="submit">Gem</button>
   </form>
 

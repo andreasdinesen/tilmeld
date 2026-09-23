@@ -482,13 +482,16 @@ def list_recipients(conn, group):
 
     Dubletter (samme mail eller samme nummer) fjernes. De manuelle står først og
     vinder, så et navn admin selv har skrevet ikke bliver overskrevet af et brugernavn.
+
+    Den SYNLIGE medlemsliste (`app.group_members`) hviler på samme kilde — derfor
+    følger `hidden` med ud herfra. Ét sted at vedligeholde, to steder at vise.
     """
     rows = conn.execute(
         "SELECT * FROM notify_recipients WHERE group_id = ? ORDER BY id",
         (group["id"],)).fetchall()
     out = [{"id": r["id"], "name": r["name"] or "", "email": r["email"] or "",
             "whatsapp": r["whatsapp"] or "", "active": bool(r["active"]),
-            "source": "manual"} for r in rows]
+            "hidden": bool(r["hidden"]), "source": "manual"} for r in rows]
 
     if group["user_accounts_enabled"] and group["notify_list_users"]:
         users = conn.execute(
@@ -497,7 +500,8 @@ def list_recipients(conn, group):
         for u in users:
             out.append({"id": None, "name": u["name"] or u["username"],
                         "email": u["email"] or "", "whatsapp": u["whatsapp"] or "",
-                        "active": True, "source": "user", "username": u["username"]})
+                        "active": True, "hidden": bool(u["hide_from_members"]),
+                        "source": "user", "username": u["username"]})
 
     seen_mail, seen_phone, uniq = set(), set(), []
     for r in out:

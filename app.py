@@ -274,6 +274,22 @@ def inject_app_version():
     return {"app_version": system_info.rune_version()}
 
 
+@app.template_filter("gaester")
+def fmt_gaester(value):
+    """JSON-strengen fra registrations.guest_names som liste. Tomme navne i enden
+    klippes væk, så »+2 gæster« uden navne ikke bliver til to tomme streger."""
+    try:
+        navne = json.loads(value or "[]")
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(navne, list):
+        return []
+    navne = [str(n).strip() for n in navne]
+    while navne and not navne[-1]:
+        navne.pop()
+    return navne
+
+
 @app.template_filter("filstr")
 def fmt_filesize(n):
     """Filstørrelse i noget, et menneske kan læse."""
@@ -1475,11 +1491,12 @@ def build_csv(conn, group, ev):
     buf = io.StringIO()
     buf.write("﻿")  # BOM så Excel viser æøå korrekt
     writer = csv.writer(buf, delimiter=";")
-    writer.writerow(["Navn", "E-mail", "Mobilnummer", "Pladser", "Status", "Mødt op"]
+    writer.writerow(["Navn", "E-mail", "Mobilnummer", "Pladser", "Gæster", "Status", "Mødt op"]
                     + [f["label"] for f in fields] + ["Tilmeldt"])
     for r in regs:
         status = "Venteliste" if r["waitlist"] else "Deltager"
-        row = [r["name"], r["email"], r["phone"], r["seats"], status,
+        row = [r["name"], r["email"], r["phone"], r["seats"],
+               ", ".join(fmt_gaester(r["guest_names"])), status,
                "Ja" if r["attended"] else ""]
         row += [r["values"].get(f["id"], "") for f in fields]
         row.append(r["created_at"])
@@ -1693,6 +1710,7 @@ def _registrations_with_values(conn, event_id, fields):
             "id": r["id"], "name": r["name"], "email": r["email"], "phone": r["phone"],
             "user_id": r["user_id"], "created_at": r["created_at"],
             "seats": max(1, r["seats"] or 1), "waitlist": r["waitlist"],
+            "guest_names": r["guest_names"],
             "attended": r["attended"],
             "values": {v["field_id"]: v["value"] for v in vals},
         })
@@ -2022,6 +2040,15 @@ def _handle_registration(slug, event_slug, reg_id):
     if declining:
         seats = 1  # afbud optager ingen plads alligevel
 
+    # Gaesternes navne. Valgfri: den, der tager to med uden at vide hvem endnu, skal
+    # ikke spaerres. Der gemmes hoejst seats-1 navne, saa et saenket antal pladser
+    # ikke efterlader en gaest, ingen har plads til.
+    gaester = ""
+    if ev["allow_guests"] and seats > 1:
+        gaester = json.dumps(
+            [g.strip()[:80] for g in request.form.getlist("guest_name")][:seats - 1],
+            ensure_ascii=False)
+
     # Er tilmeldingen allerede på venteliste? (bevares ved redigering)
     waitlist_flag = 0
     if reg_id:
@@ -2066,16 +2093,17 @@ def _handle_registration(slug, event_slug, reg_id):
     if reg_id:
         conn.execute(
             "UPDATE registrations SET name=?, email=?, phone=?, user_id=?, seats=?, "
-            "waitlist=?, updated_at=? WHERE id=?",
-            (name, email, phone, owner_id, seats, waitlist_flag, db.now_iso(), reg_id))
+            "guest_names=?, waitlist=?, updated_at=? WHERE id=?",
+            (name, email, phone, owner_id, seats, gaester, waitlist_flag,
+             db.now_iso(), reg_id))
         conn.execute("DELETE FROM registration_values WHERE registration_id = ?", (reg_id,))
         rid = reg_id
         is_new = False
     else:
         cur = conn.execute(
             "INSERT INTO registrations (event_id, name, email, phone, user_id, seats, "
-            "waitlist, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
-            (ev["id"], name, email, phone, owner_id, seats, waitlist_flag,
+            "guest_names, waitlist, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (ev["id"], name, email, phone, owner_id, seats, gaester, waitlist_flag,
              db.now_iso(), db.now_iso()))
         rid = cur.lastrowid
         is_new = True
@@ -2160,10 +2188,14 @@ def user_profile(slug):
     if request.method == "POST":
         action = request.form.get("action")
         if action == "contact":
-            conn.execute("UPDATE users SET name = ?, email = ?, whatsapp = ? WHERE id = ?",
+            # Fluebenet står i SAMME formular som kontaktoplysningerne — det er der,
+            # man tænker over, hvem der kan se dem.
+            conn.execute("UPDATE users SET name = ?, email = ?, whatsapp = ?, "
+                         "hide_from_members = ? WHERE id = ?",
                          (request.form.get("name", "").strip(),
                           request.form.get("email", "").strip(),
-                          request.form.get("whatsapp", "").strip(), uid))
+                          request.form.get("whatsapp", "").strip(),
+                          1 if request.form.get("hide_from_members") else 0, uid))
             flash("Oplysninger gemt.", "ok")
         elif action == "password":
             newpw = request.form.get("new_password", "")
@@ -2188,6 +2220,7 @@ def user_profile(slug):
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     conn.close()
     return render_template("user/profile.html", group=group, u=u, mine=mine, creds=creds,
+                           members_visible=bool(group["members_visible"]),
                            passkey_blocked=passkeys.blocked_reason(request),
                            push_on=push_on)
 
@@ -2451,6 +2484,50 @@ def event_file_download(slug, event_slug, file_id):
     resp = send_file(sti, as_attachment=True, download_name=row["original_name"])
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+
+# --------------------------------------------------------------------------- #
+# Medlemsliste (den medlemmerne selv kan se)
+# --------------------------------------------------------------------------- #
+def group_members(conn, group) -> list:
+    """Medlemmerne med kontaktoplysninger, som de vises på medlemssiden.
+
+    Samme kilde som notifikationslisten — dem admin har skrevet ind, plus
+    gruppens brugere — så der kun er ÉT sted at vedligeholde. Forskellen er, hvem
+    der må se listen, og at den enkelte kan holde sig udenfor:
+
+    - `hidden` på en manuel modtager (admin sætter den)
+    - `hide_from_members` på en bruger (brugeren sætter den selv i Min profil)
+
+    Begge dele påvirker KUN visningen. Den, der står udenfor listen, får stadig
+    sine notifikationer — det er to forskellige spørgsmål.
+
+    Uden navn og uden kontaktoplysninger er der intet at vise, så den række
+    springes over.
+    """
+    folk = [r for r in notifications.list_recipients(conn, group)
+            if not r["hidden"] and (r["name"] or r["email"] or r["whatsapp"])]
+    return sorted(folk, key=lambda r: (r["name"] or r["email"] or "").lower())
+
+
+@app.route("/<slug>/medlemmer")
+def user_members(slug):
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    is_admin = bool(session.get(f"admin_{group['slug']}"))
+    # Admin kan altid se siden — også før den er slået til — så man kan se PRÆCIS
+    # hvad medlemmerne vil få at se, inden man udgiver den.
+    if not group["members_visible"] and not is_admin:
+        abort(404)
+    conn = db.get_db()
+    medlemmer = group_members(conn, group)
+    conn.close()
+    return render_template("user/members.html", group=group, medlemmer=medlemmer,
+                           is_admin=is_admin,
+                           accounts=bool(group["user_accounts_enabled"]))
 
 
 # --------------------------------------------------------------------------- #
@@ -2757,6 +2834,9 @@ def admin_notify(slug):
             except ValueError:
                 days = 14
             conn.execute(
+                "UPDATE groups SET members_visible = ? WHERE id = ?",
+                (1 if request.form.get("members_visible") else 0, group["id"]))
+            conn.execute(
                 "UPDATE groups SET notify_list_enabled = ?, notify_list_days = ?, "
                 "notify_list_users = ? WHERE id = ?",
                 (1 if request.form.get("notify_list_enabled") else 0, days,
@@ -2794,6 +2874,12 @@ def admin_notify(slug):
         elif action == "toggle":
             conn.execute(
                 "UPDATE notify_recipients SET active = 1 - active "
+                "WHERE id = ? AND group_id = ?",
+                (request.form.get("recipient_id"), group["id"]))
+        elif action == "toggle_hidden":
+            # Skjuler KUN på medlemslisten — modtageren får stadig notifikationer.
+            conn.execute(
+                "UPDATE notify_recipients SET hidden = 1 - hidden "
                 "WHERE id = ? AND group_id = ?",
                 (request.form.get("recipient_id"), group["id"]))
         elif action == "delete":
@@ -2865,7 +2951,7 @@ def _flash_send_result(mails, whatsapps, smses, pushes, errors):
 _NOTIFY_ANCHOR = {
     "settings": "#indstillinger",
     "add": "#modtagere", "edit": "#modtagere",
-    "toggle": "#modtagere", "delete": "#modtagere",
+    "toggle": "#modtagere", "toggle_hidden": "#modtagere", "delete": "#modtagere",
     "send_event": "#send", "send_text": "#send",
 }
 

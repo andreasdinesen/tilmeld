@@ -11,6 +11,36 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 26
+
+**Medlemsliste medlemmerne selv kan se — og navne på gæsterne.**
+
+### Medlemsliste
+
+Notifikationslisten har altid haft navn, mail og mobilnummer, men kun admin kunne se den.
+Nu kan admin give medlemmerne adgang: et punkt **Medlemmer** på bruger-siden med en
+klub-telefonbog, hvor mail og numre kan trykkes på.
+
+Det er **samme liste** som notifikationerne sender til — ét sted at vedligeholde. Slås til
+under **Notifikationsliste → Indstillinger**, og er som udgangspunkt **slået fra**.
+
+Den enkelte kan holdes udenfor, og det gælder kun visningen — man får stadig sine beskeder:
+
+- admin trykker **Skjul** ved en modtager
+- en bruger med konto sætter selv fluebenet under **Min profil**
+
+Admin kan åbne siden, før listen slås til, og se præcis hvad medlemmerne vil få at se.
+
+### Navne på gæster
+
+Tillader et event gæster, kommer der nu et navnefelt pr. gæst: vælger man 3 pladser,
+dukker »Navn på gæst 1« og »Navn på gæst 2« op. Navnene er **valgfri** — den, der tager to
+med uden at vide hvem endnu, bliver ikke spærret.
+
+Navnene vises i deltagerlisten (»+2 gæster: Bo, Carl«) og har fået sin egen kolonne i
+CSV-eksporten. Skruer man ned for antallet af pladser, forsvinder den overskydende gæst
+med, så der ikke står et navn, ingen har plads til.
+
 ## Version 25
 
 **Velkomsttekst og dokumenter på gruppens forside.**

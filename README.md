@@ -196,6 +196,16 @@ ikke kan logge ind, har et event bag adgangskode en **åben forside** med netop 
 oplysninger og en »Log ind«-knap — deltagerlisten og tilmeldingen forbliver lukket.
 Kræver en **offentlig URL** under master → Opsætning.
 
+## Medlemsliste
+
+Notifikationslisten (navn, mail, mobilnummer) kan gøres synlig for medlemmerne: så får
+bruger-siden et punkt **Medlemmer** med en klub-telefonbog. Samme liste som
+notifikationerne sender til — ét sted at vedligeholde. Slås til under **admin →
+Notifikationsliste → Indstillinger** og er som udgangspunkt slået fra.
+
+Den enkelte kan holdes udenfor visningen — admin med **Skjul**, en bruger med konto selv
+under **Min profil**. Begge dele påvirker kun listen; notifikationerne kommer stadig frem.
+
 ## Forsiden: velkomsttekst og dokumenter
 
 Under **gruppe-admin → Opsætning → Bruger-sidens udseende** kan admin skrive en tekst, der

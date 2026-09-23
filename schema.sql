@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS groups (
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)
     push_enabled        INTEGER DEFAULT 0,         -- push-notifikationer (slået til af master)
+    members_visible     INTEGER DEFAULT 0,         -- må medlemmerne se hinandens
+                                                   -- kontaktoplysninger? Slås til af admin.
     home_text           TEXT DEFAULT '',           -- Markdown over »Kommende events« på forsiden
     facebook_url        TEXT DEFAULT '',           -- adressen på klubbens Facebook-gruppe,
                                                    -- så »Del«-kortet kan åbne den direkte
@@ -66,6 +68,8 @@ CREATE TABLE IF NOT EXISTS users (
     whatsapp            TEXT DEFAULT '',           -- mobilnummer: bruges til BÅDE WhatsApp og SMS.
                                                    -- Kolonnenavnet er historisk (SMS kom til igen
                                                    -- efter WhatsApp) — ét nummer, to kanaler.
+    hide_from_members   INTEGER DEFAULT 0,         -- brugerens eget valg: stå ikke på
+                                                   -- gruppens synlige medlemsliste
     reset_token         TEXT DEFAULT '',           -- "glemt adgangskode"-token
     reset_expires       TEXT DEFAULT '',
     created_at          TEXT NOT NULL
@@ -147,6 +151,8 @@ CREATE TABLE IF NOT EXISTS registrations (
     phone               TEXT DEFAULT '',
     user_id             INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,  -- ejer (individuel bruger)
     seats               INTEGER DEFAULT 1,         -- antal pladser (dig + gæster)
+    guest_names         TEXT DEFAULT '',           -- JSON-liste med gæsternes navne
+                                                   -- (valgfri; højst seats-1 navne)
     waitlist            INTEGER DEFAULT 0,         -- 1 = står på venteliste
     attended            INTEGER DEFAULT 0,         -- fremmøde markeret af admin
     created_at          TEXT NOT NULL,
@@ -195,6 +201,8 @@ CREATE TABLE IF NOT EXISTS notify_recipients (
     whatsapp            TEXT DEFAULT '',           -- mobilnummer til WhatsApp-broen OG til SMS
                                                    -- (samme nummer; se users.whatsapp)
     active              INTEGER DEFAULT 1,         -- sat på pause uden at blive slettet
+    hidden              INTEGER DEFAULT 0,         -- står ikke på den synlige medlemsliste
+                                                   -- (men får stadig notifikationer)
     created_at          TEXT NOT NULL
 );
 

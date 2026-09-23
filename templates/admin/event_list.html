@@ -98,7 +98,7 @@
       {% set ns = namespace(declined=false) %}
       {% for did in decline_ids %}{% if r['values'].get(did) == 'Ja' %}{% set ns.declined = true %}{% endif %}{% endfor %}
       <tr class="{{ 'declined' if ns.declined }}">
-        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}{% if r.seats > 1 %} <span class="muted small">(+{{ r.seats - 1 }} gæst{{ '' if r.seats == 2 else 'er' }})</span>{% endif %}</td>
+        <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}{% if r.seats > 1 %}{% set g = r.guest_names | gaester %} <span class="muted small">(+{{ r.seats - 1 }} gæst{{ '' if r.seats == 2 else 'er' }}{% if g %}: {{ g | join(', ') }}{% endif %})</span>{% endif %}</td>
         <td>{{ r.email }}</td><td>{{ r.phone }}</td>
         {% for f in fields %}<td>{{ r['values'].get(f.id, '') }}</td>{% endfor %}
         <td class="muted small">{{ r.created_at|dt }}</td>

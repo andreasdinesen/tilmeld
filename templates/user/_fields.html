@@ -15,8 +15,13 @@
 {% endif %}
 {% if ev is defined and ev.allow_guests %}
 <label>Antal pladser (dig + gæster)
-  <input type="number" name="seats" min="1" max="50" value="{{ reg.seats if reg else 1 }}">
+  <input type="number" name="seats" min="1" max="50" value="{{ reg.seats if reg else 1 }}"
+         data-seats>
 </label>
+{# Ét navnefelt pr. gæst. Felterne tegnes af scriptet nedenfor, så antallet følger
+   med, når man skruer op eller ned for pladserne. Uden JavaScript er der ingen
+   felter — men tilmeldingen virker stadig, navnene er valgfri. #}
+<div data-gaester data-navne="{{ ((reg.guest_names if reg else '') | gaester) | tojson | forceescape }}"></div>
 {% endif %}
 {# Med individuelle konti kommer kontakt fra brugerens profil #}
 {% if mail_on and not accounts %}
@@ -61,3 +66,36 @@
       {{ 'required' if f.required }} {{ 'checked' if val == 'Ja' }}> {{ f.label }}{% if f.required %} *{% endif %}</label>
   {% endif %}
 {% endfor %}
+
+{% if ev is defined and ev.allow_guests %}
+<script>
+(function () {
+  var antal = document.querySelector('[data-seats]');
+  var boks = document.querySelector('[data-gaester]');
+  if (!antal || !boks) return;
+  var kendte = [];
+  try { kendte = JSON.parse(boks.dataset.navne || '[]'); } catch (e) { kendte = []; }
+
+  function tegn() {
+    var n = Math.max(0, Math.min(49, (parseInt(antal.value, 10) || 1) - 1));
+    // Behold det, der allerede er tastet, så et klik på pilene ikke tømmer felterne.
+    var nuvaerende = Array.prototype.map.call(
+      boks.querySelectorAll('input[name=guest_name]'), function (i) { return i.value; });
+    boks.innerHTML = '';
+    for (var i = 0; i < n; i++) {
+      var l = document.createElement('label');
+      l.textContent = 'Navn på gæst ' + (i + 1) + ' (valgfrit)';
+      var f = document.createElement('input');
+      f.type = 'text';
+      f.name = 'guest_name';
+      f.value = nuvaerende[i] || kendte[i] || '';
+      l.appendChild(f);
+      boks.appendChild(l);
+    }
+  }
+  antal.addEventListener('input', tegn);
+  antal.addEventListener('change', tegn);
+  tegn();
+})();
+</script>
+{% endif %}

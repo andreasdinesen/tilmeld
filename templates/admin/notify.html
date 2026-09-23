@@ -70,6 +70,18 @@
       <p class="muted small">Mail og mobilnummer hentes direkte fra brugernes profiler —
          de skal ikke skrives ind her. Retter en bruger sin mail, følger listen med.</p>
     {% endif %}
+    <h3>Medlemsliste</h3>
+    <label class="chk"><input type="checkbox" name="members_visible"
+      {{ 'checked' if group.members_visible }}> Lad medlemmerne se listen
+      (navn, mobil og mail)</label>
+    <p class="muted small">Så får bruger-siden et punkt <strong>Medlemmer</strong>, hvor alle
+       med adgang til gruppen kan se hinandens kontaktoplysninger — en klub-telefonbog
+       bygget på de samme oplysninger som herunder.
+       <a href="{{ url_for('user_members', slug=group.slug) }}">Se hvordan den ser ud</a>
+       (det kan du også, før du slår den til).</p>
+    <p class="muted small">Den enkelte kan holdes udenfor: brug <em>Skjul</em> ved en modtager,
+       og brugere med konto kan selv sætte fluebenet under <em>Min profil</em>. Det gælder kun
+       visningen — de får stadig deres notifikationer.</p>
     <button type="submit">Gem indstillinger</button>
   </form>
 </div>
@@ -102,6 +114,7 @@
           <strong>{{ r.name or r.email or r.whatsapp }}</strong>
           {% if r.source == 'user' %}<span class="tag cat-user">bruger</span>{% endif %}
           {% if not r.active %}<span class="tag finished">på pause</span>{% endif %}
+          {% if group.members_visible and r.hidden %}<span class="tag finished">skjult på medlemslisten</span>{% endif %}
           <div class="muted small">
             {% if mail_on %}{{ r.email or '— ingen mail' }}{% endif %}
             {% if mail_on and tlf_on %} · {% endif %}
@@ -115,6 +128,13 @@
             <input type="hidden" name="recipient_id" value="{{ r.id }}">
             <button class="small">{{ 'Genoptag' if not r.active else 'Sæt på pause' }}</button>
           </form>
+          {% if group.members_visible %}
+          <form method="post" class="inline">
+            <input type="hidden" name="action" value="toggle_hidden">
+            <input type="hidden" name="recipient_id" value="{{ r.id }}">
+            <button class="small">{{ 'Vis igen' if r.hidden else 'Skjul' }}</button>
+          </form>
+          {% endif %}
           <form method="post" class="inline"
                 onsubmit="return confirm('Fjern {{ r.name or r.email or r.whatsapp }} fra listen?')">
             <input type="hidden" name="action" value="delete">
