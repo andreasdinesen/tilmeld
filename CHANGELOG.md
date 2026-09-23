@@ -11,6 +11,16 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 32
+
+**Hjælpeteksten passede ikke til rullemenuen.**
+
+Der stod »efter du har **skrevet** dit navn«, men med rullemenuen vælger man det. Teksten
+følger nu feltet: *valgt* ved rullemenu, *skrevet* ved fritekst — og i grupper med
+individuelle konti, hvor navnefeltet er skjult, nævnes navnet slet ikke.
+
+Anførselstegnene er samtidig rettet til danske (»deltager ikke«) som i resten af appen.
+
 ## Version 31
 
 **Admin mistede rullemenuen ved tilmelding.**

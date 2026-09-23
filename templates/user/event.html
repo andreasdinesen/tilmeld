@@ -151,7 +151,17 @@
   {% elif full %}
     <p class="flash error">Der er ikke plads til flere — du kan kun melde afbud ("deltager ikke").</p>
   {% endif %}
-  {% if decline_ids %}<p class="muted small">Sæt flueben ved "deltager ikke" (efter du har skrevet dit navn) for at melde afbud med det samme.</p>{% endif %}
+    {# Ordlyden følger feltet: med rullemenu VÆLGER man sit navn, man skriver det
+       ikke. Har man konto, er navnet givet på forhånd — så nævnes det slet ikke. #}
+    {% set navn_skjult = accounts and not is_admin %}
+    {% if decline_ids %}
+      {% if navn_skjult %}
+        <p class="muted small">Sæt flueben ved »deltager ikke« for at melde afbud med det samme.</p>
+      {% else %}
+        <p class="muted small">Sæt flueben ved »deltager ikke« (efter du har
+           {{ 'valgt' if navne else 'skrevet' }} dit navn) for at melde afbud med det samme.</p>
+      {% endif %}
+    {% endif %}
   <form id="signup-form" method="post" action="{{ url_for('user_signup', slug=group.slug, event_slug=ev.slug) }}">
     {% if accounts and is_admin %}
     <label>Opret på vegne af (bruger)
