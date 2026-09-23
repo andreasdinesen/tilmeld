@@ -228,7 +228,7 @@ arver hverken jagtledere eller resultat.
 
 ## Gem som PDF
 
-Medlemslisten, ordensreglerne og udbyttet har en **Gem som PDF**-knap. Den bruger browserens
+Medlemslisten, regelsættet og udbyttet har en **Gem som PDF**-knap. Den bruger browserens
 egen udskrift (ingen PDF-pakke på serveren); print-arket er sat op til sort på hvidt uden
 menuer og knapper.
 
@@ -251,9 +251,9 @@ klikbare på medlemssiden (`mailto:`/`tel:`). Slås medlemslisten til, kan der s
 mail og mobilnummer ind, også selvom gruppen ikke har SMS eller WhatsApp — oplysningerne
 har et formål i sig selv der.
 
-## Ordensregler
+## Regelsæt
 
-Admin skriver gruppens ordensregler under **Opsætning → Bruger-sidens udseende**. De får
+Admin skriver gruppens regelsæt under **Opsætning → Bruger-sidens udseende**. De får
 deres egen side med link fra forsiden og fra topbaren. Tomt felt = ingen side.
 
 ## Forsiden: velkomsttekst og dokumenter

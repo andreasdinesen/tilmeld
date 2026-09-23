@@ -4,7 +4,7 @@ gameskill:
   category: "Apps"
   description: "Event-tilmeldingssystem: bruger-, gruppe-admin- og master-admin-UI med tilmelding, deltagerlister, CSV-eksport, notifikationsliste, madbestilling, mail/WhatsApp/SMS/push-notifikationer, lyst/moerkt tema og passkey-login."
   author: "andreasdinesen"
-  version: 29
+  version: 30
   icon: "app"
 
   # Fra og med rune 21 baerer runen IKKE app-koden. Den koerer et almindeligt

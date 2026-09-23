@@ -11,6 +11,19 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 30
+
+**»Ordensregler« hedder nu »Regelsæt«.**
+
+Navnet er ændret overalt: menupunktet, knappen på forsiden, sidens overskrift, feltet under
+Opsætning og navnet på PDF'en.
+
+Adressen er samtidig blevet til `/<gruppe>/regelsaet`. **Den gamle `/ordensregler` virker
+stadig** og sender videre til den nye, så et link, nogen har delt eller sat bogmærke på,
+ikke dør af en omdøbning.
+
+Selve teksten er uberørt — kun navnet på den.
+
 ## Version 29
 
 **Gæster tælles for sig — og tælleren viser hvad tallet består af.**

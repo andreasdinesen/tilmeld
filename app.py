@@ -2783,8 +2783,15 @@ def event_leaders(conn, group, ev) -> list:
 
 
 @app.route("/<slug>/ordensregler")
+def user_rules_gammel(slug):
+    """Siden hed »ordensregler« indtil rune 30. Et link, nogen har delt eller
+    sat bogmærke på, skal ikke dø af en omdøbning."""
+    return redirect(url_for("user_rules", slug=slug), code=301)
+
+
+@app.route("/<slug>/regelsaet")
 def user_rules(slug):
-    """Gruppens ordensregler. Ren tekst admin skriver — ikke et dokument, så den
+    """Gruppens regelsæt. Ren tekst admin skriver — ikke et dokument, så den
     kan rettes uden at skulle uploade en ny PDF."""
     group = get_group(slug)
     if not group:

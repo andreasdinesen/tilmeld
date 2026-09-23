@@ -5,7 +5,7 @@
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
   {% if accounts %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
-  {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Ordensregler</a>{% endif %}
+  {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Regelsæt</a>{% endif %}
   {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
   <a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>
 {% endblock %}

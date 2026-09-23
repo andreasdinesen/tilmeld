@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "user/_print.html" as pr %}
-{% block title %}Ordensregler · {{ group.name }}{% endblock %}
+{% block title %}Regelsæt · {{ group.name }}{% endblock %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
@@ -12,12 +12,12 @@
 {% block content %}
 <a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til forsiden</a>
 <div class="card">
-  <h1>Ordensregler</h1>
+  <h1>Regelsæt</h1>
   {% if group.rules_text %}
     <div class="description">{{ group.rules_text | md }}</div>
-    {{ pr.pdf_knap('Ordensregler-' ~ group.name) }}
+    {{ pr.pdf_knap('Regelsaet-' ~ group.name) }}
   {% else %}
-    <div class="tag locked big">Der er ikke skrevet nogen ordensregler endnu — kun du kan se
+    <div class="tag locked big">Der er ikke skrevet noget regelsæt endnu — kun du kan se
       denne side. Skriv dem under
       <a href="{{ url_for('admin_settings', slug=group.slug) }}#udseende">Opsætning</a>.</div>
   {% endif %}
