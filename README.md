@@ -196,6 +196,18 @@ ikke kan logge ind, har et event bag adgangskode en **åben forside** med netop 
 oplysninger og en »Log ind«-knap — deltagerlisten og tilmeldingen forbliver lukket.
 Kræver en **offentlig URL** under master → Opsætning.
 
+## Jagtledere og resultat
+
+Hvert event kan få én eller to **jagtledere** valgt fra medlemslisten (i event-formularen).
+Medlemmerne trykker på navnet og får mobil og mail frem, klar til at ringe. Kun folk, der
+er synlige på medlemslisten, kan vælges.
+
+Efter jagten kan admin udfylde et **Resultat** nederst på deltagerlisten: antal skudt
+vildt, vinder af bengættet og en note. Det vises på eventets side.
+
+Begge dele gemmes uden for event-formularens øvrige felter, så en kopi af et event ikke
+arver hverken jagtledere eller resultat.
+
 ## Medlemsliste
 
 Notifikationslisten (navn, mail, mobilnummer) kan gøres synlig for medlemmerne: så får

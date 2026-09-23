@@ -2,6 +2,7 @@
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}<a href="{{ url_for('admin_home', slug=group.slug) }}">Tilbage</a>{% endblock %}
 {% block content %}
+<a class="tilbage" href="{{ url_for('admin_home', slug=group.slug) }}">← Tilbage til admin</a>
 <div class="card narrow">
   <h1>{{ 'Redigér event' if ev else 'Nyt event' }}</h1>
   <form method="post">
@@ -15,6 +16,32 @@
     <label>Beskrivelse <textarea name="description" rows="6">{{ ev.description if ev else '' }}</textarea></label>
     <p class="muted small">Understøtter Markdown: <code>**fed**</code>, <code>*kursiv*</code>,
        <code># overskrift</code>, <code>- punktliste</code>, <code>[link](https://...)</code>.</p>
+    <h2>Jagtledere</h2>
+    {% if not medlemmer %}
+      <p class="muted small">Der er ingen på medlemslisten endnu. Tilføj folk under
+         <a href="{{ url_for('admin_notify', slug=group.slug) }}#modtagere">Notifikationsliste
+         → Modtagere</a>, så kan du vælge dem her.</p>
+    {% else %}
+      <div class="grid2">
+        {% for nr in [0, 1] %}
+          <label>Jagtleder {{ nr + 1 }}
+            <select name="leader">
+              <option value="">— ingen —</option>
+              {% for m in medlemmer %}
+                <option value="{{ m.ref }}"
+                  {{ 'selected' if valgte_ledere|length > nr and valgte_ledere[nr] == m.ref }}>
+                  {{ m.name or m.email or m.whatsapp }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        {% endfor %}
+      </div>
+      <p class="muted small">Medlemmerne kan trykke på jagtlederens navn på eventets side og
+         få mobil og mail frem. <strong>Derfor står kun folk, der er synlige på
+         medlemslisten, på listen her</strong> — har nogen valgt at skjule sig, bliver de
+         ikke vist som kontaktperson mod deres vilje.</p>
+    {% endif %}
+
     <label>Forventet antal deltagere <input type="number" name="expected_count" value="{{ ev.expected_count if ev else 0 }}"></label>
     <label class="chk"><input type="checkbox" name="capacity_limit" {{ 'checked' if ev and ev.capacity_limit }}> Begræns tilmeldinger til det forventede antal (luk når der er fyldt)</label>
     <label class="chk"><input type="checkbox" name="waitlist_enabled" {{ 'checked' if ev and ev.waitlist_enabled }}> Venteliste når der er fyldt (rykker automatisk op ved afbud)</label>

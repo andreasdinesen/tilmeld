@@ -38,6 +38,23 @@
   </div>
   <div class="count big">{{ count }} / {{ ev.expected_count }} deltagere
     {% if full %}<span class="tag locked">FULDT</span>{% endif %}</div>
+  {% if ledere %}
+    <div class="ledere">
+      <span class="muted small">{{ 'Jagtleder' if ledere|length == 1 else 'Jagtledere' }}:</span>
+      {% for m in ledere %}
+        {# <details> frem for JavaScript: virker overalt, også uden scripts, og det
+           er præcis »tryk for at folde ud«. #}
+        <details class="leder">
+          <summary>{{ m.name or m.email or m.whatsapp }}</summary>
+          <div class="leder-kontakt">
+            {% if m.whatsapp %}<a class="btn small" href="tel:{{ m.whatsapp|replace(' ', '') }}">📞 {{ m.whatsapp }}</a>{% endif %}
+            {% if m.email %}<a class="btn small" href="mailto:{{ m.email }}">✉️ {{ m.email }}</a>{% endif %}
+            {% if not m.whatsapp and not m.email %}<span class="muted small">Ingen kontaktoplysninger</span>{% endif %}
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+  {% endif %}
   {% if ev.description %}<div class="description">{{ ev.description | md }}</div>{% endif %}
   {% if filer %}
     <h2>Filer</h2>
@@ -59,6 +76,19 @@
      kalender</a> i stedet, så kommer <strong>alle</strong> events automatisk ind — og følger
      med, når noget ændrer sig.</p>
 </div>
+
+{% if ev.result_game or ev.result_winner or ev.result_note %}
+<div class="card">
+  <h2>Resultat</h2>
+  {% if ev.result_game %}
+    <p class="count big">Skudt vildt: <strong>{{ ev.result_game }}</strong></p>
+  {% endif %}
+  {% if ev.result_winner %}
+    <p class="count big">Vinder af bengættet: <strong>{{ ev.result_winner }}</strong></p>
+  {% endif %}
+  {% if ev.result_note %}<div class="description">{{ ev.result_note | md }}</div>{% endif %}
+</div>
+{% endif %}
 
 <div class="card">
   <h2>Deltagere</h2>

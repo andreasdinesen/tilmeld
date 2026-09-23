@@ -1116,8 +1116,14 @@ def _render_event_form(group, ev):
     days = db.get_settings(conn)["default_deadline_days"]
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     filer = event_files(conn, ev["id"]) if ev else []
+    medlemmer = group_members(conn, group)
+    try:
+        valgte = json.loads(ev["leaders"] or "[]") if ev else []
+    except (ValueError, TypeError):
+        valgte = []
     conn.close()
     return render_template("admin/event_form.html", group=group, ev=ev,
+                           medlemmer=medlemmer, valgte_ledere=valgte,
                            fields=fields, hidden=hidden, default_deadline_days=days,
                            mail_on=mail_on, wa_on=wa_on, sms_on=sms_on,
                            push_on=push_on, tlf_on=wa_on or sms_on,
@@ -1272,6 +1278,15 @@ def _save_event(group, ev):
         flash("Event oprettet.", "ok")
         if frist_advarsel:
             flash(frist_advarsel, "error")
+
+    # Jagtledere gemmes UDEN FOR vals-tuplen, præcis som resultatet: så arver en
+    # kopi eller en gentagelse ikke en leder, der ikke er spurgt.
+    ledere = [r for r in request.form.getlist("leader") if r.strip()][:2]
+    gyldige = {m["ref"] for m in group_members(conn, group)}
+    # Dubletter fjernes: den samme person to gange er ikke to jagtledere.
+    ledere = list(dict.fromkeys(r for r in ledere if r in gyldige))
+    conn.execute("UPDATE events SET leaders = ? WHERE id = ?",
+                 (json.dumps(ledere, ensure_ascii=False) if ledere else "", event_id))
 
     # Gem hvilke punkter der er skjult på dette event (ukrydsede = skjult)
     hidden_ids = [f["id"] for f in all_group_fields(conn, group["id"])
@@ -1463,6 +1478,40 @@ def admin_event_list(slug, event_id):
                            state=event_state(ev), attended_count=attended_count,
                            tal=tal, meal_fields=meal_fields,
                            cat_mail=cat_mail, cat_tlf=cat_tlf, share=share)
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/resultat", methods=["POST"])
+def admin_event_result(slug, event_id):
+    """Resultatet efter jagten: udbytte, vinder af bengættet og en note.
+
+    Egen rute og egne kolonner — IKKE en del af event-formularens vals-tuple.
+    To grunde: en kopi af et event skal ikke arve sidste jagts udbytte, og man
+    retter resultatet dér hvor man står bagefter (deltagerlisten), ikke inde i
+    planlægningsformularen.
+    """
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        return redirect(url_for("admin_login", slug=slug))
+    conn = db.get_db()
+    ev = conn.execute("SELECT * FROM events WHERE id = ? AND group_id = ?",
+                      (event_id, group["id"])).fetchone()
+    if not ev:
+        conn.close()
+        abort(404)
+    conn.execute(
+        "UPDATE events SET result_game = ?, result_winner = ?, result_note = ? "
+        "WHERE id = ? AND group_id = ?",
+        (request.form.get("result_game", "").strip()[:200],
+         request.form.get("result_winner", "").strip()[:200],
+         request.form.get("result_note", "").strip(),
+         event_id, group["id"]))
+    conn.commit()
+    db.add_log(conn, "event", f"Resultat opdateret for '{ev['name']}'", group["slug"])
+    conn.close()
+    flash("Resultatet er gemt.", "ok")
+    return redirect(url_for("admin_event_list", slug=slug, event_id=event_id) + "#resultat")
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/export.csv")
@@ -1924,11 +1973,13 @@ def user_event(slug, event_slug):
         my_name = (mu["name"] or mu["username"]) if mu else ""
     filer = event_files(conn, ev["id"]) if group["files_enabled"] else []
     share = event_share(conn, group, ev)
+    ledere = event_leaders(conn, group, ev)
     conn.close()
     # Med konti: brugere ser kun tilmeldings-formularen hvis de ikke allerede er tilmeldt
     show_signup = (state == "open") and (is_admin or not accounts or not has_own)
     parsed_fields = [{"f": f, "options": json.loads(f["options"] or "[]")} for f in fields]
     return render_template("user/event.html", group=group, ev=ev, state=state, share=share,
+                           ledere=ledere,
                            fields=parsed_fields, regs=regs, count=attending, full=full,
                            mail_on=mail_on, wa_on=wa_on, sms_on=sms_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
@@ -2508,7 +2559,29 @@ def group_members(conn, group) -> list:
     """
     folk = [r for r in notifications.list_recipients(conn, group)
             if not r["hidden"] and (r["name"] or r["email"] or r["whatsapp"])]
+    # En stabil henvisning pr. medlem, så et event kan pege på en jagtleder.
+    # Brugere peges på med brugernavn (unikt og uforanderligt), manuelle med række-id.
+    for r in folk:
+        r["ref"] = f"u:{r['username']}" if r["source"] == "user" else f"m:{r['id']}"
     return sorted(folk, key=lambda r: (r["name"] or r["email"] or "").lower())
+
+
+def event_leaders(conn, group, ev) -> list:
+    """Eventets jagtledere, slået op i medlemslisten.
+
+    Der gemmes kun en HENVISNING, ikke en kopi: retter en jagtleder sit nummer,
+    følger eventet med. Er personen siden fjernet — eller har hun skjult sig fra
+    medlemslisten — falder hun bare ud, i stedet for at efterlade et dødt navn
+    med et nummer, der ikke længere passer.
+    """
+    try:
+        refs = json.loads(ev["leaders"] or "[]")
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(refs, list):
+        return []
+    medlemmer = {m["ref"]: m for m in group_members(conn, group)}
+    return [medlemmer[r] for r in refs if r in medlemmer]
 
 
 @app.route("/<slug>/ordensregler")

@@ -2,6 +2,7 @@
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}<a href="{{ url_for('admin_home', slug=group.slug) }}">Tilbage</a>{% endblock %}
 {% block content %}
+<a class="tilbage" href="{{ url_for('admin_home', slug=group.slug) }}">← Tilbage til admin</a>
 <div class="card" id="del">
   <h2>Del eventet</h2>
   {% if not share.url %}
@@ -145,4 +146,28 @@
     });
   });
 </script>
+
+<div class="card" id="resultat">
+  <h2>Resultat</h2>
+  <p class="muted small">Udfyldes efter jagten. Det, du skriver her, vises på eventets side
+     for medlemmerne. Tomme felter vises ikke.</p>
+  <form method="post" action="{{ url_for('admin_event_result', slug=group.slug, event_id=ev.id) }}">
+    <label>Antal skudt vildt
+      <input type="text" name="result_game" value="{{ ev.result_game }}"
+             placeholder="fx 12 — eller »8 fasaner, 2 harer«">
+    </label>
+    <label>Vinder af bengættet
+      <input type="text" name="result_winner" value="{{ ev.result_winner }}"
+             placeholder="fx Brian">
+    </label>
+    <label>Note
+      <textarea name="result_note" rows="5"
+                placeholder="Alt andet værd at nævne — tak for i dag, næste jagt, ros og ris">{{ ev.result_note }}</textarea>
+    </label>
+    <p class="muted small">Noten understøtter Markdown: <code>**fed**</code>,
+       <code>- punktliste</code>, <code>[link](https://...)</code>.</p>
+    <button type="submit" class="primary">Gem resultat</button>
+  </form>
+</div>
+
 {% endblock %}

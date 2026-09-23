@@ -11,6 +11,37 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 28
+
+**Jagtledere, resultat efter jagten — og en vej tilbage fra admin.**
+
+### Jagtledere
+
+Hvert event kan få **én eller to jagtledere**, valgt fra medlemslisten. Medlemmerne
+trykker på navnet på eventets side og får mobil og mail frem som knapper — ét tryk, så
+ringer telefonen.
+
+Der gemmes kun en **henvisning**, ikke en kopi: retter jagtlederen sit nummer, følger
+eventet med. Fjernes personen, falder hun bare ud i stedet for at efterlade et dødt navn
+med et forkert nummer.
+
+**Kun folk, der er synlige på medlemslisten, kan vælges.** Har nogen skjult sig, bliver
+hun ikke vist som kontaktperson mod sin vilje — hun får stadig alle notifikationer.
+
+### Resultat efter jagten
+
+Nederst på deltagerlisten er der nu et **Resultat**-kort: antal skudt vildt, vinder af
+bengættet og en note (Markdown). Det vises på eventets side for medlemmerne. Tomme felter
+vises ikke.
+
+Både resultatet og jagtlederne gemmes **uden for** event-formularens felter. Derfor arver
+en kopi eller en gentagelse af et event hverken sidste jagts udbytte eller dens jagtledere.
+
+### Tilbage fra admin
+
+Opsætning, Notifikationsliste, Brugere, deltagerlisten og event-formularen har fået et
+**← Tilbage til admin** øverst — samme sted som tilbage-linket på bruger-siderne.
+
 ## Version 27
 
 **Ordensregler, synlige links på forsiden — og telefonnumre uden SMS.**

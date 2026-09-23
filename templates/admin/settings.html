@@ -39,6 +39,7 @@
   <a href="{{ url_for('admin_logout', slug=group.slug) }}">Log ud</a>
 {% endblock %}
 {% block content %}
+<a class="tilbage" href="{{ url_for('admin_home', slug=group.slug) }}">← Tilbage til admin</a>
 <div class="card narrow">
   <h1>Gruppe-opsætning</h1>
 

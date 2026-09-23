@@ -137,6 +137,14 @@ CREATE TABLE IF NOT EXISTS events (
     catering_sent       INTEGER DEFAULT 0,
     catering_email      TEXT DEFAULT '',           -- tomt = brug gruppens standard
     catering_phone      TEXT DEFAULT '',
+    -- Resultatet EFTER jagten. Bevidst uden for event-formularens vals-tuple, så en
+    -- kopi af et event aldrig arver sidste jagts udbytte.
+    leaders             TEXT DEFAULT '',           -- JSON: op til 2 henvisninger til
+                                                   -- medlemslisten, fx ["m:4","u:brian"]
+    result_game         TEXT DEFAULT '',           -- antal skudt vildt (tekst: »12« eller
+                                                   -- »8 fasaner, 2 harer«)
+    result_winner       TEXT DEFAULT '',           -- vinder af bengættet
+    result_note         TEXT DEFAULT '',           -- Markdown: alt andet værd at nævne
     created_at          TEXT NOT NULL,
     updated_at          TEXT DEFAULT '',           -- iCal LAST-MODIFIED
     revision            INTEGER DEFAULT 0,         -- iCal SEQUENCE: tælles op når noget

@@ -35,6 +35,7 @@
 {% endblock %}
 
 {% block content %}
+<a class="tilbage" href="{{ url_for('admin_home', slug=group.slug) }}">← Tilbage til admin</a>
 <div class="card narrow">
   <h1>Notifikationsliste</h1>
   <p class="muted small">Modtagere der får besked, når der er et nyt event på vej — eller når
