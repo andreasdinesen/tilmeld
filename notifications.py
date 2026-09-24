@@ -459,6 +459,41 @@ def notify_catering(conn, group, ev, note="") -> tuple:
     return sendt, errors
 
 
+# Mærket foran prøve-beskeden. Firkantparenteser og PRØVE er alle latin-1, så
+# mærket koster ikke beskeden dens plads (se gigasms.prepare).
+PROEVE_MAERKE = "[PRØVE]"
+
+
+def catering_test_sms(conn, group, ev) -> str:
+    """Teksten i prøve-SMS'en til madbestilleren — klar til afsendelse.
+
+    Præcis den besked, `notify_catering` ville sende på SMS, med et mærke foran,
+    så modtageren ikke går ud og køber ind til en jagt, der ikke er lukket endnu.
+    Teksten køres gennem `gigasms.prepare()`, fordi det er dén udgave, der lander
+    på telefonen — så er forhåndsvisningen i admin ikke en pæn løgn.
+    """
+    subject, body, _ = catering_message(conn, group, ev)
+    return gigasms.prepare(f"{PROEVE_MAERKE} {subject}: {body}")
+
+
+def send_catering_test(conn, group, ev) -> tuple:
+    """Send prøve-SMS'en. Returnér (nummer, fejl) — fejl er "" hvis den gik af sted.
+
+    Egen funktion og IKKE `notify_catering` med et flag: prøven må aldrig sætte
+    `catering_sent`, aldrig sende på mail eller WhatsApp, og aldrig regnes med som
+    den rigtige bestilling. Den eneste modtager er madbestillerens telefon.
+    """
+    if not group["sms_enabled"]:
+        return "", "SMS er ikke slået til for gruppen"
+    _, phone = catering_contact(group, ev)
+    if not phone:
+        return "", "der er ikke sat et mobilnummer på madbestilleren"
+    err = send_sms(db.get_settings(conn), phone, catering_test_sms(conn, group, ev))
+    db.add_log(conn, "sms", f"Prøve-madbestilling til {phone}: {ev['name']}{_note(err)}",
+               group["slug"])
+    return phone, err
+
+
 # ---- Notifikationsliste: hvem står på den, og hvordan sendes der til dem ------
 
 def _norm_mail(v):

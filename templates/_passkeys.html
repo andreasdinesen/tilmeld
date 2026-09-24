@@ -19,8 +19,10 @@
 {% endmacro %}
 
 
-{% macro manage(scope, slug, creds, blocked) %}
-  <h2>Passkeys</h2>
+{# `vis_titel=false` bruges, når kaldstedet selv har overskriften — fx et
+   foldbart afsnit, hvor titlen står i dets <summary>. #}
+{% macro manage(scope, slug, creds, blocked, vis_titel=true) %}
+  {% if vis_titel %}<h2>Passkeys</h2>{% endif %}
   <p class="muted small">Log ind med fingeraftryk, ansigt eller skærmlås i stedet for at taste
      adgangskoden. En passkey er et <strong>tillæg</strong> — adgangskoden virker uændret, så
      du aldrig kan låse dig ude.</p>

@@ -455,6 +455,34 @@ details.help[open] summary { border-bottom: 1px solid var(--line); }
 .help-body ul, .help-body ol { padding-left: 1.3em; margin: 0.4em 0; }
 .help-body li { margin: 0.25em 0; }
 
+/* --- Opsætning: foldbare afsnit ----------------------------------------- */
+/* Hvert kort på opsætnings-siden ER en <details>. Siden er lang, og de fleste
+   afsnit sættes op én gang og røres aldrig igen; foldet sammen kan man overskue
+   dem på én skærm. Tilstanden huskes pr. afsnit i sessionStorage, og et #anker
+   (fx efter et »Gem«) folder sit eget afsnit ud igen. */
+.sektion { padding-top: 4px; padding-bottom: 4px; scroll-margin-top: 80px; }
+.sektion > summary {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  cursor: pointer; list-style: none; padding: 12px 0;
+  font-size: 1.05rem; font-weight: 700;
+}
+.sektion > summary::-webkit-details-marker { display: none; }
+.sektion > summary::after { content: "\25be"; color: var(--muted); font-weight: 400; }
+.sektion[open] > summary::after { content: "\25b4"; }
+.sektion > summary:hover .sektion-titel { color: var(--accent); }
+.sektion[open] > summary { border-bottom: 1px solid var(--line); }
+.sektion-hint {
+  font-size: 0.8rem; font-weight: 400; color: var(--muted);
+  text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sektionkrop { padding-bottom: 6px; }
+.sektionkrop > *:first-child { margin-top: 12px; }
+/* Prøve-SMS'en vises, som den kommer ud af telefonen: rå tekst, ingen typografi. */
+.smsprove {
+  background: var(--sunken); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px; margin: 8px 0 4px; font-size: 0.85rem; white-space: pre-wrap;
+}
+
 /* --- Master: gruppe-kort ------------------------------------------------ */
 
 .group-card { padding: 16px 20px; }

@@ -1,0 +1,19 @@
+{# Et foldbart afsnit på opsætnings-siden.
+
+   Kortet ER selve <details>-elementet, så layoutet er præcis det samme som før —
+   der er bare et låg på. `id` bruges som anker efter et »Gem« (se _SETTINGS_ANCHOR
+   i app.py) OG som nøgle, når tilstanden huskes i sessionStorage.
+
+   `hint` er den ene linje, man kan nøjes med at læse, når afsnittet er foldet
+   sammen: hvor mange arter, hvor mange punkter, om der er et password. Uden den
+   ville man skulle folde ud bare for at se, om der stod noget. #}
+
+{% macro sektion(id, titel, hint='') %}
+<details class="card narrow sektion" id="{{ id }}">
+  <summary>
+    <span class="sektion-titel">{{ titel }}</span>
+    {% if hint %}<span class="sektion-hint">{{ hint }}</span>{% endif %}
+  </summary>
+  <div class="sektionkrop">{{ caller() }}</div>
+</details>
+{% endmacro %}

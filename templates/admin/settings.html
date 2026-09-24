@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_passkeys.html" as pk %}
 {% import "_push.html" as push %}
+{% import "admin/_sektion.html" as s %}
 
 {# Felterne i et tilmeldings-punkt. Samme makro bruges til BÅDE tilføj og redigér,
    så de to formularer ikke kan komme til at tilbyde forskellige muligheder. #}
@@ -42,8 +43,12 @@
 <a class="tilbage" href="{{ url_for('admin_home', slug=group.slug) }}">← Tilbage til admin</a>
 <div class="card narrow">
   <h1>Gruppe-opsætning</h1>
+  <p class="muted small">Klik på et afsnit for at folde det ud. Siden husker, hvad du har
+     åbent, så længe fanen er åben.</p>
+</div>
 
-  <h2 id="adgang">Gruppe-password</h2>
+{% call s.sektion('adgang', 'Gruppe-password',
+                  'password sat' if group.user_password else 'åben uden login') %}
   <p class="muted small">Adgangskode til bruger-siden <code>/{{ group.slug }}</code>.
      Tomt password = åben adgang uden login.</p>
   <form method="post">
@@ -57,8 +62,11 @@
     <input type="hidden" name="action" value="delete_password">
     <button type="submit" class="danger">Slet password</button>
   </form>
+{% endcall %}
 
-  <h2 id="vildtarter">Vildtarter</h2>
+{% call s.sektion('vildtarter', 'Vildtarter',
+                  ('%d art%s' % (arter|length, '' if arter|length == 1 else 'er'))
+                  if arter else 'ingen endnu') %}
   <p class="muted small">Arterne I noterer udbytte på. De bliver til et talfelt hver under
      <em>Resultat</em> på jagten, og tælles sammen for hele sæsonen på
      <a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>.</p>
@@ -91,10 +99,10 @@
     <label>Navn <input type="text" name="species" placeholder="fx Sneppe"></label>
     <button type="submit">Tilføj</button>
   </form>
-</div>
+{% endcall %}
 
-<div class="card narrow">
-  <h2 id="facebook">Facebook-gruppe</h2>
+{% call s.sektion('facebook', 'Facebook-gruppe',
+                  'adresse sat' if group.facebook_url else 'ingen adresse') %}
   <p class="muted small">Adressen på klubbens Facebook-gruppe. Så kan du åbne den med ét klik
      fra »Del eventet«, når du vil slå et event op.</p>
   <form method="post">
@@ -105,9 +113,12 @@
     </label>
     <button type="submit">Gem</button>
   </form>
+{% endcall %}
 
-  {% if group.mail_enabled or group.whatsapp_enabled or group.sms_enabled %}
-  <h2 id="kontakt">Kontakt for notifikationer</h2>
+{% if group.mail_enabled or group.whatsapp_enabled or group.sms_enabled %}
+{% call s.sektion('kontakt', 'Kontakt for notifikationer',
+                  'madbestiller sat' if (group.catering_phone or group.catering_email)
+                  else 'ingen madbestiller') %}
   <p class="muted small">Modtagere som master admin satte ved oprettelsen — du kan rette dem her.</p>
   <form method="post">
     <input type="hidden" name="action" value="contact">
@@ -122,11 +133,36 @@
     {% if group.sms_enabled or group.whatsapp_enabled %}<label>Madbestillerens mobilnummer <input type="text" name="catering_phone" value="{{ group.catering_phone }}" placeholder="+4520123456"></label>{% endif %}
     <button type="submit">Gem kontakt</button>
   </form>
-  {% endif %}
-</div>
 
-<div class="card narrow">
-  <h2 id="punkter">Tilmeldings-punkter</h2>
+  {# Prøven står i sin EGEN formular: indlejrede <form> er ugyldig HTML (faldgrube 7),
+     og en prøve skal sendes med det, der er gemt — ikke med det, der står i felterne. #}
+  {% if group.sms_enabled %}
+    <h3>Prøve-SMS til madbestilleren</h3>
+    {% if proeve %}
+      <p class="muted small">Sender madbestillingen præcis som den ser ud i dag, med tallene
+         fra det event, der ligger nærmest: <strong>{{ proeve.ev.name }}</strong>
+         d. {{ proeve.ev.event_date|d }}{% if proeve.tidligere %} (sidst afholdte — der er
+         ingen kommende events){% endif %}. Beskeden er mærket <code>[PRØVE]</code>, så
+         madbestilleren ikke går ud og køber ind.</p>
+      <div class="smsprove">{{ proeve.tekst }}</div>
+      <p class="muted small">{{ proeve.tegn }} tegn = {{ proeve.dele }} SMS-del{{ '' if proeve.dele == 1 else 'e' }}
+         til {{ proeve.nummer }}.{% if proeve.klippet %} Beskeden er for lang og bliver
+         klippet af — den vises herover, som den bliver sendt.{% endif %}</p>
+      <form method="post"
+            onsubmit="return confirm('Send prøve-SMS til {{ proeve.nummer }}?')">
+        <input type="hidden" name="action" value="catering_test">
+        <button type="submit">Send prøve-SMS nu</button>
+      </form>
+    {% else %}
+      <p class="muted small">Kan ikke sendes endnu — {{ proeve_spaerre }}.</p>
+    {% endif %}
+  {% endif %}
+{% endcall %}
+{% endif %}
+
+{% call s.sektion('punkter', 'Tilmeldings-punkter',
+                  ('%d punkt%s' % (fields|length, '' if fields|length == 1 else 'er'))
+                  if fields else 'ingen endnu') %}
   <p class="muted small">Punkter som vises på alle gruppens events ved tilmelding.</p>
   {% if not fields %}<p>Ingen punkter endnu.</p>{% endif %}
   {% for item in fields %}
@@ -186,10 +222,10 @@
     <p class="muted small">Nye punkter placeres nederst — brug ▲/▼ ovenfor til at flytte dem.</p>
     <button type="submit">Tilføj punkt</button>
   </form>
-</div>
+{% endcall %}
 
-<div class="card narrow">
-  <h2 id="udseende">Bruger-sidens udseende</h2>
+{% call s.sektion('udseende', 'Bruger-sidens udseende',
+                  'billede, forside-tekst og regelsæt') %}
   <p class="muted small">Billedet vises på login-skærmen og i toppen af bruger-siden.</p>
   <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="action" value="branding">
@@ -219,13 +255,14 @@
     </label>
     <button type="submit">Gem</button>
   </form>
-</div>
+{% endcall %}
 
 {% if group.files_enabled %}
-{# Egen formular OG eget kort: upload kræver enctype="multipart/form-data", og
-   indlejrede <form> er ugyldig HTML (faldgrube 7). #}
-<div class="card narrow">
-  <h2 id="dokumenter">Dokumenter på forsiden</h2>
+{# Egen formular: upload kræver enctype="multipart/form-data", og indlejrede
+   <form> er ugyldig HTML (faldgrube 7). #}
+{% call s.sektion('dokumenter', 'Dokumenter på forsiden',
+                  ('%d fil%s' % (dokumenter|length, '' if dokumenter|length == 1 else 'er'))
+                  if dokumenter else 'ingen endnu') %}
   <p class="muted small">Vedtægter, jagtplan, kort … De vises nederst på forsiden og kan
      hentes af dem, der har adgang til gruppen.</p>
   {% if not dokumenter %}<p>Ingen dokumenter endnu.</p>{% endif %}
@@ -253,12 +290,12 @@
        kun almindelige dokument- og billedtyper.</p>
     <button type="submit">Læg på forsiden</button>
   </form>
-</div>
+{% endcall %}
 {% endif %}
 
 {% if templates %}
-<div class="card narrow">
-  <h2 id="skabeloner">Mail-skabeloner</h2>
+{% call s.sektion('skabeloner', 'Mail-skabeloner',
+                  '%d skabeloner' % templates|length) %}
   <p class="muted small">Teksten der bruges når der sendes mails. Pladsholdere du kan bruge:
      <code>{event}</code>, <code>{name}</code>, <code>{date}</code>,
      <code>{deadline}</code>, <code>{group}</code>, <code>{link}</code> (i "Frist nået"
@@ -276,18 +313,63 @@
     {% endfor %}
     <button type="submit">Gem skabeloner</button>
   </form>
-</div>
+{% endcall %}
 {% endif %}
 
-<div class="card narrow">
-  {{ pk.manage('admin', group.slug, creds, passkey_blocked) }}
-</div>
+{% call s.sektion('passkeys', 'Passkeys',
+                  ('%d nøgle%s' % (creds|length, '' if creds|length == 1 else 'r'))
+                  if creds else 'ingen endnu') %}
+  {{ pk.manage('admin', group.slug, creds, passkey_blocked, false) }}
+{% endcall %}
 
 {% if push_on %}
-<div class="card narrow">
+{% call s.sektion('notifikationer', 'Notifikationer på din egen enhed') %}
   {{ push.manage('admin', group.slug, 'Notifikationer på din egen enhed',
      'Få admin-beskederne som en notifikation i stedet for kun på mail — ny
-      tilmelding, ændring og »fristen er nået«. Følger de samme flueben på eventet.') }}
-</div>
+      tilmelding, ændring og »fristen er nået«. Følger de samme flueben på eventet.',
+     false) }}
+{% endcall %}
 {% endif %}
+
+<script>
+/* Foldbare afsnit: husk hvad der var åbent, og åbn det afsnit man er sendt til.
+
+   sessionStorage, ikke localStorage — samme valg som tema-skifteren: et »Gem«
+   laver et sideskift, og så skal afsnittet stadig stå åbent, men en ny fane må
+   gerne starte foldet sammen igen.
+
+   Ankeret vinder over hukommelsen: kommer man tilbage fra et »Gem« med #punkter,
+   SKAL punkterne være foldet ud — ellers ser det ud som om handlingen forsvandt. */
+(function () {
+  var NOEGLE = 'tilmeld_sektioner_{{ group.slug }}';
+  var afsnit = Array.prototype.slice.call(document.querySelectorAll('details.sektion'));
+  if (!afsnit.length) return;
+
+  function laes() {
+    try { return JSON.parse(sessionStorage.getItem(NOEGLE)) || {}; } catch (e) { return {}; }
+  }
+  function gem(tilstand) {
+    try { sessionStorage.setItem(NOEGLE, JSON.stringify(tilstand)); } catch (e) {}
+  }
+
+  var husket = laes();
+  afsnit.forEach(function (d) {
+    if (husket[d.id]) d.open = true;
+    d.addEventListener('toggle', function () {
+      var t = laes();
+      if (d.open) t[d.id] = 1; else delete t[d.id];
+      gem(t);
+    });
+  });
+
+  var anker = (location.hash || '').slice(1);
+  if (anker) {
+    var maal = document.getElementById(anker);
+    if (maal && maal.tagName === 'DETAILS') {
+      maal.open = true;
+      maal.scrollIntoView();
+    }
+  }
+})();
+</script>
 {% endblock %}

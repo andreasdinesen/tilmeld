@@ -39,6 +39,11 @@ MASTER_PASSWORD="dit-hemmelige-kodeord" bash run.sh
 
 `/master` og `/gruppe/admin` er reserverede og kan ikke oprettes som gruppe-/event-navne.
 
+Gruppe-admins **Opsætning** er delt op i foldbare afsnit — password, vildtarter,
+kontakt, tilmeldings-punkter, udseende, dokumenter, skabeloner, passkeys og
+notifikationer. Hvert afsnit viser sin status (»5 arter«, »ingen madbestiller«), så man
+kan overskue siden uden at folde noget ud. Fanen husker, hvad du havde åbent.
+
 ## Startside
 
 Under **master → Opsætning → Startside** kan du vælge, hvilken gruppe forsiden `/` skal vise.
@@ -155,6 +160,17 @@ event arver begge dele.
 
 Deltagerlisten viser, hvem beskeden går til og hvor mange kuverter, med en knap
 **»Send nu«** — til når tallet skal meldes ind før fristen, eller sendes igen.
+
+### Prøve-SMS
+
+Under **Opsætning → Kontakt → Madbestiller** kan admin sende madbestillingen som en
+**prøve**. Den bruger tallene fra det event, der ligger nærmest — det næste kommende,
+eller det sidst afholdte, hvis der ikke er flere forude — og går til madbestillerens
+mobilnummer. Beskeden vises på forhånd, med sin længde og hvad den koster i SMS-dele,
+og er mærket `[PRØVE]`, så modtageren ikke går ud og køber ind.
+
+Prøven rører ikke den rigtige madbestilling: den sætter ikke »sendt«-fluebenet på
+eventet, og den går kun på SMS — ikke på mail eller WhatsApp.
 
 ### »Spiser ikke med«
 

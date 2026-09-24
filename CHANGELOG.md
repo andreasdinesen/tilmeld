@@ -11,6 +11,25 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 33
+
+**Opsætningen kan foldes sammen — og madbestillerens SMS kan prøves af.**
+
+Opsætnings-siden var blevet lang. Nu er hvert afsnit et låg, man kan klappe op: password,
+vildtarter, Facebook, kontakt, tilmeldings-punkter, udseende, dokumenter, skabeloner,
+passkeys og notifikationer. Ved siden af hver overskrift står afsnittets status — »5
+arter«, »ingen madbestiller«, »4 punkter« — så man kan se, om der er styr på det, uden at
+folde det ud. Vildtarterne behøver med andre ord ikke fylde en skærm, når de er sat op én
+gang. Fanen husker, hvad du havde åbent, og efter et »Gem« folder siden selv det afsnit
+ud, du arbejdede i.
+
+Under **Kontakt → Madbestiller** er der desuden kommet en **prøve-SMS**. Den bruger
+tallene fra det event, der ligger nærmest — det næste kommende, eller det sidst afholdte,
+hvis der ikke er flere forude — og sender til madbestillerens mobilnummer. Beskeden vises,
+præcis som den lander på telefonen, med sin længde og hvad den koster i SMS-dele, og den
+er mærket `[PRØVE]`, så madbestilleren ikke går ud og køber ind. Prøven sætter ikke
+»sendt«-fluebenet på eventet og går kun på SMS — den rigtige madbestilling er urørt.
+
 ## Version 32
 
 **Hjælpeteksten passede ikke til rullemenuen.**

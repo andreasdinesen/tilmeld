@@ -76,6 +76,25 @@ def prepare(text: str) -> str:
     return text
 
 
+def parts(text: str) -> int:
+    """Hvor mange SMS-dele fylder teksten — altså hvad den kommer til at koste.
+
+    En enkeltstående SMS har plads til 160 tegn (70 i unicode). Skal beskeden
+    deles, går der plads fra hver del til det, der syr dem sammen igen, og
+    grænsen falder til 153 (67). Det er dét regnestykke, `LATIN1_MAX` = 3 × 153
+    og `UCS2_MAX` = 3 × 67 kommer af.
+    """
+    try:
+        text.encode("latin-1")
+        alene, delt = 160, 153
+    except UnicodeEncodeError:
+        alene, delt = 70, 67
+    n = len(text or "")
+    if not n:
+        return 0
+    return 1 if n <= alene else -(-n // delt)
+
+
 # ---- HTTP mod gatewayen ------------------------------------------------------
 
 def configured(settings) -> bool:

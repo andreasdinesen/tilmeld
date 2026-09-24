@@ -5,8 +5,9 @@
    scope: 'user' (deltager med konto) | 'admin' (gruppe-admin) | 'list' (varsling om
    nye events). Serveren afgør selv om man MÅ det scope, man beder om. #}
 
-{% macro manage(scope, slug, titel, forklaring) %}
-<h2 id="notifikationer">{{ titel }}</h2>
+{# `vis_titel=false`: kaldstedet har selv overskriften (et foldbart afsnit). #}
+{% macro manage(scope, slug, titel, forklaring, vis_titel=true) %}
+{% if vis_titel %}<h2 id="notifikationer">{{ titel }}</h2>{% endif %}
 <p class="muted small">{{ forklaring }}</p>
 <div class="pushbox" data-push="{{ scope }}" data-slug="{{ slug }}">
   <div class="actions">

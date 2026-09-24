@@ -848,6 +848,24 @@ def admin_home(slug):
                            notify_on=mail_on or wa_on or sms_on or push_on)
 
 
+def naermeste_event(conn, group_id):
+    """Det event, en prøvebesked skal hente sine tal fra.
+
+    Først det næste, der ligger forude — det er dét, en madbestilling ville
+    handle om. Er der ingen kommende, bruges det sidst afholdte, så knappen
+    stadig kan trykkes i en stille periode. Returnerer None i en helt tom gruppe.
+    """
+    i_dag = datetime.now().strftime("%Y-%m-%d")
+    ev = conn.execute(
+        "SELECT * FROM events WHERE group_id = ? AND event_date >= ? "
+        "ORDER BY event_date, start_time LIMIT 1", (group_id, i_dag)).fetchone()
+    if ev:
+        return ev
+    return conn.execute(
+        "SELECT * FROM events WHERE group_id = ? ORDER BY event_date DESC LIMIT 1",
+        (group_id,)).fetchone()
+
+
 @app.route("/<slug>/admin/settings", methods=["GET", "POST"])
 def admin_settings(slug):
     group = get_group(slug)
@@ -1009,6 +1027,19 @@ def admin_settings(slug):
                      request.form.get(f"subject_{tkey}", "").strip(),
                      request.form.get(f"body_{tkey}", "").strip()))
             flash("Mail-skabeloner gemt.", "ok")
+        elif action == "catering_test":
+            # Prøven bruger det event, der ligger nærmest, og rører hverken
+            # `catering_sent` eller de andre kanaler — se notifications.send_catering_test.
+            ev = naermeste_event(conn, group["id"])
+            if not ev:
+                flash("Der er ingen events at hente tal fra endnu.", "error")
+            else:
+                nummer, fejl = notifications.send_catering_test(conn, group, ev)
+                if fejl:
+                    flash(f"Prøve-SMS ikke sendt — {fejl}", "error")
+                else:
+                    flash(f"Prøve-SMS sendt til {nummer} med tallene fra "
+                          f"»{ev['name']}«.", "ok")
         conn.commit()
         conn.close()
         # POST → Redirect → GET, med anker til det afsnit man arbejdede i. Uden det
@@ -1036,6 +1067,28 @@ def admin_settings(slug):
     creds = passkeys.list_credentials(conn, "admin", group_id=group["id"])
     dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
     arter = game_species(conn, group["id"])
+    # Forhåndsvisning af prøve-SMS'en til madbestilleren: den NØJAGTIGE tekst, der
+    # ville blive sendt, med længden og prisen i SMS-dele. Kan den ikke sendes, står
+    # der hvorfor — en knap, der fejler, når man trykker, er værre end ingen knap.
+    proeve, proeve_spaerre = None, ""
+    if group["sms_enabled"]:
+        ev = naermeste_event(conn, group["id"])
+        cat_tlf = notifications.catering_contact(group, ev)[1] if ev else ""
+        if not sms_on:
+            proeve_spaerre = "SMS er ikke sat op globalt (det gør master admin)"
+        elif not ev:
+            proeve_spaerre = "der er ingen events at hente tal fra endnu"
+        elif not cat_tlf:
+            proeve_spaerre = "madbestilleren mangler et mobilnummer"
+        else:
+            tekst = notifications.catering_test_sms(conn, group, ev)
+            proeve = {
+                "ev": ev, "nummer": cat_tlf, "tekst": tekst, "tegn": len(tekst),
+                "dele": gigasms.parts(tekst),
+                "klippet": tekst.endswith("...")
+                           and len(tekst) in (gigasms.LATIN1_MAX, gigasms.UCS2_MAX),
+                "tidligere": ev["event_date"] < datetime.now().strftime("%Y-%m-%d"),
+            }
     # Hvor mange tilmeldinger har allerede et svar på hvert punkt — vises i redigér-
     # formularen, så man kan se konsekvensen FØR man ændrer type eller dropdown-valg.
     used = {r["field_id"]: r["n"] for r in conn.execute(
@@ -1048,7 +1101,8 @@ def admin_settings(slug):
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request),
                            notify_on=mail_on or wa_on or sms_on or push_on, push_on=push_on,
-                           dokumenter=dokumenter, arter=arter)
+                           dokumenter=dokumenter, arter=arter,
+                           proeve=proeve, proeve_spaerre=proeve_spaerre)
 
 
 # Hvilket afsnit på opsætnings-siden hører en handling til. Bruges til ankeret i
@@ -1063,6 +1117,7 @@ _SETTINGS_ANCHOR = {
     "delete_field": "#punkter", "move_field": "#punkter",
     "branding": "#udseende",
     "templates": "#skabeloner",
+    "catering_test": "#kontakt",
 }
 
 
