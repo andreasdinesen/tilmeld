@@ -1081,10 +1081,15 @@ def admin_settings(slug):
         elif not cat_tlf:
             proeve_spaerre = "madbestilleren mangler et mobilnummer"
         else:
+            # To længder: prøven er dén, der sendes nu, men det er den RIGTIGE
+            # madbestilling, der skal holdes under 160 tegn — mærket følger jo
+            # ikke med, når fristen er nået.
             tekst = notifications.catering_test_sms(conn, group, ev)
+            rigtig = notifications.catering_sms(conn, group, ev)
             proeve = {
-                "ev": ev, "nummer": cat_tlf, "tekst": tekst, "tegn": len(tekst),
-                "dele": gigasms.parts(tekst),
+                "ev": ev, "nummer": cat_tlf, "tekst": tekst,
+                "tegn": len(rigtig), "dele": gigasms.parts(rigtig),
+                "proeve_tegn": len(tekst), "proeve_dele": gigasms.parts(tekst),
                 "klippet": tekst.endswith("...")
                            and len(tekst) in (gigasms.LATIN1_MAX, gigasms.UCS2_MAX),
                 "tidligere": ev["event_date"] < datetime.now().strftime("%Y-%m-%d"),

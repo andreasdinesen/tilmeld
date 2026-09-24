@@ -11,6 +11,24 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 34
+
+**Madbestillingen fylder nu én SMS.**
+
+Teksten var to SMS-dele lang, og en SMS koster pr. del. Den lange del var gentagelsen:
+jagtens navn, dato og klokkeslæt stod både i emnet og i teksten — og på SMS klistres de
+to sammen til én besked. Nu står de kun i emnet, og teksten er tallene:
+
+> Madbestilling: Jagt 14 november 2026 d. 2026-11-14 kl. 08:30: Tilmeldingen er lukket.
+> Mad til 24. 26 deltagere inkl. gæster, 2 uden mad.
+
+134 tegn med den længste af sæsonens jagter — under de 160, en enkelt SMS rummer.
+Prøve-SMS'en viser nu længden på den **rigtige** besked (mærket `[PRØVE]` følger jo ikke
+med, når fristen er nået) og siger til, hvis skabelonen er vokset over én del.
+
+Har gruppen gemt sine egne skabeloner under *Opsætning → Mail-skabeloner*, gælder dens
+egen tekst uændret — så skal den kortes ned i hånden.
+
 ## Version 33
 
 **Opsætningen kan foldes sammen — og madbestillerens SMS kan prøves af.**

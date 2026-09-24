@@ -167,7 +167,8 @@ Under **Opsætning → Kontakt → Madbestiller** kan admin sende madbestillinge
 **prøve**. Den bruger tallene fra det event, der ligger nærmest — det næste kommende,
 eller det sidst afholdte, hvis der ikke er flere forude — og går til madbestillerens
 mobilnummer. Beskeden vises på forhånd, med sin længde og hvad den koster i SMS-dele,
-og er mærket `[PRØVE]`, så modtageren ikke går ud og køber ind.
+og er mærket `[PRØVE]`, så modtageren ikke går ud og køber ind. Længden, der tæller, er
+den **rigtige** besked uden mærket — den står først i linjen under beskeden.
 
 Prøven rører ikke den rigtige madbestilling: den sætter ikke »sendt«-fluebenet på
 eventet, og den går kun på SMS — ikke på mail eller WhatsApp.
@@ -194,6 +195,11 @@ givet gruppen lov). Ud over de sædvanlige pladsholdere har den fem tal:
 | `{no_meals}` | Har meldt fra til spisning |
 | `{signups}` | Antal tilmeldinger (personer) |
 | `{waitlist}` | Antal på venteliste |
+
+Standard-teksten er holdt under **160 tegn**, så madbestillingen fylder **én SMS**. På SMS
+klistres emne og tekst sammen til én besked, så navn, dato og klokkeslæt står kun ét sted
+— i emnet. Retter du skabelonen, kan du se prisen med det samme på prøve-SMS'en ovenfor;
+over 160 tegn koster beskeden to dele (grænsen er 153 tegn pr. del derefter).
 
 ## Del et event (Facebook m.fl.)
 

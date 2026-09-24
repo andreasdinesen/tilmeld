@@ -145,9 +145,13 @@
          ingen kommende events){% endif %}. Beskeden er mærket <code>[PRØVE]</code>, så
          madbestilleren ikke går ud og køber ind.</p>
       <div class="smsprove">{{ proeve.tekst }}</div>
-      <p class="muted small">{{ proeve.tegn }} tegn = {{ proeve.dele }} SMS-del{{ '' if proeve.dele == 1 else 'e' }}
-         til {{ proeve.nummer }}.{% if proeve.klippet %} Beskeden er for lang og bliver
-         klippet af — den vises herover, som den bliver sendt.{% endif %}</p>
+      <p class="muted small">Selve madbestillingen fylder <strong>{{ proeve.tegn }} tegn
+         = {{ proeve.dele }} SMS-del{{ '' if proeve.dele == 1 else 'e' }}</strong>; prøven
+         herover fylder {{ proeve.proeve_tegn }} tegn, fordi mærket følger med. Sendes til
+         {{ proeve.nummer }}.{% if proeve.dele > 1 %} Vil du have den ned på én del, skal
+         den under 160 tegn — kort teksten ned under <em>Mail-skabeloner</em>.{% endif %}{% if proeve.klippet %}
+         Beskeden er for lang og bliver klippet af — den vises herover, som den bliver
+         sendt.{% endif %}</p>
       <form method="post"
             onsubmit="return confirm('Send prøve-SMS til {{ proeve.nummer }}?')">
         <input type="hidden" name="action" value="catering_test">

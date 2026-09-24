@@ -43,10 +43,12 @@ DEFAULT_TEMPLATES = {
     # Madbestilling: går til den, der skal bestille maden — ikke til deltagerne.
     # Pladsholderne {meals}/{count}/{no_meals} findes KUN her og i »deadline«;
     # de andre skabeloner har ingen tal at sætte ind.
-    "catering": ("Madbestilling: {event} d. {date}",
-                 "Tilmeldingen til {event} d. {date}{start} er lukket.\n"
-                 "Der skal bestilles mad til {meals}.\n"
-                 "I alt {count} deltagere inkl. gæster, heraf {no_meals} uden mad."),
+    # Teksten er holdt kort MED VILJE: på SMS klistres emne og tekst sammen til én
+    # besked, og over 160 tegn koster den to dele i stedet for en. Derfor står
+    # navn, dato og klokkeslæt kun ÉN gang — i emnet — og tallene står i teksten.
+    "catering": ("Madbestilling: {event} d. {date}{start}",
+                 "Tilmeldingen er lukket.\n"
+                 "Mad til {meals}. {count} deltagere inkl. gæster, {no_meals} uden mad."),
     # Uden »Hej {name}«: varslingen går også til modtagere UDEN navn — en adresse
     # admin har tastet ind, eller en telefon der har abonneret. »Hej .« er værre
     # end ingen hilsen. Admin kan selv sætte {name} ind, hvis listen har navne.
@@ -464,16 +466,20 @@ def notify_catering(conn, group, ev, note="") -> tuple:
 PROEVE_MAERKE = "[PRØVE]"
 
 
-def catering_test_sms(conn, group, ev) -> str:
-    """Teksten i prøve-SMS'en til madbestilleren — klar til afsendelse.
+def catering_sms(conn, group, ev) -> str:
+    """Madbestillingen, som den lander på telefonen — emne og tekst i én besked.
 
-    Præcis den besked, `notify_catering` ville sende på SMS, med et mærke foran,
-    så modtageren ikke går ud og køber ind til en jagt, der ikke er lukket endnu.
-    Teksten køres gennem `gigasms.prepare()`, fordi det er dén udgave, der lander
-    på telefonen — så er forhåndsvisningen i admin ikke en pæn løgn.
+    Samme sammensætning som `notify_catering` sender, og kørt gennem
+    `gigasms.prepare()`, så admin kan få længden at se uden at gætte.
     """
     subject, body, _ = catering_message(conn, group, ev)
-    return gigasms.prepare(f"{PROEVE_MAERKE} {subject}: {body}")
+    return gigasms.prepare(f"{subject}: {body}")
+
+
+def catering_test_sms(conn, group, ev) -> str:
+    """Prøve-udgaven: den rigtige besked med et mærke foran, så modtageren ikke
+    går ud og køber ind til en jagt, der ikke er lukket endnu."""
+    return gigasms.prepare(f"{PROEVE_MAERKE} {catering_sms(conn, group, ev)}")
 
 
 def send_catering_test(conn, group, ev) -> tuple:
