@@ -80,8 +80,11 @@ def _kald(api_key: str, metode: str, sti: str, krop=None):
         raise SmsError("ingen API-nøgle til inMobile")
     data = json.dumps(krop).encode("utf-8") if krop is not None else None
     req = urllib.request.Request(f"{BASE}{sti}", data=data, method=metode)
-    # Brugernavnet kasseres af API'et; det skal bare være der.
-    noegle = base64.b64encode(f"tilmeld:{api_key.strip()}".encode("utf-8")).decode()
+    # TOMT brugernavn og nøglen som adgangskode. Dokumentationen siger, at
+    # brugernavnet kasseres, men inMobiles egen PHP-klient sender `:<nøgle>`
+    # (CURLOPT_USERPWD), og der er ingen grund til at afvige fra den udgave, de
+    # selv tester imod.
+    noegle = base64.b64encode(f":{api_key.strip()}".encode("utf-8")).decode()
     req.add_header("Authorization", f"Basic {noegle}")
     req.add_header("Accept", "application/json")
     if data is not None:

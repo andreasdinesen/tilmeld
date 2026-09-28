@@ -11,6 +11,18 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 39
+
+**Godkendelsen mod inMobile sendes nu præcis som deres egen klient gør det.**
+
+Vi sendte `tilmeld:<nøgle>` som Basic auth. Dokumentationen siger, at brugernavnet
+kasseres — og inMobiles egen PHP-klient sender `:<nøgle>` med tomt brugernavn. De to
+burde være lige gyldige, men der er ingen grund til at afvige fra den udgave, udbyderen
+selv tester imod, når en nøgle alligevel bliver afvist.
+
+Det løser ikke i sig selv en 401 fra en konto, der endnu ikke er godkendt — det fjerner
+bare en variabel, inden der testes igen.
+
 ## Version 38
 
 **»Tjek SMS-opsætningen« dømte en god inMobile-nøgle ude.**
