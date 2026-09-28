@@ -12,9 +12,13 @@ CREATE TABLE IF NOT EXISTS settings (
     smtp_use_tls        INTEGER DEFAULT 1,
     whatsapp_api_url    TEXT DEFAULT '',             -- URL til WhatsApp-bro/gateway
     whatsapp_api_key    TEXT DEFAULT '',             -- API-nøgle (sendes som Bearer-token)
+    sms_provider        TEXT DEFAULT 'gigahost',     -- hvilken SMS-udbyder: gigahost | inmobile
     sms_username        TEXT DEFAULT '',             -- Gigahost: brugernavn (som i Kontrolcenteret)
     sms_password        TEXT DEFAULT '',             -- Gigahost: API-adgangskode (ikke login-koden)
     sms_sender          TEXT DEFAULT '',             -- afsendernummer, VERIFICERET hos Gigahost
+    inmobile_api_key    TEXT DEFAULT '',             -- inMobile: API-nøgle (Basic auth-adgangskode)
+    inmobile_sender     TEXT DEFAULT '',             -- inMobile: afsender — tekst (3-11 tegn) eller
+                                                     -- et nummer. Tekst kan der ikke svares på.
     base_url            TEXT DEFAULT '',             -- offentlig URL (til links i mails)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT 'andreasdinesen/tilmeld',  -- "ejer/repo" til opdaterings-tjek

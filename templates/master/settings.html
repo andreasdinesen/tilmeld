@@ -73,9 +73,50 @@
     <p><a class="btn" href="{{ url_for('master_whatsapp_groups') }}" target="_blank" rel="noopener">Hent WhatsApp-gruppe-id'er ↗</a></p>
     {% endif %}
 
-    <h2>SMS (Gigahost)</h2>
+    <h2>SMS</h2>
+    {# Én udbyder ad gangen. To gateways, der sendte hver sin kopi af samme besked,
+       ville koste dobbelt og se ud som en fejl på telefonen. #}
+    <label>Udbyder
+      <select name="sms_provider">
+        <option value="gigahost" {{ 'selected' if s.sms_provider != 'inmobile' }}>Gigahost</option>
+        <option value="inmobile" {{ 'selected' if s.sms_provider == 'inmobile' }}>inMobile</option>
+      </select>
+    </label>
+    <p class="muted small">Felterne for begge udbydere står nedenfor og bliver gemt begge
+       to — det er valget her, der afgør, hvem beskederne sendes med.</p>
+
+    <h3>inMobile</h3>
     <details class="help">
-      <summary>Sådan sætter du SMS op</summary>
+      <summary>Sådan sætter du inMobile op</summary>
+      <div class="help-body">
+        <ol>
+          <li>Log ind på <a href="https://app.inmobile.com/" target="_blank" rel="noopener">inMobile</a>
+              og opret en <strong>API-nøgle</strong> (API v4).</li>
+          <li>Skriv nøglen ind her. Den er både brugernavn og adgangskode over for
+              API'et — der er ikke andet at udfylde.</li>
+          <li>Vælg en <strong>afsender</strong>: enten et navn på 3-11 bogstaver
+              (fx <code>Svaljagt</code>) eller et telefonnummer. Et navn kan der
+              <strong>ikke svares på</strong> — vil du kunne modtage svar, skal
+              afsenderen være et nummer.</li>
+          <li>Køb <strong>SMS-klip</strong> hos inMobile. API'et har ikke noget
+              saldo-opslag, så tallet står kun på deres egen side.</li>
+        </ol>
+        <p class="muted small">Modtagernumre skrives som hidtil med landekode
+           (<code>+4520123456</code>); plus og mellemrum fjernes automatisk, inden
+           beskeden sendes.</p>
+      </div>
+    </details>
+    <label>API-nøgle <input type="password" name="inmobile_api_key" value="{{ s.inmobile_api_key }}"></label>
+    <label>Afsender (navn på 3-11 tegn, eller et nummer)
+      <input type="text" name="inmobile_sender" value="{{ s.inmobile_sender }}" placeholder="Svaljagt">
+    </label>
+    {% if s.inmobile_api_key %}
+    <p><a class="btn" href="{{ url_for('master_sms_status') }}" target="_blank" rel="noopener">Tjek SMS-opsætningen ↗</a></p>
+    {% endif %}
+
+    <h3>Gigahost</h3>
+    <details class="help">
+      <summary>Sådan sætter du Gigahost op</summary>
       <div class="help-body">
         <ol>
           <li>Log ind i <a href="https://controlcenter.gigahost.dk/" target="_blank" rel="noopener">Gigahost Kontrolcenter</a>
@@ -100,6 +141,7 @@
     {% if s.sms_username and s.sms_password %}
     <p><a class="btn" href="{{ url_for('master_sms_status') }}" target="_blank" rel="noopener">Tjek saldo og afsendernumre ↗</a></p>
     {% endif %}
+    <p class="muted small">Status-siden viser den udbyder, der er valgt ovenfor.</p>
 
     <h2>Links i mails</h2>
     <label>Offentlig URL (bruges til links i mails, fx til deltagerlisten)

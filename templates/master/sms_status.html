@@ -2,10 +2,38 @@
 {% block brand %}SMS-status{% endblock %}
 {% block content %}
 <div class="card narrow">
-  <h1>SMS hos Gigahost</h1>
-  <p class="muted small">Prøve-opslag på kontoen. Svarer siden, er brugernavn og
-     API-adgangskode rigtige.</p>
+  <h1>SMS hos {{ 'inMobile' if udbyder == 'inmobile' else 'Gigahost' }}</h1>
+  <p class="muted small">Prøve-opslag på kontoen — der sendes ingen beskeder.
+     {% if udbyder == 'inmobile' %}Svarer API'et, er nøglen rigtig.{% else %}Svarer
+     siden, er brugernavn og API-adgangskode rigtige.{% endif %}</p>
 
+  {% if udbyder == 'inmobile' %}
+    {% if error %}
+      <p class="flash error">{{ error[0]|upper }}{{ error[1:] }}</p>
+      <p class="muted small">Nøglen laves i <a href="https://app.inmobile.com/" target="_blank" rel="noopener">inMobiles
+         administration</a> og skrives ind under
+         <a href="{{ url_for('master_settings') }}">Opsætning</a>.</p>
+    {% else %}
+      <p class="flash ok">API-nøglen virker.</p>
+      <p class="muted small">inMobile har ikke noget saldo-opslag i API'et — antallet af
+         SMS-klip ser du på deres egen side. Løber de tør, afvises beskederne, og
+         afvisningen står i <a href="{{ url_for('master_log') }}">aktivitetsloggen</a>.</p>
+      {% if afsender %}
+        <h2>Afsender</h2>
+        {% set kun_cifre = afsender|replace(' ', '')|replace('+', '') %}
+        <p>Beskederne sendes fra <code>{{ afsender }}</code>.
+          {% if not kun_cifre.isdigit() %}
+            <span class="muted small">Et navn kan der ikke svares på — vil du kunne modtage
+            svar, skal afsenderen være et nummer.</span>
+          {% endif %}
+        </p>
+      {% else %}
+        <p class="tag big locked">Der er ikke sat nogen afsender under
+           <a href="{{ url_for('master_settings') }}">Opsætning</a>.</p>
+      {% endif %}
+    {% endif %}
+    <p><a class="btn" href="{{ url_for('master_settings') }}">Tilbage til Opsætning</a></p>
+  {% else %}
   {% if error %}
     {# Fejlteksterne er skrevet til at stå inde i en sætning (»ikke leveret (…)«).
        Her står de alene, så de får et stort begyndelsesbogstav. #}
@@ -56,5 +84,6 @@
   <ul>{% for g in gateways %}<li><code>{{ g }}</code></li>{% endfor %}</ul>
 
   <p><a class="btn" href="{{ url_for('master_settings') }}">Tilbage til Opsætning</a></p>
+  {% endif %}
 </div>
 {% endblock %}

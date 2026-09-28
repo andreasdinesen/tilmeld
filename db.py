@@ -205,6 +205,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
                     # betydningen er den samme, så appen kører videre.
                     print(f"[MIGRATION] kunne ikke fjerne groups.{gammel}: {e}", flush=True)
 
+    # Anden SMS-udbyder ved siden af Gigahost (rune 36).
+    add("settings", "sms_provider", "TEXT DEFAULT 'gigahost'")
+    add("settings", "inmobile_api_key", "TEXT DEFAULT ''")
+    add("settings", "inmobile_sender", "TEXT DEFAULT ''")
+
     # Deltagerliste til jagtlederne, når fristen er nået (rune 35).
     add("events", "notify_leaders", "INTEGER DEFAULT 0")
     add("events", "leaders_sent", "INTEGER DEFAULT 0")

@@ -14,6 +14,7 @@ from email.mime.text import MIMEText
 
 import db
 import gigasms
+import inmobile
 import push as webpush
 
 # Sættes af app.py: funktion (conn, group, event) -> csv-tekst. Undgår cirkulær import.
@@ -139,9 +140,10 @@ def channels(conn, group):
     global opsætning og at master har slået den til for gruppen. `app.group_channels`
     kalder den her, så UI og afsendelse aldrig kan være uenige om, hvad der er aktiveret.
 
-    SMS' »globale opsætning« er brugernavn + API-adgangskode + afsendernummer hos
-    Gigahost. Alle tre skal være der: uden et verificeret afsendernummer svarer
-    gatewayen 403, og så ville kanalen se aktiv ud og aldrig levere noget.
+    SMS' »globale opsætning« afhænger af den udbyder, master har valgt: hos
+    Gigahost brugernavn + API-adgangskode + verificeret afsendernummer, hos
+    inMobile API-nøgle + afsender. Alt skal være der — en halvt opsat gateway
+    ville få kanalen til at se aktiv ud og aldrig levere noget.
 
     Push' »globale opsætning« er den offentlige URL. VAPID-nøglerne laver appen selv,
     men nyttelasten skal indeholde ABSOLUTTE adresser — en relativ adresse får en
@@ -151,7 +153,7 @@ def channels(conn, group):
     s = db.get_settings(conn)
     return (bool(s["smtp_host"]) and bool(group["mail_enabled"]),
             bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"]),
-            gigasms.configured(s) and bool(group["sms_enabled"]),
+            sms_configured(s) and bool(group["sms_enabled"]),
             bool((s["base_url"] or "").strip()) and bool(group["push_enabled"]))
 
 
@@ -251,25 +253,58 @@ def send_whatsapp(settings, to: str, body: str) -> str:
         return str(e)[:300]
 
 
+def sms_provider(settings) -> str:
+    """Hvilken SMS-udbyder er valgt: "gigahost" (standard) eller "inmobile"."""
+    try:
+        valgt = (settings["sms_provider"] or "").strip().lower()
+    except (IndexError, KeyError):
+        valgt = ""
+    return valgt if valgt in ("gigahost", "inmobile") else "gigahost"
+
+
+def sms_module(settings):
+    """Modulet for den valgte udbyder — eller None, hvis den ikke er sat op.
+
+    Kun ÉN udbyder er aktiv ad gangen. To gateways, der sendte hver sin kopi af
+    samme besked, ville koste dobbelt og se ud som en fejl på telefonen.
+    """
+    if sms_provider(settings) == "inmobile":
+        return inmobile if inmobile.configured(settings) else None
+    return gigasms if gigasms.configured(settings) else None
+
+
+def sms_configured(settings) -> bool:
+    """Kan der sendes SMS overhovedet — med den udbyder, master har valgt?"""
+    return sms_module(settings) is not None
+
+
 def send_sms(settings, to: str, body: str) -> str:
-    """Send en SMS via Gigahosts Message Delivery Service. Returnér "" hvis sendt,
-    ellers en kort fejl-/årsagstekst.
+    """Send en SMS. Returnér "" hvis sendt, ellers en kort fejl-/årsagstekst.
 
-    Selve API'et bor i `gigasms.py`. Her ligger kun det, notifikationslaget skal
-    kunne: fejl må aldrig vælte en tilmelding, og en besked, der ikke kan sendes,
-    skal stadig kunne ses i konsollen under lokal test.
+    Hvilken udbyder, der sendes med, er masters valg — `gigasms.py` (Gigahost)
+    eller `inmobile.py` (inMobile). Modulerne har samme overflade, så her skal
+    der kun vælges, ikke gøres noget forskelligt.
 
-    En SMS koster penge pr. afsendt del, så `gigasms.prepare()` holder teksten
-    indenfor 3 dele og oversætter de typografiske tegn, skabelonerne bruger.
+    Her ligger i øvrigt kun det, notifikationslaget skal kunne: fejl må aldrig
+    vælte en tilmelding, og en besked, der ikke kan sendes, skal stadig kunne ses
+    i konsollen under lokal test.
+
+    En SMS koster penge pr. afsendt del, så `smstekst.prepare()` — som begge
+    udbydere kalder — holder teksten indenfor 3 dele.
     """
     if not to:
         return "ingen modtager"
-    if not gigasms.configured(settings):
+    udbyder = sms_module(settings)
+    if not udbyder:
         _log("SMS", to, "(sms)", body)
         return "SMS ikke konfigureret"
     try:
-        gigasms.send(settings["sms_username"], settings["sms_password"],
-                     settings["sms_sender"], to, body, tag="Tilmeld")
+        if udbyder is inmobile:
+            udbyder.send(settings["inmobile_api_key"], settings["inmobile_sender"],
+                         to, body, tag="Tilmeld")
+        else:
+            udbyder.send(settings["sms_username"], settings["sms_password"],
+                         settings["sms_sender"], to, body, tag="Tilmeld")
         return ""
     except Exception as e:  # robust: en notifikation må aldrig vælte en tilmelding
         print(f"[SMS-FEJL] {e}", flush=True)

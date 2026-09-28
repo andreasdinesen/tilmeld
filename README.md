@@ -83,7 +83,30 @@ Tilmeld kalder den med `POST <gateway-url>` og JSON-body `{"to": "<nummer eller 
 "message": "..."}` samt header `Authorization: Bearer <api-nøgle>`. Konfigurér din bro
 til at acceptere det format (eller sæt en lille adapter foran).
 
-## SMS (Gigahost)
+## SMS (Gigahost eller inMobile)
+
+Der er to udbydere at vælge imellem under **master → Opsætning → SMS**. Kun én er aktiv ad
+gangen — to gateways, der sendte hver sin kopi af samme besked, ville koste dobbelt og se
+ud som en fejl på telefonen. Felterne for begge gemmes, så man kan skifte tilbage uden at
+taste forfra.
+
+| | Gigahost | inMobile |
+|---|---|---|
+| Opsætning | brugernavn + API-adgangskode | API-nøgle |
+| Afsender | et **verificeret nummer** | navn på 3-11 tegn **eller** et nummer |
+| Saldo i appen | ja, på status-siden | nej — kun hos inMobile selv |
+| Teknik | XML over HTTP, gateway slås op i DNS | JSON over HTTPS, `api.inmobile.com/v4` |
+
+**inMobile** sættes op med én API-nøgle fra
+[inMobiles administration](https://app.inmobile.com/) og en afsender. Vælger du et navn
+(fx `Svaljagt`) i stedet for et nummer, **kan modtageren ikke svare** på beskeden.
+Knappen *Tjek SMS-opsætningen* prøver nøglen af uden at sende noget.
+
+Reglerne for selve teksten er de samme for begge udbydere og bor i `smstekst.py`:
+3 SMS-dele (459 tegn, eller 201 hvis teksten kræver unicode), og de typografiske tegn
+appen selv skriver oversættes, inden længden måles.
+
+### Gigahost
 
 SMS er den fjerde kanal og følger samme regler som de øvrige: master sætter den op
 globalt og slår den til pr. gruppe, og event-fluebenene bestemmer, hvad der sendes.

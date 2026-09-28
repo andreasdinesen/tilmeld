@@ -15,8 +15,8 @@ Tre ting API'et kræver, som er værd at kende:
    nummer giver 403, ikke en fejl i selve beskeden.
 3. **En besked må fylde højst 3 SMS-dele.** Latin-1 giver 459 tegn, men ét
    eneste tegn udenfor latin-1 (fx en tankestreg) tvinger hele beskeden over i
-   UCS2 og halverer pladsen til 201. Derfor oversætter `prepare()` de typografiske
-   tegn, appen selv skriver, inden længden måles.
+   UCS2 og halverer pladsen til 201. Selve reglen bor i `smstekst.py`, som deles
+   med inMobile-udbyderen.
 
 Kør `python gigasms.py` for at slå gatewayene op (og med GIGAHOST_USER +
 GIGAHOST_PASSWORD i miljøet: hente saldoen og de godkendte afsendernumre).
@@ -33,14 +33,14 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
+import smstekst
+
 SERVICE_ADDRESS = "_sms._tcp.tel.gigahost.dk"
 # Bruges hvis SRV-opslaget ikke kan lade sig gøre. Listen er dokumentationens
 # eksempel; den rigtige liste kommer fra DNS.
 FALLBACK_GATEWAYS = ["gw1.tel.gigahost.dk", "gw2.tel.gigahost.dk"]
 
 MAX_RECIPIENTS = 1000          # gatewayens grænse pr. forsendelse
-LATIN1_MAX = 459               # 3 SMS-dele i latin-1
-UCS2_MAX = 201                 # 3 SMS-dele i unicode
 TIMEOUT = 20
 
 _gateway_cache = {"hosts": [], "at": 0.0}
@@ -52,47 +52,13 @@ class SmsError(Exception):
 
 
 # ---- Tekst: hold beskeden indenfor 3 SMS-dele --------------------------------
-
-# Typografiske tegn appen selv bruger i skabeloner og logtekster. De findes ikke
-# i latin-1, og ét af dem ville tvinge HELE beskeden ned på 201 tegn — og koste
-# det samme i SMS-dele undervejs. Oversættelsen er ren gevinst.
-_TYPOGRAFI = {
-    "—": "-", "–": "-", "…": "...", " ": " ",
-    "“": '"', "”": '"', "„": '"', "‘": "'", "’": "'",
-    "‑": "-", "−": "-", "•": "*", "→": "->",
-}
-
-
-def prepare(text: str) -> str:
-    """Gør teksten klar til en SMS: oversæt typografi og klip til 3 dele."""
-    text = "".join(_TYPOGRAFI.get(ch, ch) for ch in (text or ""))
-    try:
-        text.encode("latin-1")
-        limit = LATIN1_MAX
-    except UnicodeEncodeError:
-        limit = UCS2_MAX
-    if len(text) > limit:
-        text = text[:limit - 3].rstrip() + "..."
-    return text
-
-
-def parts(text: str) -> int:
-    """Hvor mange SMS-dele fylder teksten — altså hvad den kommer til at koste.
-
-    En enkeltstående SMS har plads til 160 tegn (70 i unicode). Skal beskeden
-    deles, går der plads fra hver del til det, der syr dem sammen igen, og
-    grænsen falder til 153 (67). Det er dét regnestykke, `LATIN1_MAX` = 3 × 153
-    og `UCS2_MAX` = 3 × 67 kommer af.
-    """
-    try:
-        text.encode("latin-1")
-        alene, delt = 160, 153
-    except UnicodeEncodeError:
-        alene, delt = 70, 67
-    n = len(text or "")
-    if not n:
-        return 0
-    return 1 if n <= alene else -(-n // delt)
+# Reglerne bor i `smstekst.py`, fordi de gælder uanset udbyder — de står her som
+# navne, fordi resten af appen kender dem herfra (app.py måler længden på en
+# madbestilling med gigasms.parts).
+LATIN1_MAX = smstekst.LATIN1_MAX
+UCS2_MAX = smstekst.UCS2_MAX
+prepare = smstekst.prepare
+parts = smstekst.parts
 
 
 # ---- HTTP mod gatewayen ------------------------------------------------------

@@ -29,7 +29,9 @@ from werkzeug.utils import secure_filename
 import auth
 import db
 import gigasms
+import inmobile
 import notifications
+import smstekst
 import passkeys
 import push
 import system_info
@@ -563,21 +565,37 @@ def master_sms_status():
     conn = db.get_db()
     s = db.get_settings(conn)
     conn.close()
+    udbyder = notifications.sms_provider(s)
+    vis = dict(udbyder=udbyder, konto=None, numre=None, error=None, gateways=[],
+               afsender="", lister=None)
+
+    if udbyder == "inmobile":
+        # inMobile har ikke noget saldo-opslag i API'et; prøven er, om nøglen
+        # overhovedet lukker os ind. Opslaget er harmløst — se inmobile.check.
+        vis["afsender"] = (s["inmobile_sender"] or "").strip()
+        if not (s["inmobile_api_key"] or "").strip():
+            vis["error"] = ("inMobile er ikke sat op endnu — udfyld API-nøglen "
+                            "under Opsætning.")
+        else:
+            try:
+                vis["lister"] = inmobile.check(s["inmobile_api_key"])
+            except inmobile.SmsError as e:
+                vis["error"] = str(e)
+        return render_template("master/sms_status.html", **vis)
+
     bruger = (s["sms_username"] or "").strip()
+    vis["afsender"] = (s["sms_sender"] or "").strip()
     if not bruger or not (s["sms_password"] or ""):
-        return render_template("master/sms_status.html",
-                               error="SMS er ikke sat op endnu — udfyld brugernavn "
-                                     "og API-adgangskode under Opsætning.",
-                               konto=None, numre=None, afsender="", gateways=[])
+        vis["error"] = ("SMS er ikke sat op endnu — udfyld brugernavn "
+                        "og API-adgangskode under Opsætning.")
+        return render_template("master/sms_status.html", **vis)
     try:
-        konto = gigasms.credits(bruger, s["sms_password"])
-        numre = gigasms.numbers(bruger, s["sms_password"])
-        fejl = None
+        vis["konto"] = gigasms.credits(bruger, s["sms_password"])
+        vis["numre"] = gigasms.numbers(bruger, s["sms_password"])
+        vis["gateways"] = gigasms.gateways()
     except gigasms.SmsError as e:
-        konto, numre, fejl = None, None, str(e)
-    return render_template("master/sms_status.html", konto=konto, numre=numre,
-                           error=fejl, afsender=(s["sms_sender"] or "").strip(),
-                           gateways=gigasms.gateways())
+        vis["error"] = str(e)
+    return render_template("master/sms_status.html", **vis)
 
 
 @app.route("/master/settings", methods=["GET", "POST"])
@@ -593,7 +611,8 @@ def master_settings():
         conn.execute(
             "UPDATE settings SET smtp_host=?, smtp_port=?, smtp_user=?, smtp_password=?, "
             "smtp_from=?, smtp_use_tls=?, whatsapp_api_url=?, whatsapp_api_key=?, "
-            "sms_username=?, sms_password=?, sms_sender=?, "
+            "sms_provider=?, sms_username=?, sms_password=?, sms_sender=?, "
+            "inmobile_api_key=?, inmobile_sender=?, "
             "base_url=?, default_deadline_days=?, github_repo=?, update_branch=? WHERE id = 1",
             (request.form.get("smtp_host", "").strip(),
              int(request.form.get("smtp_port") or 587),
@@ -603,9 +622,13 @@ def master_settings():
              1 if request.form.get("smtp_use_tls") else 0,
              request.form.get("whatsapp_api_url", "").strip(),
              request.form.get("whatsapp_api_key", "").strip(),
+             ("inmobile" if request.form.get("sms_provider") == "inmobile"
+              else "gigahost"),
              request.form.get("sms_username", "").strip(),
              request.form.get("sms_password", ""),
              request.form.get("sms_sender", "").strip(),
+             request.form.get("inmobile_api_key", "").strip(),
+             request.form.get("inmobile_sender", "").strip(),
              request.form.get("base_url", "").strip(),
              int(request.form.get("default_deadline_days") or 4),
              request.form.get("github_repo", "").strip(),
@@ -1088,10 +1111,10 @@ def admin_settings(slug):
             rigtig = notifications.catering_sms(conn, group, ev)
             proeve = {
                 "ev": ev, "nummer": cat_tlf, "tekst": tekst,
-                "tegn": len(rigtig), "dele": gigasms.parts(rigtig),
-                "proeve_tegn": len(tekst), "proeve_dele": gigasms.parts(tekst),
+                "tegn": len(rigtig), "dele": smstekst.parts(rigtig),
+                "proeve_tegn": len(tekst), "proeve_dele": smstekst.parts(tekst),
                 "klippet": tekst.endswith("...")
-                           and len(tekst) in (gigasms.LATIN1_MAX, gigasms.UCS2_MAX),
+                           and len(tekst) in (smstekst.LATIN1_MAX, smstekst.UCS2_MAX),
                 "tidligere": ev["event_date"] < datetime.now().strftime("%Y-%m-%d"),
             }
     # Hvor mange tilmeldinger har allerede et svar på hvert punkt — vises i redigér-

@@ -11,6 +11,29 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 36
+
+**SMS kan nu sendes med inMobile i stedet for Gigahost.**
+
+Under **master → Opsætning → SMS** vælger man udbyder. inMobile kræver kun to ting: en
+API-nøgle og en afsender. Afsenderen må være et **navn** på 3-11 tegn (fx »Svaljagt«) og
+ikke kun et verificeret nummer, som hos Gigahost — til gengæld kan modtageren ikke svare
+på en besked fra et navn.
+
+Felterne for begge udbydere står på siden og bliver gemt begge to, så man kan skifte frem
+og tilbage uden at taste forfra. Kun den valgte er aktiv: to gateways, der sendte hver sin
+kopi af samme besked, ville koste dobbelt og se ud som en fejl på telefonen.
+
+Knappen *Tjek SMS-opsætningen* prøver nøglen af uden at sende noget. Den slår kontoens
+modtagerlister op — ikke statusrapporterne, som ellers var det oplagte valg: dem
+udleverer API'et kun én gang og sletter dem bagefter, så et uskyldigt tjek ville smide
+kvitteringerne for allerede sendte beskeder væk. inMobile har ikke noget saldo-opslag i
+API'et, så antallet af SMS-klip ses kun på deres egen side.
+
+Reglerne for selve teksten — 3 SMS-dele, og de typografiske tegn oversat — er flyttet til
+`smstekst.py` og deles nu af begge udbydere, så de ikke kan komme til at klippe en besked
+forskelligt.
+
 ## Version 35
 
 **Overblik i CSV-listen, og deltagerlisten til jagtlederne når fristen er nået.**
