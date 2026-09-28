@@ -1097,7 +1097,7 @@ def admin_settings(slug):
         labels = {"new_signup": "Ny tilmelding (til admin)",
                   "change": "Ændret tilmelding (til admin)",
                   "receipt": "Kvittering (til deltager)",
-                  "reminder": "Påmindelse 48t før frist (til notifikationslisten)",
+                  "reminder": "Påmindelse 48t før frist (til dem, der ikke har svaret)",
                   "deadline": "Frist nået (til admin, med link)",
                   "waitlist_promoted": "Rykket op fra venteliste (til deltager)",
                   "event_reminder": "Påmindelse før eventet (til deltager)",

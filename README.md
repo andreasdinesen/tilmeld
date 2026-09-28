@@ -204,6 +204,12 @@ event arver begge dele.
 Deltagerlisten viser, hvem beskeden går til og hvor mange kuverter, med en knap
 **»Send nu«** — til når tallet skal meldes ind før fristen, eller sendes igen.
 
+Påmindelsen **48 timer før fristen** går kun til dem på notifikationslisten, der hverken
+har tilmeldt sig eller meldt afbud — et afbud er også et svar. Sammenligningen er på navn
+(og på brugeren bag tilmeldingen i grupper med konti); den, der står på listen uden navn,
+kan ikke matches og får påmindelsen. Har alle svaret, sendes der ingenting, og det noteres
+i aktivitetsloggen.
+
 **Stilletid 22–08:** beskederne fra scheduleren til folks telefoner (madbestilling,
 deltagerliste til jagtlederne, påmindelse før frist, påmindelse før eventet og varsling om
 nye events) sendes ikke om natten. En tilmeldingsfrist kl. 23.00 udløser altså en

@@ -704,7 +704,38 @@ def list_recipients(conn, group):
     return uniq
 
 
-def send_to_list(conn, group, subject, body, ctx=None, note=""):
+def _norm_navn(v) -> str:
+    """Sammenligningsform for et navn: små bogstaver, ét mellemrum.
+    »  Knud  Poulsen « og »knud poulsen« er den samme mand."""
+    return " ".join(str(v or "").split()).lower()
+
+
+def list_recipients_uden_svar(conn, group, ev) -> list:
+    """Dem på listen, der hverken har tilmeldt sig eller meldt afbud til eventet.
+
+    Et AFBUD er også et svar: det er en tilmeldings-række med »deltager ikke«
+    krydset af, og den tæller her på lige fod med en tilmelding. Pointen med
+    påmindelsen er at fange dem, man ikke har hørt fra — ikke at rykke folk, der
+    allerede har taget stilling.
+
+    Sammenligningen er på NAVN, for det er navnet, tilmeldingen bærer. I grupper
+    med konti matches desuden på brugeren bag tilmeldingen. Den, der står på
+    listen uden navn (kun et nummer), kan ikke matches og får påmindelsen — det
+    er den rigtige vej at fejle.
+    """
+    svaret = set()
+    for r in conn.execute(
+            "SELECT r.name, u.name AS user_name, u.username FROM registrations r "
+            "LEFT JOIN users u ON u.id = r.user_id WHERE r.event_id = ?",
+            (ev["id"],)).fetchall():
+        for navn in (r["name"], r["user_name"], r["username"]):
+            if (navn or "").strip():
+                svaret.add(_norm_navn(navn))
+    return [m for m in list_recipients(conn, group)
+            if _norm_navn(m["name"]) not in svaret]
+
+
+def send_to_list(conn, group, subject, body, ctx=None, note="", modtagere=None):
     """Send én besked til hele notifikationslisten.
     Returnér (mails, whatsapps, sms'er, push, fejl).
 
@@ -712,6 +743,9 @@ def send_to_list(conn, group, subject, body, ctx=None, note=""):
     modtager, så {name} bliver modtagerens eget navn. Kanalerne følger det, master har
     aktiveret for gruppen: er mail slået fra, sendes der ikke mail, uanset hvad der står
     i listen.
+
+    `modtagere` er hele listen, når den ikke gives. Påmindelsen før fristen sender kun
+    til dem, der ikke har svaret (se `list_recipients_uden_svar`).
 
     Modtagerens mobilnummer bruges af BÅDE WhatsApp og SMS — det er ét nummer, og
     hvilke kanaler det nås på, er masters valg pr. gruppe. Er begge slået til, får
@@ -737,7 +771,7 @@ def send_to_list(conn, group, subject, body, ctx=None, note=""):
                        group["slug"])
 
     ctx = _pretty_dates(ctx)
-    for r in list_recipients(conn, group):
+    for r in (list_recipients(conn, group) if modtagere is None else modtagere):
         if not r["active"]:
             continue
         c = dict(ctx or {}, name=r["name"])
@@ -914,7 +948,16 @@ def process_scheduled(now=None):
                 # allerede er tilmeldt. Pointen er at fange dem, der IKKE har svaret
                 # endnu — de står pr. definition ikke på deltagerlisten.
                 subject, body = template_for(conn, group, "reminder")
-                send_to_list(conn, group, subject, body, ctx, note="48t før frist")
+                # Kun dem, vi ikke har hørt fra. Har alle svaret — tilmeldt eller
+                # afbud — er der ingen at rykke, og så skal der ikke sendes noget.
+                mangler = list_recipients_uden_svar(conn, group, ev)
+                if mangler:
+                    send_to_list(conn, group, subject, body, ctx,
+                                 note="48t før frist", modtagere=mangler)
+                else:
+                    db.add_log(conn, "event",
+                               f"Påmindelse ikke sendt — alle på listen har svaret: "
+                               f"{ev['name']}", group["slug"])
                 notify_admin(conn, group, *render_message(conn, group, "reminder", ctx))
                 conn.execute("UPDATE events SET reminder_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()

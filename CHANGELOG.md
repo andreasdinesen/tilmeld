@@ -11,6 +11,24 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 51
+
+**Påmindelsen før fristen rykker kun dem, man ikke har hørt fra.**
+
+Den gik til hele notifikationslisten — også til dem, der havde tilmeldt sig for en uge
+siden. Nu springes de over, og det gælder også dem, der har **meldt afbud**: et afbud er
+et svar på lige fod med en tilmelding, og pointen med påmindelsen er at fange tavsheden.
+
+Sammenligningen er på navn, for det er navnet, tilmeldingen bærer (»  Knud  Poulsen « og
+»knud poulsen« er den samme mand). I grupper med konti matches desuden på brugeren bag
+tilmeldingen. Den, der står på listen uden navn — kun et nummer — kan ikke matches og får
+påmindelsen; det er den rigtige vej at fejle.
+
+Har alle svaret, sendes der ingenting, og der står en linje om det i aktivitetsloggen.
+
+Push til dem, der har slået notifikationer til på forsiden, kan ikke filtreres: et
+push-abonnement hænger på en enhed, ikke på et navn.
+
 ## Version 50
 
 **Deltagerlisten kan sendes til hvem som helst.**
