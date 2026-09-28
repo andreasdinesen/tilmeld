@@ -11,6 +11,18 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 45
+
+**»Tilføj i Google Kalender« sendte en adresse, Google ikke kunne se.**
+
+Knappen pegede på `webcal://`-udgaven af feedet. Google laver et internt kalender-id ud af
+adressen — og `webcal://` og `https://` giver hvert sit id. Abonnerede man i forvejen på
+https-udgaven, spurgte knappen altså om et id, kontoen aldrig havde set, og Google svarede
+»You don't have access« med tilbud om at *anmode om adgang* til sin egen kalender.
+
+Knappen sender nu https-adressen. Apple-knappen bliver ved med `webcal://` — det er dét
+skema, Apple Kalender selv forventer.
+
 ## Version 44
 
 **Nu kan man se, om kalenderen overhovedet henter.**

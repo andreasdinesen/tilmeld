@@ -45,11 +45,16 @@
          kommer til senere, og ændringer i dato, tidspunkt og beskrivelse.</p>
       {# To knapper frem for en adresse, der skal kopieres rigtigt: Google henter
          ikke feedet, hvis adressen er http (den får et 301 og giver op i stilhed),
-         og webcal-skemaet er dét, Apple Kalender selv forventer. #}
+         og webcal-skemaet er dét, Apple Kalender selv forventer.
+
+         Google får https-adressen og IKKE webcal-udgaven: Google laver et internt
+         kalender-id ud af adressen, og de to skemaer giver hvert sit id. Peger
+         knappen på webcal-udgaven, mens man i forvejen abonnerer på https-udgaven,
+         svarer Google »You don't have access« på et id, man aldrig har set. #}
       {% set webcal = cal_url|replace('https://', 'webcal://')|replace('http://', 'webcal://') %}
       <div class="actions">
         <a class="btn" target="_blank" rel="noopener"
-           href="https://calendar.google.com/calendar/r?cid={{ webcal|urlencode }}">Tilføj i Google Kalender</a>
+           href="https://calendar.google.com/calendar/r?cid={{ cal_url|urlencode }}">Tilføj i Google Kalender</a>
         <a class="btn" href="{{ webcal }}">Tilføj i Apple Kalender</a>
         <button type="button" data-kopi="kalenderadresse"
                 data-kopi-ok="Adressen er kopieret — sæt den ind i din kalender.">Kopiér adressen</button>
