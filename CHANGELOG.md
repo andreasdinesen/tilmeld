@@ -11,6 +11,22 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 38
+
+**»Tjek SMS-opsætningen« dømte en god inMobile-nøgle ude.**
+
+Knappen slog kontoens modtagerlister op. Men en nøgle hos inMobile kan begrænses til
+bestemte operationer, og API'et har **ingen 403** — en nøgle, der gerne må sende, men ikke
+læse lister, får nøjagtig samme 401 som en forkert nøgle. Så stod der »inMobile afviste
+API-nøglen«, selvom afsendelsen ville have virket.
+
+Nu prøves to opslag: først SMS-skabelonerne (samme område som afsendelsen), derefter
+modtagerlisterne. Svarer ét af dem, er nøglen god. Svarer ingen, siger siden kun det, den
+ved — at nøglen ikke kom igennem *her* — og peger på, at afsendelsen er en anden
+rettighed, som man kan prøve af med prøve-SMS'en.
+
+Status-siden siger desuden til, hvis afsender-nummeret mangler landekode.
+
 ## Version 37
 
 **»SMS er ikke sat op« siger nu hvad der mangler.**

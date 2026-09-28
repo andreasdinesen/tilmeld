@@ -567,7 +567,7 @@ def master_sms_status():
     conn.close()
     udbyder = notifications.sms_provider(s)
     vis = dict(udbyder=udbyder, konto=None, numre=None, error=None, gateways=[],
-               afsender="", lister=None)
+               afsender="", proeve=None)
 
     if udbyder == "inmobile":
         # inMobile har ikke noget saldo-opslag i API'et; prøven er, om nøglen
@@ -578,7 +578,7 @@ def master_sms_status():
                             "under Opsætning.")
         else:
             try:
-                vis["lister"] = inmobile.check(s["inmobile_api_key"])
+                vis["proeve"] = inmobile.check(s["inmobile_api_key"])
             except inmobile.SmsError as e:
                 vis["error"] = str(e)
         return render_template("master/sms_status.html", **vis)

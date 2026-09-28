@@ -112,7 +112,10 @@ def _fejltekst(e) -> str:
     besked = (krop.get("errorMessage") or "").strip()
     detaljer = "; ".join(str(d) for d in (krop.get("details") or []))[:200]
     if e.code == 401:
-        return "inMobile afviste API-nøglen (401)"
+        # Ingen 403 i API'et: en nøgle uden rettighed til netop dette opslag får
+        # samme svar som en forkert nøgle. Teksten må ikke gætte på hvilken.
+        return ("inMobile afviste nøglen (401) — enten er den forkert, eller også "
+                "har den ikke lov til dette opslag")
     samlet = " — ".join(x for x in (besked, detaljer) if x)
     return f"inMobile svarede {e.code}" + (f": {samlet}" if samlet else "")
 
@@ -164,19 +167,37 @@ def send(api_key: str, sender: str, recipients, message: str, tag: str = "") -> 
             "erroneous_numbers": [x for x in fejlede if x]}
 
 
-def check(api_key: str) -> dict:
-    """Prøv nøglen af uden at sende noget. Returnér {"lists": antal}.
+# Harmløse opslag, nøglen kan prøves af med. Rækkefølgen er ikke tilfældig:
+# skabelonerne hører til SMS-området ligesom afsendelsen, så en nøgle, der må
+# sende, må som regel også læse dem. Modtagerlisterne er reserven.
+#
+# Statusrapporterne ville ellers være det oplagte valg — de er en fælde: API'et
+# udleverer hver rapport ÉN gang og sletter den bagefter, så et »tjek nøglen«-klik
+# ville smide kvitteringerne for allerede sendte beskeder væk.
+_PROEVEOPSLAG = (("SMS-skabelonerne", "/v4/sms/templates?pageLimit=1"),
+                 ("modtagerlisterne", "/v4/lists?pageLimit=1"))
 
-    Opslaget er gruppens modtagerlister — et harmløst GET. Det oplagte valg,
-    statusrapporterne, ville være en fælde: API'et udleverer hver rapport ÉN
-    gang og sletter den bagefter, så et »tjek nøglen«-klik ville smide kvitteringer
-    for allerede sendte beskeder væk.
+
+def check(api_key: str) -> dict:
+    """Prøv nøglen af uden at sende noget. Returnér {"opslag": det der svarede}.
+
+    En nøgle hos inMobile kan begrænses til bestemte operationer, og API'et har
+    ingen 403: en manglende rettighed kommer tilbage som 401 — præcis som en
+    forkert nøgle. Derfor prøves flere opslag. Svarer ét af dem, er nøglen god;
+    svarer ingen, siger vi det, vi VED (den kom ikke igennem her), og ikke at den
+    er forkert.
 
     inMobile har ikke noget saldo-opslag i API'et — antallet af SMS-klip ses kun
     på deres egen side.
     """
-    svar = _kald(api_key, "GET", "/v4/lists?pageLimit=1")
-    return {"lists": len(svar.get("items") or svar.get("_embedded") or [])}
+    sidste = None
+    for navn, sti in _PROEVEOPSLAG:
+        try:
+            _kald(api_key, "GET", sti)
+            return {"opslag": navn}
+        except SmsError as e:
+            sidste = e
+    raise sidste
 
 
 def selvtest():

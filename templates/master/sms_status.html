@@ -13,8 +13,17 @@
       <p class="muted small">Nøglen laves i <a href="https://app.inmobile.com/" target="_blank" rel="noopener">inMobiles
          administration</a> og skrives ind under
          <a href="{{ url_for('master_settings') }}">Opsætning</a>.</p>
+      {# Et 401 kan betyde to ting, og vi kan ikke se hvilken: API'et har ingen 403,
+         så en nøgle uden rettighed til netop dette opslag svarer som en forkert
+         nøgle. Afsendelsen er en anden rettighed og kan udmærket virke alligevel. #}
+      <p class="muted small">Opslaget her læser kontoens SMS-skabeloner og modtagerlister.
+         En nøgle kan i inMobiles administration være <strong>begrænset til bestemte
+         operationer</strong>, og API'et svarer det samme, uanset om nøglen er forkert
+         eller bare ikke må læse dem. Er nøglen sat op til at <em>sende</em>, virker
+         afsendelsen fint alligevel — prøv den med <strong>Send prøve-SMS</strong> under
+         gruppens Opsætning → Kontakt → Madbestiller.</p>
     {% else %}
-      <p class="flash ok">API-nøglen virker.</p>
+      <p class="flash ok">API-nøglen virker — {{ proeve.opslag }} kunne læses.</p>
       <p class="muted small">inMobile har ikke noget saldo-opslag i API'et — antallet af
          SMS-klip ser du på deres egen side. Løber de tør, afvises beskederne, og
          afvisningen står i <a href="{{ url_for('master_log') }}">aktivitetsloggen</a>.</p>
@@ -25,6 +34,10 @@
           {% if not kun_cifre.isdigit() %}
             <span class="muted small">Et navn kan der ikke svares på — vil du kunne modtage
             svar, skal afsenderen være et nummer.</span>
+          {% elif kun_cifre|length < 10 %}
+            <span class="muted small">Et nummer bør skrives <strong>med landekode</strong>
+            (fx <code>45{{ kun_cifre }}</code>) — ellers kan operatøren vise afsenderen
+            forkert.</span>
           {% endif %}
         </p>
       {% else %}
