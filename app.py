@@ -2014,8 +2014,8 @@ def calendar_url(conn, group) -> str:
     token = ensure_calendar_token(conn, group)
     base = public_base_url(conn).rstrip("/")
     if base:
-        return f"{base}/{group['slug']}/kalender.ics?token={token}"
-    url = url_for("group_calendar_ics", slug=group["slug"], token=token, _external=True)
+        return f"{base}/{group['slug']}/kalender-{token}.ics"
+    url = url_for("group_calendar_ics_sti", slug=group["slug"], token=token, _external=True)
     if request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip() == "https":
         url = url.replace("http://", "https://", 1)
     return url
@@ -2122,14 +2122,34 @@ def user_logout(slug):
     return redirect(url_for("user_login", slug=slug))
 
 
+@app.route("/<slug>/kalender-<token>.ics")
+def group_calendar_ics_sti(slug, token):
+    """Samme feed, men med nøglen i STIEN i stedet for som ?token=.
+
+    Det er den adresse, der deles ud. Google Kalender afviste adressen med
+    forespørgselsstreng (»Unable to add calendar. Check the URL.«), selvom serveren
+    svarede 200 på præcis den adresse — over for curl, over for Googles eget
+    kendetegn, med og uden gzip. Forespørgselsstrengen var den eneste forskel fra et
+    ganske almindeligt .ics-feed, så den er væk nu.
+
+    Den gamle rute bliver stående: nogen abonnerer allerede på den, og et
+    kalender-abonnement, der holder op med at virke, opdager man ikke.
+    """
+    return _calendar_feed(slug, token)
+
+
 @app.route("/<slug>/kalender.ics")
 def group_calendar_ics(slug):
+    """Den gamle adresse med ?token=. Bevares for dem, der allerede abonnerer."""
+    return _calendar_feed(slug, request.args.get("token", ""))
+
+
+def _calendar_feed(slug, token):
     """Abonnements-feed til Google/Outlook/Apple Kalender. Adgang via hemmelig token
     (kalender-apps sender ikke cookies) — eller almindelig login i browseren."""
     group = get_group(slug)
     if not group:
         abort(404)
-    token = request.args.get("token", "")
     if not (group["calendar_token"] and token == group["calendar_token"]):
         if not user_has_access(group):
             abort(404)

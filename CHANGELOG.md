@@ -11,6 +11,21 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 46
+
+**Kalender-adressen har fået nøglen ind i stien: `/jagt/kalender-<nøgle>.ics`.**
+
+Google Kalender afviste den gamle adresse med »Unable to add calendar. Check the URL.«
+Serveren svarede 200 på præcis den adresse — over for curl, over for Googles eget
+kendetegn `Google-Calendar-Importer`, med HEAD, med gzip og med betinget hent. Filen er
+gennemgået mod RFC 5545. Andre kalender-apps henter den uden at kny.
+
+Tilbage stod én forskel fra et ganske almindeligt .ics-feed: forespørgselsstrengen
+`?token=`. Den er væk nu.
+
+**Den gamle adresse virker stadig** — et abonnement, der holder op med at virke, opdager
+man ikke. Men det er den nye, der deles ud, og den, de to knapper peger på.
+
 ## Version 45
 
 **»Tilføj i Google Kalender« sendte en adresse, Google ikke kunne se.**

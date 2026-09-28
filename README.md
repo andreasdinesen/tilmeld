@@ -39,6 +39,10 @@ MASTER_PASSWORD="dit-hemmelige-kodeord" bash run.sh
 
 `/master` og `/gruppe/admin` er reserverede og kan ikke oprettes som gruppe-/event-navne.
 
+Kalender-feedet ligger på `/<gruppe>/kalender-<nøgle>.ics` — nøglen i stien og ikke som
+`?token=`, fordi Google Kalender afviser at tilføje en adresse med forespørgselsstreng.
+Den gamle `?token=`-adresse svarer stadig, så gamle abonnementer ikke dør.
+
 **Versionsnummeret står i topbaren** på alle tre niveauer (`v39` ved siden af navnet), så
 man altid kan se, hvilken udgave serveren kører — fx efter en genstart.
 
