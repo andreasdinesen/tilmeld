@@ -63,11 +63,30 @@ parts = smstekst.parts
 
 # ---- HTTP mod gatewayen ------------------------------------------------------
 
+NAVN = "Gigahost"
+
+
 def configured(settings) -> bool:
     """Er SMS sat op globalt? Alle tre dele skal være der for at kunne sende."""
-    return bool((settings["sms_username"] or "").strip()
-                and (settings["sms_password"] or "")
-                and (settings["sms_sender"] or "").strip())
+    return not mangler(settings)
+
+
+def mangler(settings) -> str:
+    """Hvad står tomt? "" hvis udbyderen er klar. Teksten vises til master."""
+    savn = [navn for navn, n in (("et brugernavn", "sms_username"),
+                                 ("en API-adgangskode", "sms_password"),
+                                 ("et afsendernummer", "sms_sender"))
+            if not (settings[n] or "").strip()]
+    if not savn:
+        return ""
+    liste = ", ".join(savn[:-1]) + " og " + savn[-1] if len(savn) > 1 else savn[0]
+    return f"{NAVN} mangler {liste}"
+
+
+def send_settings(settings, to, body) -> dict:
+    """Send med de oplysninger, master har gemt. Samme kald hos alle udbydere."""
+    return send(settings["sms_username"], settings["sms_password"],
+                settings["sms_sender"], to, body, tag="Tilmeld")
 
 
 def _request(username, password, method, path, params=None) -> bytes:

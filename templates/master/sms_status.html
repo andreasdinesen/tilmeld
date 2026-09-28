@@ -2,12 +2,41 @@
 {% block brand %}SMS-status{% endblock %}
 {% block content %}
 <div class="card narrow">
-  <h1>SMS hos {{ 'inMobile' if udbyder == 'inmobile' else 'Gigahost' }}</h1>
+  <h1>SMS hos {{ {'inmobile': 'inMobile', 'suresms': 'SureSMS'}.get(udbyder, 'Gigahost') }}</h1>
   <p class="muted small">Prøve-opslag på kontoen — der sendes ingen beskeder.
-     {% if udbyder == 'inmobile' %}Svarer API'et, er nøglen rigtig.{% else %}Svarer
-     siden, er brugernavn og API-adgangskode rigtige.{% endif %}</p>
+     {% if udbyder == 'inmobile' %}Svarer API'et, er nøglen rigtig.
+     {% elif udbyder == 'suresms' %}Svarer kontoen, er login og adgangskode rigtige.
+     {% else %}Svarer siden, er brugernavn og API-adgangskode rigtige.{% endif %}</p>
 
-  {% if udbyder == 'inmobile' %}
+  {% if udbyder == 'suresms' %}
+    {% if error %}
+      <p class="flash error">{{ error[0]|upper }}{{ error[1:] }}</p>
+      <p class="muted small">Login og adgangskode rettes under
+         <a href="{{ url_for('master_settings') }}">Opsætning</a>. Bruger du en API-nøgle,
+         skal der stå <code>apikey</code> i login-feltet — og er dit login et telefonnummer,
+         skal landekoden med.</p>
+    {% else %}
+      <p class="flash ok">Login virker.</p>
+      <h2>Saldo</h2>
+      {% if saldo.amount %}
+        <p><strong>{{ saldo.amount }}</strong> {{ saldo.currency }} tilbage på kontoen.</p>
+      {% else %}
+        <p class="muted small">Kontoen svarede, men saldoen kunne ikke læses ud af svaret:
+           <code>{{ saldo.raw }}</code></p>
+      {% endif %}
+      <h2>Afsender</h2>
+      {% if afsender %}
+        <p>Beskederne sendes fra <code>{{ afsender }}</code>.
+           <span class="muted small">Den skal være godkendt hos SureSMS — ellers afvises
+           beskederne med en 401, uanset at login er rigtigt.</span></p>
+      {% else %}
+        <p class="muted small">Ingen afsender valgt — SureSMS bruger kontoens standard
+           for afsender.</p>
+      {% endif %}
+    {% endif %}
+    <p><a class="btn" href="{{ url_for('master_settings') }}">Tilbage til Opsætning</a></p>
+
+  {% elif udbyder == 'inmobile' %}
     {% if error %}
       <p class="flash error">{{ error[0]|upper }}{{ error[1:] }}</p>
       <p class="muted small">Nøglen laves i <a href="https://app.inmobile.com/" target="_blank" rel="noopener">inMobiles

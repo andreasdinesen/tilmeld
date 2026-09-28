@@ -15,6 +15,7 @@ from email.mime.text import MIMEText
 import db
 import gigasms
 import inmobile
+import suresms
 import push as webpush
 
 # Sættes af app.py: funktion (conn, group, event) -> csv-tekst. Undgår cirkulær import.
@@ -253,13 +254,20 @@ def send_whatsapp(settings, to: str, body: str) -> str:
         return str(e)[:300]
 
 
+# De SMS-udbydere, master kan vælge imellem. Modulerne har samme overflade —
+# NAVN, configured(), mangler(), send_settings() — så der kun skal VÆLGES her,
+# ikke gøres noget forskelligt. En fjerde udbyder er en linje i denne tabel.
+SMS_UDBYDERE = {"gigahost": gigasms, "inmobile": inmobile, "suresms": suresms}
+SMS_STANDARD = "gigahost"
+
+
 def sms_provider(settings) -> str:
-    """Hvilken SMS-udbyder er valgt: "gigahost" (standard) eller "inmobile"."""
+    """Hvilken SMS-udbyder er valgt — en nøgle i SMS_UDBYDERE."""
     try:
         valgt = (settings["sms_provider"] or "").strip().lower()
     except (IndexError, KeyError):
         valgt = ""
-    return valgt if valgt in ("gigahost", "inmobile") else "gigahost"
+    return valgt if valgt in SMS_UDBYDERE else SMS_STANDARD
 
 
 def sms_module(settings):
@@ -268,9 +276,8 @@ def sms_module(settings):
     Kun ÉN udbyder er aktiv ad gangen. To gateways, der sendte hver sin kopi af
     samme besked, ville koste dobbelt og se ud som en fejl på telefonen.
     """
-    if sms_provider(settings) == "inmobile":
-        return inmobile if inmobile.configured(settings) else None
-    return gigasms if gigasms.configured(settings) else None
+    mod = SMS_UDBYDERE[sms_provider(settings)]
+    return mod if mod.configured(settings) else None
 
 
 def sms_configured(settings) -> bool:
@@ -282,21 +289,10 @@ def sms_mangler(settings) -> str:
     """Hvad mangler der, før den valgte udbyder kan sende? "" hvis intet.
 
     »SMS er ikke sat op« er sandt, men ubrugeligt: man har lige udfyldt noget og
-    kan ikke se hvad der så stadig står tomt. Teksten her nævner feltet.
+    kan ikke se hvad der så stadig står tomt. Hver udbyder kender selv sine
+    felter og svarer for sig.
     """
-    def tomme(felter):
-        savn = [navn for navn, n in felter if not (settings[n] or "").strip()]
-        # »a, b og c« — ikke »a og b og c«.
-        return ", ".join(savn[:-1]) + " og " + savn[-1] if len(savn) > 1 else "".join(savn)
-
-    if sms_provider(settings) == "inmobile":
-        savn = tomme([("en API-nøgle", "inmobile_api_key"),
-                      ("en afsender", "inmobile_sender")])
-        return f"inMobile mangler {savn}" if savn else ""
-    savn = tomme([("et brugernavn", "sms_username"),
-                  ("en API-adgangskode", "sms_password"),
-                  ("et afsendernummer", "sms_sender")])
-    return f"Gigahost mangler {savn}" if savn else ""
+    return SMS_UDBYDERE[sms_provider(settings)].mangler(settings)
 
 
 def send_sms(settings, to: str, body: str) -> str:
@@ -320,12 +316,7 @@ def send_sms(settings, to: str, body: str) -> str:
         _log("SMS", to, "(sms)", body)
         return sms_mangler(settings) or "SMS ikke konfigureret"
     try:
-        if udbyder is inmobile:
-            udbyder.send(settings["inmobile_api_key"], settings["inmobile_sender"],
-                         to, body, tag="Tilmeld")
-        else:
-            udbyder.send(settings["sms_username"], settings["sms_password"],
-                         settings["sms_sender"], to, body, tag="Tilmeld")
+        udbyder.send_settings(settings, to, body)
         return ""
     except Exception as e:  # robust: en notifikation må aldrig vælte en tilmelding
         print(f"[SMS-FEJL] {e}", flush=True)

@@ -91,17 +91,19 @@
 
 {% endcall %}
 
-{% call sek.sektion('sms', 'SMS', 'inMobile' if s.sms_provider == 'inmobile' else 'Gigahost') %}
+{% call sek.sektion('sms', 'SMS',
+                    {'inmobile': 'inMobile', 'suresms': 'SureSMS'}.get(s.sms_provider, 'Gigahost')) %}
     {# Én udbyder ad gangen. To gateways, der sendte hver sin kopi af samme besked,
        ville koste dobbelt og se ud som en fejl på telefonen. #}
     <label>Udbyder
       <select name="sms_provider">
-        <option value="gigahost" {{ 'selected' if s.sms_provider != 'inmobile' }}>Gigahost</option>
+        <option value="gigahost" {{ 'selected' if s.sms_provider not in ('inmobile', 'suresms') }}>Gigahost</option>
         <option value="inmobile" {{ 'selected' if s.sms_provider == 'inmobile' }}>inMobile</option>
+        <option value="suresms" {{ 'selected' if s.sms_provider == 'suresms' }}>SureSMS</option>
       </select>
     </label>
-    <p class="muted small">Felterne for begge udbydere står nedenfor og bliver gemt begge
-       to — det er valget her, der afgør, hvem beskederne sendes med.</p>
+    <p class="muted small">Felterne for alle tre udbydere står nedenfor og bliver gemt
+       alle sammen — det er valget her, der afgør, hvem beskederne sendes med.</p>
 
     <h3>inMobile</h3>
     <details class="help">
@@ -134,6 +136,38 @@
     {% if s.inmobile_api_key %}
     <p><a class="btn" href="{{ url_for('master_sms_status') }}" target="_blank" rel="noopener">Tjek SMS-opsætningen ↗</a></p>
     {% endif %}
+
+    <h3>SureSMS</h3>
+    <details class="help">
+      <summary>Sådan sætter du SureSMS op</summary>
+      <div class="help-body">
+        <ol>
+          <li>Lav en <strong>API-nøgle</strong> på
+              <a href="https://app.suresms.com/UserApi/Index" target="_blank" rel="noopener">app.suresms.com</a>,
+              skriv <code>apikey</code> i login-feltet og nøglen som adgangskode.</li>
+          <li>Eller brug kontoens eget login og adgangskode. Er dit login et
+              <strong>telefonnummer, skal landekoden med</strong> — API'et accepterer
+              ikke det korte nummer, selvom hjemmesiden gør.</li>
+          <li><strong>Afsenderen er valgfri</strong>: står feltet tomt, bruger SureSMS
+              kontoens standard. Vælger du en selv, skal den være
+              <a href="https://suresms.com/docs/account/sendername/" target="_blank" rel="noopener">godkendt
+              hos SureSMS</a> — ellers afvises hver eneste besked med en 401.</li>
+        </ol>
+        <p class="muted small">Modtagernumre sendes med landekode og plus
+           (<code>+4520123456</code>) — det klarer appen selv.</p>
+      </div>
+    </details>
+    <label>Login (eller ordet <code>apikey</code>)
+      <input type="text" name="suresms_login" value="{{ s.suresms_login }}" placeholder="apikey">
+    </label>
+    <label>Adgangskode eller API-nøgle
+      <input type="password" name="suresms_password" value="{{ s.suresms_password }}">
+    </label>
+    <label>Afsender (valgfri, højst 11 tegn — skal være godkendt)
+      <input type="text" name="suresms_sender" value="{{ s.suresms_sender }}" placeholder="Svaljagt">
+    </label>
+    <p class="muted small">Knappen nedenfor viser saldoen på kontoen — og er samtidig
+       prøven på, at login og adgangskode er rigtige.</p>
 
     <h3>Gigahost</h3>
     <details class="help">

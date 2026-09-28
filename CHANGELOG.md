@@ -11,6 +11,30 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 41
+
+**SureSMS er nu den tredje SMS-udbyder.**
+
+Under **master → Opsætning → SMS** kan man vælge Gigahost, inMobile eller SureSMS.
+SureSMS sættes op med kontoens login og adgangskode — eller med ordet `apikey` som login
+og en API-nøgle som adgangskode, som deres egen dokumentation anbefaler.
+
+To ting er anderledes end hos de to andre:
+
+- **Afsenderen er valgfri.** Står feltet tomt, bruger SureSMS kontoens standard. Vælger du
+  selv en, skal den være godkendt hos dem — ellers afvises hver eneste besked med en 401,
+  selvom login er rigtigt. Status-siden siger det direkte.
+- **Saldoen kan læses.** Knappen *Tjek SMS-opsætningen* viser, hvor mange penge der er
+  tilbage på kontoen, og er samtidig prøven på, at login virker.
+
+Deres fejltekster er engelske og skrevet til et menneske (»I don't know you. Bye bye!« =
+forkert login). De oversættes nu til noget, man kan handle på: »SureSMS godkendte ikke
+login og adgangskode«.
+
+Indvendigt har de tre udbyder-moduler fået den samme overflade — `NAVN`, `configured()`,
+`mangler()` og `send_settings()` — så afsendelseslaget kun vælger i en tabel. En fjerde
+udbyder er en linje i den tabel.
+
 ## Version 40
 
 **Versionen står nu i topbaren — og master-opsætningen kan foldes sammen.**

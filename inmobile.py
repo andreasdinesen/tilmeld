@@ -50,10 +50,28 @@ class SmsError(Exception):
     """Beskeden kom ikke af sted. Teksten er på dansk og må vises til admin."""
 
 
+NAVN = "inMobile"
+
+
 def configured(settings) -> bool:
     """Er inMobile sat op globalt? Nøgle og afsender skal begge være der."""
-    return bool((settings["inmobile_api_key"] or "").strip()
-                and (settings["inmobile_sender"] or "").strip())
+    return not mangler(settings)
+
+
+def mangler(settings) -> str:
+    """Hvad står tomt? "" hvis udbyderen er klar. Teksten vises til master."""
+    savn = [navn for navn, n in (("en API-nøgle", "inmobile_api_key"),
+                                 ("en afsender", "inmobile_sender"))
+            if not (settings[n] or "").strip()]
+    if not savn:
+        return ""
+    return f"{NAVN} mangler " + " og ".join(savn)
+
+
+def send_settings(settings, to, body) -> dict:
+    """Send med de oplysninger, master har gemt. Samme kald hos alle udbydere."""
+    return send(settings["inmobile_api_key"], settings["inmobile_sender"],
+                to, body, tag="Tilmeld")
 
 
 def _nummer(v: str) -> str:

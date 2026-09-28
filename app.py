@@ -30,6 +30,7 @@ import auth
 import db
 import gigasms
 import inmobile
+import suresms
 import notifications
 import smstekst
 import passkeys
@@ -556,18 +557,19 @@ def master_whatsapp_groups():
 @app.route("/master/sms/status")
 @master_required
 def master_sms_status():
-    """Slå Gigahost-kontoen op: saldo og godkendte afsendernumre.
+    """Prøv den valgte SMS-udbyders konto af — uden at sende noget.
 
-    Det er prøve-knappen for SMS-kanalen. Svarer siden, er brugernavn og
-    API-adgangskode rigtige; står afsendernummeret ikke på listen, giver
-    gatewayen 403 på hver eneste besked, uanset hvor rigtigt alt andet er.
+    Det er prøve-knappen for SMS-kanalen, og hver udbyder kan noget forskelligt:
+    Gigahost og SureSMS kan fortælle saldoen (og Gigahost desuden de godkendte
+    afsendernumre), mens inMobile intet har at spørge om ud over »lukker nøglen
+    mig ind«.
     """
     conn = db.get_db()
     s = db.get_settings(conn)
     conn.close()
     udbyder = notifications.sms_provider(s)
     vis = dict(udbyder=udbyder, konto=None, numre=None, error=None, gateways=[],
-               afsender="", proeve=None)
+               afsender="", proeve=None, saldo=None)
 
     if udbyder == "inmobile":
         # inMobile har ikke noget saldo-opslag i API'et; prøven er, om nøglen
@@ -580,6 +582,20 @@ def master_sms_status():
             try:
                 vis["proeve"] = inmobile.check(s["inmobile_api_key"])
             except inmobile.SmsError as e:
+                vis["error"] = str(e)
+        return render_template("master/sms_status.html", **vis)
+
+    if udbyder == "suresms":
+        # Saldo-opslaget er både prøven og oplysningen: svarer det, er login og
+        # adgangskode rigtige, og så står der samtidig, hvor mange penge der er
+        # tilbage på kontoen.
+        vis["afsender"] = (s["suresms_sender"] or "").strip()
+        if not suresms.configured(s):
+            vis["error"] = suresms.mangler(s) + " — udfyld det under Opsætning."
+        else:
+            try:
+                vis["saldo"] = suresms.balance(s["suresms_login"], s["suresms_password"])
+            except suresms.SmsError as e:
                 vis["error"] = str(e)
         return render_template("master/sms_status.html", **vis)
 
@@ -613,6 +629,7 @@ def master_settings():
             "smtp_from=?, smtp_use_tls=?, whatsapp_api_url=?, whatsapp_api_key=?, "
             "sms_provider=?, sms_username=?, sms_password=?, sms_sender=?, "
             "inmobile_api_key=?, inmobile_sender=?, "
+            "suresms_login=?, suresms_password=?, suresms_sender=?, "
             "base_url=?, default_deadline_days=?, github_repo=?, update_branch=? WHERE id = 1",
             (request.form.get("smtp_host", "").strip(),
              int(request.form.get("smtp_port") or 587),
@@ -622,13 +639,17 @@ def master_settings():
              1 if request.form.get("smtp_use_tls") else 0,
              request.form.get("whatsapp_api_url", "").strip(),
              request.form.get("whatsapp_api_key", "").strip(),
-             ("inmobile" if request.form.get("sms_provider") == "inmobile"
-              else "gigahost"),
+             (request.form.get("sms_provider")
+              if request.form.get("sms_provider") in notifications.SMS_UDBYDERE
+              else notifications.SMS_STANDARD),
              request.form.get("sms_username", "").strip(),
              request.form.get("sms_password", ""),
              request.form.get("sms_sender", "").strip(),
              request.form.get("inmobile_api_key", "").strip(),
              request.form.get("inmobile_sender", "").strip(),
+             request.form.get("suresms_login", "").strip(),
+             request.form.get("suresms_password", ""),
+             request.form.get("suresms_sender", "").strip(),
              request.form.get("base_url", "").strip(),
              int(request.form.get("default_deadline_days") or 4),
              request.form.get("github_repo", "").strip(),

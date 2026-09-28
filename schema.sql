@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS settings (
     inmobile_api_key    TEXT DEFAULT '',             -- inMobile: API-nøgle (Basic auth-adgangskode)
     inmobile_sender     TEXT DEFAULT '',             -- inMobile: afsender — tekst (3-11 tegn) eller
                                                      -- et nummer. Tekst kan der ikke svares på.
+    suresms_login       TEXT DEFAULT '',             -- SureSMS: kontoens login — eller ordet
+                                                     -- 'apikey', hvis feltet nedenfor er en nøgle
+    suresms_password    TEXT DEFAULT '',             -- SureSMS: adgangskode eller API-nøgle
+    suresms_sender      TEXT DEFAULT '',             -- SureSMS: afsender (valgfri, højst 11 tegn,
+                                                     -- skal være godkendt hos SureSMS)
     base_url            TEXT DEFAULT '',             -- offentlig URL (til links i mails)
     default_deadline_days INTEGER DEFAULT 4,         -- standard: frist X dage før event-start
     github_repo         TEXT DEFAULT 'andreasdinesen/tilmeld',  -- "ejer/repo" til opdaterings-tjek

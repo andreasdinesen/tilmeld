@@ -210,6 +210,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("settings", "inmobile_api_key", "TEXT DEFAULT ''")
     add("settings", "inmobile_sender", "TEXT DEFAULT ''")
 
+    # Tredje SMS-udbyder (rune 41).
+    add("settings", "suresms_login", "TEXT DEFAULT ''")
+    add("settings", "suresms_password", "TEXT DEFAULT ''")
+    add("settings", "suresms_sender", "TEXT DEFAULT ''")
+
     # Deltagerliste til jagtlederne, når fristen er nået (rune 35).
     add("events", "notify_leaders", "INTEGER DEFAULT 0")
     add("events", "leaders_sent", "INTEGER DEFAULT 0")
