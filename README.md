@@ -79,6 +79,11 @@ virker bag en reverse proxy (fx Cloudflare Tunnel) uden konfiguration.
 ## Notifikationer
 
 Uden SMTP/WhatsApp/SMS-konfiguration logges notifikationer i serverens konsol — fint til test.
+
+**Sæt »Offentlig URL« under master → Opsætning.** Links i mails, push-beskeder og
+kalender-abonnementet bygges af den. Uden den udleder appen adressen af requesten — og bag
+en proxy, der taler HTTP indad, bliver det en `http://`-adresse, som Google Kalender ikke
+henter.
 Sæt rigtige værdier under master → Opsætning for at sende rigtige beskeder.
 
 **WhatsApp** sendes via en HTTP-bro/gateway du selv hoster (fx wppconnect/Baileys).

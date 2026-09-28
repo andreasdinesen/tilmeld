@@ -11,6 +11,25 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 42
+
+**Kalender-abonnementet blev udleveret som en http-adresse — og Google henter ikke http.**
+
+Adressen i »Få alle events i din kalender« blev bygget ud fra den request, Flask ser. Bag
+Cloudflare-tunnelen er den `http://`, fordi tunnelen taler HTTP ind til serveren og
+skriver det rigtige skema i `X-Forwarded-Proto`. Abonnerede man på den adresse, fik
+Google Kalender et 301-svar i stedet for en kalender — og gav op i stilhed.
+
+Adressen bygges nu af masters **Offentlige URL**, samme kilde som links i mails og push
+bruger. Er den ikke sat, bruges requestens egen adresse, rettet efter `X-Forwarded-Proto`.
+
+Samtidig er der kommet to knapper: **Tilføj i Google Kalender** og **Tilføj i Apple
+Kalender**. Adressen står stadig nedenunder til at kopiere — men en adresse, der skal
+kopieres rigtigt, var netop dét, der gik galt.
+
+Selve .ics-filen fejlede intet: den er hentet fra svaljagt.dk og gennemgået — CRLF,
+VERSION, PRODID, UID, DTSTAMP og tidspunkter i UTC står, som de skal.
+
 ## Version 41
 
 **SureSMS er nu den tredje SMS-udbyder.**

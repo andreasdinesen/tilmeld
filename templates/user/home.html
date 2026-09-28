@@ -43,9 +43,19 @@
       <p class="muted small">Abonnér på denne adresse i Google/Outlook/Apple Kalender, så
          dukker <strong>alle {{ group.name }}s events</strong> op automatisk — også dem der
          kommer til senere, og ændringer i dato, tidspunkt og beskrivelse.</p>
+      {# To knapper frem for en adresse, der skal kopieres rigtigt: Google henter
+         ikke feedet, hvis adressen er http (den får et 301 og giver op i stilhed),
+         og webcal-skemaet er dét, Apple Kalender selv forventer. #}
+      {% set webcal = cal_url|replace('https://', 'webcal://')|replace('http://', 'webcal://') %}
+      <div class="actions">
+        <a class="btn" target="_blank" rel="noopener"
+           href="https://calendar.google.com/calendar/r?cid={{ webcal|urlencode }}">Tilføj i Google Kalender</a>
+        <a class="btn" href="{{ webcal }}">Tilføj i Apple Kalender</a>
+      </div>
+      <p class="muted small">Eller kopiér adressen og sæt den ind selv — Google Kalender:
+         <em>Andre kalendere → + → Fra URL</em>. Apple Kalender:
+         <em>Arkiv → Nyt kalenderabonnement</em>.</p>
       <input type="text" value="{{ cal_url }}" readonly onclick="this.select()">
-      <p class="muted small">Google Kalender: <em>Andre kalendere → + → Fra URL</em>.
-         Apple Kalender: <em>Arkiv → Nyt kalenderabonnement</em>.</p>
       <p class="muted small">Hvor tit din kalender henter nyt, bestemmer den selv: Google kan
          være op til et døgn om det, og i Apple Kalender står abonnementet ofte til at opdatere
          <em>hver uge</em> — den kan sættes ned under kalenderens indstillinger.</p>

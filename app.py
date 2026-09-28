@@ -1994,6 +1994,29 @@ def build_list_link(conn, group, ev):
     return f"{base}/{group['slug']}/{ev['slug']}/liste?n={ensure_list_token(conn, ev)}"
 
 
+def calendar_url(conn, group) -> str:
+    """Adressen på gruppens .ics-feed — som den skal se ud UDADTIL.
+
+    `url_for(_external=True)` bygger adressen ud fra den request, Flask ser. Bag
+    Cloudflare-tunnelen er den `http://`, for tunnelen taler HTTP ind til
+    serveren og skriver det rigtige skema i `X-Forwarded-Proto`. Resultatet var
+    en http-adresse i »Få alle events i din kalender« — og Google Kalender får
+    så et 301-svar, når den henter, i stedet for kalenderen.
+
+    Derfor: brug masters offentlige URL, når den er sat (samme kilde som links i
+    mails og push), og ellers request'ens egen adresse, rettet efter
+    X-Forwarded-Proto.
+    """
+    token = ensure_calendar_token(conn, group)
+    base = public_base_url(conn).rstrip("/")
+    if base:
+        return f"{base}/{group['slug']}/kalender.ics?token={token}"
+    url = url_for("group_calendar_ics", slug=group["slug"], token=token, _external=True)
+    if request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip() == "https":
+        url = url.replace("http://", "https://", 1)
+    return url
+
+
 def _registrations_with_values(conn, event_id, fields):
     # Deltagere først, derefter ventelisten (i den rækkefølge de skrev sig på)
     regs = conn.execute(
@@ -2152,8 +2175,7 @@ def user_home(slug):
             continue  # afsluttede events skjules for brugere
         tal = notifications.event_counts(conn, group, ev)
         rows.append({"ev": ev, "state": state, "count": tal["count"], "tal": tal})
-    cal_url = url_for("group_calendar_ics", slug=group["slug"],
-                      token=ensure_calendar_token(conn, group), _external=True)
+    cal_url = calendar_url(conn, group)
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
     har_vildt = bool(game_species(conn, group["id"]))
