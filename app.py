@@ -1098,7 +1098,10 @@ def admin_settings(slug):
         ev = naermeste_event(conn, group["id"])
         cat_tlf = notifications.catering_contact(group, ev)[1] if ev else ""
         if not sms_on:
-            proeve_spaerre = "SMS er ikke sat op globalt (det gør master admin)"
+            # Sig HVILKET felt der mangler. »Ikke sat op« sender admin på en
+            # rundtur i master-opsætningen efter noget, han måske lige har udfyldt.
+            proeve_spaerre = (notifications.sms_mangler(db.get_settings(conn))
+                              or "SMS er ikke sat op globalt") + " (master → Opsætning)"
         elif not ev:
             proeve_spaerre = "der er ingen events at hente tal fra endnu"
         elif not cat_tlf:

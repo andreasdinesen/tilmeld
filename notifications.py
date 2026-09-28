@@ -278,6 +278,27 @@ def sms_configured(settings) -> bool:
     return sms_module(settings) is not None
 
 
+def sms_mangler(settings) -> str:
+    """Hvad mangler der, før den valgte udbyder kan sende? "" hvis intet.
+
+    »SMS er ikke sat op« er sandt, men ubrugeligt: man har lige udfyldt noget og
+    kan ikke se hvad der så stadig står tomt. Teksten her nævner feltet.
+    """
+    def tomme(felter):
+        savn = [navn for navn, n in felter if not (settings[n] or "").strip()]
+        # »a, b og c« — ikke »a og b og c«.
+        return ", ".join(savn[:-1]) + " og " + savn[-1] if len(savn) > 1 else "".join(savn)
+
+    if sms_provider(settings) == "inmobile":
+        savn = tomme([("en API-nøgle", "inmobile_api_key"),
+                      ("en afsender", "inmobile_sender")])
+        return f"inMobile mangler {savn}" if savn else ""
+    savn = tomme([("et brugernavn", "sms_username"),
+                  ("en API-adgangskode", "sms_password"),
+                  ("et afsendernummer", "sms_sender")])
+    return f"Gigahost mangler {savn}" if savn else ""
+
+
 def send_sms(settings, to: str, body: str) -> str:
     """Send en SMS. Returnér "" hvis sendt, ellers en kort fejl-/årsagstekst.
 
@@ -297,7 +318,7 @@ def send_sms(settings, to: str, body: str) -> str:
     udbyder = sms_module(settings)
     if not udbyder:
         _log("SMS", to, "(sms)", body)
-        return "SMS ikke konfigureret"
+        return sms_mangler(settings) or "SMS ikke konfigureret"
     try:
         if udbyder is inmobile:
             udbyder.send(settings["inmobile_api_key"], settings["inmobile_sender"],

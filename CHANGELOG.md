@@ -11,6 +11,20 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 37
+
+**»SMS er ikke sat op« siger nu hvad der mangler.**
+
+Med inMobile valgt og API-nøglen tastet ind stod der stadig »SMS er ikke sat op globalt«
+på prøve-SMS'en — fordi afsender-feltet var tomt, og inMobile kræver en afsender på hver
+eneste besked. Det kunne man bare ikke se. Nu står der:
+
+> Kan ikke sendes endnu — inMobile mangler en afsender (master → Opsætning).
+
+Det samme gælder Gigahost (»mangler et afsendernummer«), og årsagen følger med i
+aktivitetsloggen, når en besked ikke kan sendes. På master-siden står der nu ved inMobile,
+at begge felter skal være udfyldt.
+
 ## Version 36
 
 **SMS kan nu sendes med inMobile i stedet for Gigahost.**

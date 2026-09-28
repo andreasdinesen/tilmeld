@@ -110,6 +110,8 @@
     <label>Afsender (navn på 3-11 tegn, eller et nummer)
       <input type="text" name="inmobile_sender" value="{{ s.inmobile_sender }}" placeholder="Svaljagt">
     </label>
+    <p class="muted small"><strong>Begge felter skal være udfyldt, før der kan sendes</strong>
+       — inMobile kræver en afsender på hver eneste besked.</p>
     {% if s.inmobile_api_key %}
     <p><a class="btn" href="{{ url_for('master_sms_status') }}" target="_blank" rel="noopener">Tjek SMS-opsætningen ↗</a></p>
     {% endif %}
