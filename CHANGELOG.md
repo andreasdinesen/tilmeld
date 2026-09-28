@@ -11,6 +11,19 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 47
+
+**Google-knappen procent-kodede adressen. Det kan Google ikke lide.**
+
+Adressen stod som `cid=https%3A//svaljagt.dk/…`, og dertil svarede Google »Unable to add
+calendar. Check the URL.« — mens præcis den samme adresse indsat i hånden blev taget imod
+uden at kny. Feedet fejlede altså intet; det gjorde linket.
+
+Knappen skriver nu adressen råt: `cid=webcal://svaljagt.dk/jagt/kalender-<nøgle>.ics`. Det
+er den form, Googles egen dokumentation og alle fungerende eksempler bruger — og den kunne
+først lade sig gøre, efter nøglen i rune 46 flyttede fra `?token=` ind i stien. En
+forespørgselsstreng ville her blive læst som Googles egne parametre.
+
 ## Version 46
 
 **Kalender-adressen har fået nøglen ind i stien: `/jagt/kalender-<nøgle>.ics`.**
