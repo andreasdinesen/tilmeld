@@ -1998,6 +1998,24 @@ def build_list_link(conn, group, ev):
     return f"{base}/{group['slug']}/{ev['slug']}/liste?n={ensure_list_token(conn, ev)}"
 
 
+def _noter_henter(gemt: str, agent: str, maks: int = 8) -> str:
+    """Læg dette hent ind i {app: tidspunkt}-oversigten og returnér den som JSON.
+
+    `maks` holder listen kort: en kalender-app, der ikke har hentet i måneder,
+    siger intet længere, og en ondsindet hentende robot skal ikke kunne fylde
+    kolonnen op.
+    """
+    try:
+        folk = json.loads(gemt or "{}")
+        if not isinstance(folk, dict):
+            folk = {}
+    except ValueError:
+        folk = {}
+    folk[agent] = db.now_iso()
+    nyeste = sorted(folk.items(), key=lambda kv: kv[1], reverse=True)[:maks]
+    return json.dumps(dict(nyeste), ensure_ascii=False)
+
+
 def calendar_url(conn, group) -> str:
     """Adressen på gruppens .ics-feed — som den skal se ud UDADTIL.
 
@@ -2163,9 +2181,15 @@ def _calendar_feed(slug, token):
     # ikke se, om kalenderen aldrig har spurgt, eller om den spurgte og fik noget
     # forkert. Serveren fører ingen adgangslog (waitress logger ikke requests), så
     # det skal stå her. Én UPDATE pr. hent — en kalender spørger højst hver time.
+    #
+    # Der gemmes ÉN linje pr. kalender-app, ikke bare den seneste: BusyCal henter
+    # hvert kvarter, Google måske en gang i døgnet, og så ville Googles hent være
+    # væk, længe før nogen kiggede efter det.
+    agent = (request.headers.get("User-Agent") or "ukendt")[:120]
     conn.execute(
-        "UPDATE groups SET calendar_fetched_at = ?, calendar_fetched_by = ? WHERE id = ?",
-        (db.now_iso(), (request.headers.get("User-Agent") or "ukendt")[:120], group["id"]))
+        "UPDATE groups SET calendar_fetched_at = ?, calendar_fetched_by = ?, "
+        "calendar_fetchers = ? WHERE id = ?",
+        (db.now_iso(), agent, _noter_henter(group["calendar_fetchers"], agent), group["id"]))
     conn.commit()
     conn.close()
     return Response(build_ics(group, events, base), content_type="text/calendar; charset=utf-8")
@@ -2208,11 +2232,19 @@ def user_home(slug):
         tal = notifications.event_counts(conn, group, ev)
         rows.append({"ev": ev, "state": state, "count": tal["count"], "tal": tal})
     cal_url = calendar_url(conn, group)
+    # {app: tidspunkt} sorteret med den seneste først — svaret på »henter min
+    # kalender overhovedet?«, og hvilke der gør.
+    try:
+        hentere = sorted(json.loads(group["calendar_fetchers"] or "{}").items(),
+                         key=lambda kv: kv[1], reverse=True)
+    except (ValueError, AttributeError):
+        hentere = []
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
     dokumenter = group_files(conn, group["id"]) if group["files_enabled"] else []
     har_vildt = bool(game_species(conn, group["id"]))
     conn.close()
     return render_template("user/home.html", group=group, events=rows, cal_url=cal_url,
+                           hentere=hentere,
                            har_vildt=har_vildt,
                            dokumenter=dokumenter,
                            accounts=bool(group["user_accounts_enabled"]),

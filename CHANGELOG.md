@@ -11,6 +11,20 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 48
+
+**Hent-linjen huskede kun den sidste. Nu står der én linje pr. kalender-app.**
+
+BusyCal henter hvert kvarter, Google måske en gang i døgnet. Med kun ét felt ville Googles
+hent være overskrevet, længe før nogen kiggede efter det — og det er netop det sjældne
+hent, man leder efter. Boksen viser nu:
+
+> **Hentet af:**
+> 28-09-2026 15:46 — BusyCal-2026.3.3 (Calendar) Mac OS X/13.0.1
+> 28-09-2026 09:12 — Google-Calendar-Importer
+
+Der gemmes de otte nyeste, så en app, der ikke har hentet i månedsvis, falder ud igen.
+
 ## Version 47
 
 **Google-knappen procent-kodede adressen. Det kan Google ikke lide.**

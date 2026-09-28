@@ -71,14 +71,21 @@
          <em>hver uge</em> — den kan sættes ned under kalenderens indstillinger.</p>
       <p class="muted small">Adressen er personlig for gruppen — del den kun med dem, der må se
          events.</p>
-      {# Svaret på »virker abonnementet?«. Uden den linje kan man ikke skelne mellem
-         en kalender, der aldrig har spurgt, og en der spurgte og fik noget forkert. #}
-      <p class="muted small">{% if group.calendar_fetched_at %}Sidst hentet af en kalender:
-         <strong>{{ group.calendar_fetched_at|dt }}</strong>
-         <span class="nowrap">({{ group.calendar_fetched_by or 'ukendt' }})</span>.
-         {% else %}Ingen kalender har hentet adressen endnu. Google kan være timevis om
-         det første hent — og indtil den har hentet, står abonnementet med adressen som
-         navn i stedet for »{{ group.name }}«.{% endif %}</p>
+      {# Svaret på »virker abonnementet?«. Én linje pr. kalender-app: den, der henter
+         hvert kvarter, må ikke skjule den, der henter en gang i døgnet — og det er
+         som regel netop den sjældne, man leder efter. #}
+      {% if hentere %}
+        <p class="muted small">Hentet af:</p>
+        <ul class="tight muted small">
+          {% for agent, hvornaar in hentere %}
+            <li><strong>{{ hvornaar|dt }}</strong> — {{ agent }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted small">Ingen kalender har hentet adressen endnu. Google kan være
+           timevis om det første hent — og indtil den har hentet, står abonnementet med
+           adressen som navn i stedet for »{{ group.name }}«.</p>
+      {% endif %}
     </div>
   </details>
   <script src="{{ url_for('static', filename='kopi.js') }}?v={{ app_version }}" defer></script>

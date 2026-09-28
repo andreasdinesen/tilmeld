@@ -213,6 +213,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # Hvornår blev kalender-feedet sidst hentet, og af hvem (rune 44).
     add("groups", "calendar_fetched_at", "TEXT DEFAULT ''")
     add("groups", "calendar_fetched_by", "TEXT DEFAULT ''")
+    add("groups", "calendar_fetchers", "TEXT DEFAULT ''")
 
     # Tredje SMS-udbyder (rune 41).
     add("settings", "suresms_login", "TEXT DEFAULT ''")
