@@ -80,6 +80,14 @@
     <label class="chk"><input type="checkbox" name="csv_after_deadline" {{ 'checked' if ev and ev.csv_after_deadline }}> Send deltagerliste (CSV) til admin-mail 2 timer efter frist</label>
     {% endif %}
 
+    <h3>Deltagerliste til jagtlederne</h3>
+    <label class="chk"><input type="checkbox" name="notify_leaders" {{ 'checked' if ev and ev.notify_leaders }}>
+      Send deltagerlisten til jagtlederne når fristen er nået</label>
+    <p class="muted small">Sendes én gang, til de jagtledere du har valgt ovenfor — på
+       deres mail og mobil fra medlemslisten. Beskeden er et <strong>link til listen som
+       udskrift</strong>, som kan gemmes som PDF. Linket virker uden gruppens adgangskode,
+       så det kan åbnes på mobilen i skoven; det gælder kun dette event.</p>
+
     <h3>Madbestilling</h3>
     <label class="chk"><input type="checkbox" name="notify_catering" {{ 'checked' if ev and ev.notify_catering }}>
       Besked til madbestilleren når fristen er nået (med antal kuverter)</label>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "user/_tal.html" as tal_makro %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}
   <a href="{{ url_for('user_home', slug=group.slug) }}">Vis som bruger</a>
@@ -20,7 +21,8 @@
         {{ ev.event_date|d }}{% if ev.start_time %} {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
         · Frist: {{ ev.signup_deadline|dt or '—' }}
       </div>
-      <div class="count">Deltagere: <strong>{{ item.count }}</strong> / {{ ev.expected_count }} forventet{% if item.total > item.count %} <span class="muted small">({{ item.total - item.count }} afbud)</span>{% endif %}</div>
+      <div class="count">Deltagere: <strong>{{ item.tal.count }}</strong> / {{ ev.expected_count }} forventet</div>
+      {{ tal_makro.opdeling(item.tal, ev) }}
     </div>
     <div class="actions">
       <a class="btn small" href="{{ url_for('admin_event_list', slug=group.slug, event_id=ev.id) }}">Vis liste</a>

@@ -230,6 +230,14 @@ Deltagertallet viser både helheden og delene: **6 / 12 deltagere** med
 (gæster + 1), fordi kapaciteten handler om mennesker — oversættelsen sker ét sted på
 serveren.
 
+### CSV-listen
+
+**Download CSV** på deltagerlisten giver de samme tal i et regneark: en kolonne
+**Antal gæster** ved siden af gæstenavnene, status **Afbud** (med 0 pladser, så kolonnen
+kan lægges sammen) — og nederst en **opsummering** med medlemmer, gæster, pladser i alt,
+afbud, venteliste og hvor mange der skal have mad. Opsummeringen står til sidst, fordi
+regneark læser den første linje som kolonneoverskrifter.
+
 ## Vildtarter og udbytte
 
 Admin opretter gruppens **vildtarter** under Opsætning (en knap indsætter en dansk
@@ -247,6 +255,20 @@ vildt, vinder af bengættet og en note. Det vises på eventets side.
 
 Begge dele gemmes uden for event-formularens øvrige felter, så en kopi af et event ikke
 arver hverken jagtledere eller resultat.
+
+### Deltagerlisten til jagtlederne
+
+Et event kan sende **deltagerlisten til sine jagtledere, når tilmeldingsfristen er nået**
+— fluebenet sidder i event-formularen under *Notifikationer*. Beskeden går til jagtledernes
+egen mail og mobil fra medlemslisten (ikke som push: et push-abonnement hænger på en enhed,
+ikke på et navn) og indeholder et **link til listen som udskrift**, der kan gemmes som PDF.
+
+Linket virker **uden gruppens adgangskode**, så det kan åbnes på mobilen i skoven. Nøglen i
+adressen hører til ét event: slipper linket ud, er det den ene dags liste, der er sluppet ud.
+Den laves første gang nogen har brug for et link. Admin kan se og kopiere linket — og sende
+beskeden med det samme — øverst på deltagerlisten.
+
+Siden findes også for medlemmerne under **Vis som udskrift** på eventet.
 
 ## Gem som PDF
 

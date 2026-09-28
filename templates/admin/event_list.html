@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "user/_tal.html" as tal_makro %}
 {% block brand %}{{ group.name }} · admin{% endblock %}
 {% block nav %}<a href="{{ url_for('admin_home', slug=group.slug) }}">Tilbage</a>{% endblock %}
 {% block content %}
@@ -41,7 +42,8 @@
     <h1>{{ ev.name }} — deltagere</h1>
     <a class="btn primary" href="{{ url_for('admin_event_export', slug=group.slug, event_id=ev.id) }}">Download CSV</a>
   </div>
-  <p class="count">Deltagere: <strong>{{ count }}</strong> / {{ ev.expected_count }} forventet{% if total > count %} <span class="muted small">({{ total - count }} afbud/venteliste)</span>{% endif %}{% if attended_count %} · Mødt op: <strong>{{ attended_count }}</strong>{% endif %}</p>
+  <p class="count">Deltagere: <strong>{{ tal.count }}</strong> / {{ ev.expected_count }} forventet{% if attended_count %} · Mødt op: <strong>{{ attended_count }}</strong>{% endif %}</p>
+  {{ tal_makro.opdeling(tal, ev) }}
   {% if meal_fields %}
     <p class="count">Spiser med: <strong>{{ tal.meals }}</strong>{% if tal.no_meals %}
        <span class="muted small">({{ tal.no_meals }} har meldt fra til spisning)</span>{% endif %}</p>
@@ -78,6 +80,41 @@
     </div>
   </div>
   {% endif %}
+
+  {# Deltagerlisten til jagtlederne: egen boks ved siden af madbestillingen, for
+     modtageren er en anden. Samme grund til at den ligger uden for fremmøde-
+     formularen — indlejrede <form> er ugyldig HTML. #}
+  <div class="fielditem">
+    <div class="row">
+      <div>
+        <strong>Deltagerliste til jagtlederne</strong>
+        {% if ev.leaders_sent %}<span class="tag cat-signup">sendt</span>{% endif %}
+        <div class="muted small">
+          {% if ledere %}
+            Går til {{ ledere|map(attribute='name')|select|join(' og ') }} som et link,
+            de kan gemme som PDF.
+          {% else %}
+            Vælg jagtledere på eventet først — beskeden har ellers ingen modtager.
+          {% endif %}
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn small" href="{{ url_for('user_event_sheet', slug=group.slug, event_slug=ev.slug) }}">Vis listen</a>
+        {% if ledere %}
+        <form method="post"
+              onsubmit="return confirm('Send deltagerlisten til jagtlederne nu?')">
+          <input type="hidden" name="action" value="leaders">
+          <button class="small">{{ 'Send igen' if ev.leaders_sent else 'Send nu' }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% if liste_link %}
+      <label class="small">Linket (virker uden adgangskode)
+        <input type="text" value="{{ liste_link }}" readonly onclick="this.select()">
+      </label>
+    {% endif %}
+  </div>
 
   {% if not regs %}<p>Ingen tilmeldinger endnu.</p>{% else %}
   <form method="post">

@@ -107,7 +107,12 @@
 {% endif %}
 
 <div class="card">
-  <h2>Deltagere</h2>
+  <div class="row">
+    <h2>Deltagere</h2>
+    {% if regs %}
+      <a class="btn small" href="{{ url_for('user_event_sheet', slug=group.slug, event_slug=ev.slug) }}">Vis som udskrift</a>
+    {% endif %}
+  </div>
   {% if not regs %}<p>Ingen tilmeldte endnu.</p>{% else %}
   <div class="tablewrap">
   <table>

@@ -834,12 +834,11 @@ def admin_home(slug):
     rows, past = [], []
     for ev in sorted(events, key=event_sort_key):
         state = event_state(ev)
-        item = {
-            "ev": ev,
-            "state": state,
-            "count": count_attending(conn, group["id"], ev["id"]),
-            "total": count_registrations(conn, ev["id"]),
-        }
+        # Samme kilde som bruger-siden og madbestillingen. Admin regnede før selv
+        # »antal tilmeldinger minus antal pladser«, og det er ikke antallet af
+        # afbud, så snart nogen har en gæst med.
+        item = {"ev": ev, "state": state,
+                "tal": notifications.event_counts(conn, group, ev)}
         (past if state == "finished" else rows).append(item)
     past.reverse()  # afholdte: nyeste øverst
     mail_on, wa_on, sms_on, push_on = group_channels(conn, group)
@@ -1059,7 +1058,8 @@ def admin_settings(slug):
                   "waitlist_promoted": "Rykket op fra venteliste (til deltager)",
                   "event_reminder": "Påmindelse før eventet (til deltager)",
                   "event_announce": "Nyt event (til notifikationslisten)",
-                  "catering": "Madbestilling (til madbestilleren, når fristen er nået)"}
+                  "catering": "Madbestilling (til madbestilleren, når fristen er nået)",
+                  "leader_list": "Deltagerliste (til jagtlederne, når fristen er nået)"}
         for tkey in notifications.DEFAULT_TEMPLATES:
             subj, body = notifications.template_for(conn, group, tkey)
             templates.append({"key": tkey, "label": labels.get(tkey, tkey),
@@ -1342,6 +1342,7 @@ def _save_event(group, ev):
         1 if request.form.get("notify_event_reminder") else 0,
         1 if request.form.get("notify_list") else 0,
         1 if request.form.get("notify_catering") else 0,
+        1 if request.form.get("notify_leaders") else 0,
         # Felterne vises kun, når den tilsvarende kanal er sat op. Var de skjult, står
         # de ikke i formularen — og så skal den gemte værdi BEVARES, ikke tømmes.
         # `form.get(key, default)` rammer præcis det: tomt felt = "" (admin ryddede
@@ -1361,8 +1362,8 @@ def _save_event(group, ev):
             "description=?, expected_count=?, signup_deadline=?, notify_new_signup=?, "
             "notify_change=?, notify_receipt=?, notify_reminder=?, csv_after_deadline=?, "
             "capacity_limit=?, notify_deadline=?, waitlist_enabled=?, allow_guests=?, "
-            "notify_event_reminder=?, notify_list=?, notify_catering=?, catering_email=?, "
-            "catering_phone=?, updated_at=?, revision=? WHERE id = ?",
+            "notify_event_reminder=?, notify_list=?, notify_catering=?, notify_leaders=?, "
+            "catering_email=?, catering_phone=?, updated_at=?, revision=? WHERE id = ?",
             vals + (db.now_iso() if ics_ændret else (ev["updated_at"] or ev["created_at"]),
                     (ev["revision"] or 0) + (1 if ics_ændret else 0),
                     ev["id"]))
@@ -1409,9 +1410,9 @@ EVENT_INSERT_SQL = (
     "expected_count, signup_deadline, notify_new_signup, notify_change, notify_receipt, "
     "notify_reminder, csv_after_deadline, capacity_limit, notify_deadline, "
     "waitlist_enabled, allow_guests, notify_event_reminder, notify_list, "
-    "notify_catering, catering_email, catering_phone, "
+    "notify_catering, notify_leaders, catering_email, catering_phone, "
     "group_id, created_at) "
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
 
 
 def _set_hidden_fields(conn, event_id, field_ids):
@@ -1516,7 +1517,8 @@ def admin_event_copy(slug, event_id):
             ev["notify_reminder"], ev["csv_after_deadline"], ev["capacity_limit"],
             ev["notify_deadline"], ev["waitlist_enabled"], ev["allow_guests"],
             ev["notify_event_reminder"], ev["notify_list"],
-            ev["notify_catering"], ev["catering_email"], ev["catering_phone"])
+            ev["notify_catering"], ev["notify_leaders"],
+            ev["catering_email"], ev["catering_phone"])
     cur = conn.execute(EVENT_INSERT_SQL, vals + (group["id"], db.now_iso()))
     new_id = cur.lastrowid
     _set_hidden_fields(conn, new_id, list(hidden_field_ids(conn, ev["id"])))
@@ -1559,6 +1561,19 @@ def admin_event_list(slug, event_id):
             flash(f"Madbestillingen er sendt ({sendt} besked(er)).", "ok")
         for f in fejl[:5]:
             flash(f"Ikke sendt — {f}", "error")
+    elif request.method == "POST" and request.form.get("action") == "leaders":
+        # Samme besked som scheduleren sender, når fristen er nået — men nu, fordi
+        # admin selv trykker. Fristen behøver ikke være passeret: en jagtleder kan
+        # have brug for listen i forvejen.
+        sendt, fejl = notifications.notify_leaders_list(
+            conn, group, ev, event_leaders(conn, group, ev),
+            build_list_link(conn, group, ev), note="manuelt")
+        if sendt:
+            conn.execute("UPDATE events SET leaders_sent = 1 WHERE id = ?", (ev["id"],))
+            conn.commit()
+            flash(f"Deltagerlisten er sendt ({sendt} besked(er)).", "ok")
+        for f in fejl[:5]:
+            flash(f"Ikke sendt — {f}", "error")
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
     attending = count_attending(conn, group["id"], ev["id"])
@@ -1572,8 +1587,14 @@ def admin_event_list(slug, event_id):
     share = event_share(conn, group, ev)
     arter = game_species(conn, group["id"])
     udbytte = event_game(conn, ev["id"])
+    ledere = event_leaders(conn, group, ev)
+    liste_link = build_list_link(conn, group, ev)
+    # `ev` blev læst FØR nøglen blev lavet, så `leaders_sent`/`list_token` skal
+    # hentes igen — ellers viser siden en tom nøgle på sit første besøg.
+    ev = conn.execute("SELECT * FROM events WHERE id = ?", (ev["id"],)).fetchone()
     conn.close()
     return render_template("admin/event_list.html", arter=arter, udbytte=udbytte, group=group, ev=ev,
+                           ledere=ledere, liste_link=liste_link,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
                            state=event_state(ev), attended_count=attended_count,
@@ -1653,22 +1674,54 @@ def admin_event_export(slug, event_id):
 
 
 def build_csv(conn, group, ev):
-    """Byg CSV-deltagerliste (BOM + semikolon) ud fra synlige punkter."""
+    """Byg CSV-deltagerliste (BOM + semikolon) ud fra synlige punkter.
+
+    Tre ting, der gør listen til et overblik og ikke bare en udskrift af tabellen:
+
+    * **Antal gæster** står som sit eget tal ved siden af navnene. »Pladser 3« og
+      én gæst skrevet på er ikke en fejl — man må gerne tage nogen med uden at
+      kende navnet endnu — men så skal tallet kunne ses for sig.
+    * Et **afbud** optager ingen plads. I databasen står det som én plads (rækken
+      SKAL findes), men her sættes pladser og gæster til 0, og status hedder
+      »Afbud«. Ellers kunne kolonnen ikke lægges sammen.
+    * Nederst står en **opsummering** med de samme tal, som madbestillingen og
+      forsiden bruger. Den ligger til sidst og ikke øverst, fordi regneark læser
+      den første linje som kolonneoverskrifter.
+    """
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
     buf = io.StringIO()
     buf.write("﻿")  # BOM så Excel viser æøå korrekt
     writer = csv.writer(buf, delimiter=";")
-    writer.writerow(["Navn", "E-mail", "Mobilnummer", "Pladser", "Gæster", "Status", "Mødt op"]
+    writer.writerow(["Navn", "E-mail", "Mobilnummer", "Pladser", "Antal gæster",
+                     "Gæster", "Status", "Mødt op"]
                     + [f["label"] for f in fields] + ["Tilmeldt"])
     for r in regs:
-        status = "Venteliste" if r["waitlist"] else "Deltager"
-        row = [r["name"], r["email"], r["phone"], r["seats"],
+        afbud = is_declined(conn, group["id"], r["id"])
+        if afbud:
+            status, pladser, gaester = "Afbud", 0, 0
+        elif r["waitlist"]:
+            status, pladser, gaester = "Venteliste", r["seats"], r["seats"] - 1
+        else:
+            status, pladser, gaester = "Deltager", r["seats"], r["seats"] - 1
+        row = [r["name"], r["email"], r["phone"], pladser, gaester,
                ", ".join(fmt_gaester(r["guest_names"])), status,
                "Ja" if r["attended"] else ""]
         row += [r["values"].get(f["id"], "") for f in fields]
         row.append(r["created_at"])
         writer.writerow(row)
+
+    tal = notifications.event_counts(conn, group, ev)
+    writer.writerow([])
+    writer.writerow(["Opsummering"])
+    writer.writerow(["Medlemmer", tal["signups"]])
+    writer.writerow(["Gæster", tal["count"] - tal["signups"]])
+    writer.writerow(["I alt (pladser)", tal["count"]])
+    writer.writerow(["Forventet antal", ev["expected_count"]])
+    writer.writerow(["Afbud", tal["declined"]])
+    writer.writerow(["Venteliste", tal["waitlist"]])
+    writer.writerow(["Spiser ikke med", tal["no_meals"]])
+    writer.writerow(["Mad til", tal["meals"]])
     return buf.getvalue()
 
 
@@ -1862,6 +1915,36 @@ def ensure_calendar_token(conn, group):
     conn.execute("UPDATE groups SET calendar_token = ? WHERE id = ?", (token, group["id"]))
     conn.commit()
     return token
+
+
+def ensure_list_token(conn, ev):
+    """Sørg for at eventet har en nøgle til deltagerliste-linket.
+
+    Laves først, når nogen har brug for et link — admin åbner deltagerlisten,
+    eller beskeden sendes. Et event, ingen har bedt om en liste til, skal ikke
+    have en adresse, der virker uden login.
+
+    Nøglen er kort (9 byte = 12 tegn) med vilje: linket sendes på SMS, hvor hvert
+    tegn koster, og 72 bit er rigeligt til noget, der kun er en deltagerliste.
+    """
+    if ev["list_token"]:
+        return ev["list_token"]
+    token = secrets.token_urlsafe(9)
+    conn.execute("UPDATE events SET list_token = ? WHERE id = ?", (token, ev["id"]))
+    conn.commit()
+    return token
+
+
+def build_list_link(conn, group, ev):
+    """Absolut link til deltagerlisten som udskrift — med nøglen i.
+
+    Kaldes fra notifications (scheduleren), hvor der ikke er nogen request at
+    lave url_for på, så adressen bygges af master's offentlige URL.
+    """
+    base = (db.get_settings(conn)["base_url"] or "").strip().rstrip("/")
+    if not base:
+        return ""
+    return f"{base}/{group['slug']}/{ev['slug']}/liste?n={ensure_list_token(conn, ev)}"
 
 
 def _registrations_with_values(conn, event_id, fields):
@@ -2109,6 +2192,49 @@ def user_event(slug, event_slug):
                            mail_on=mail_on, wa_on=wa_on, sms_on=sms_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
                            group_users=group_users, my_name=my_name, filer=filer)
+
+
+@app.route("/<slug>/<event_slug>/liste")
+def user_event_sheet(slug, event_slug):
+    """Deltagerlisten som udskrift — den side, jagtlederen får et link til.
+
+    To veje ind, og begge er bevidste:
+
+    * det almindelige bruger-login (medlemmerne må se listen alligevel), eller
+    * nøglen fra linket, så jagtlederen kan åbne den på mobilen i skoven uden
+      først at skulle huske gruppens adgangskode.
+
+    Nøglen hører til ÉT event. Slipper linket ud, er det den ene dags liste, der
+    er sluppet ud — ikke hele gruppen.
+    """
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    conn = db.get_db()
+    ev = conn.execute("SELECT * FROM events WHERE group_id = ? AND slug = ?",
+                      (group["id"], event_slug)).fetchone()
+    if not ev:
+        conn.close()
+        abort(404)
+    token = (request.args.get("n") or "").strip()
+    gyldig_noegle = bool(ev["list_token"]) and secrets.compare_digest(token, ev["list_token"])
+    if not gyldig_noegle and not user_has_access(group):
+        conn.close()
+        return redirect(url_for("user_login", slug=slug))
+    fields = visible_fields(conn, group["id"], ev["id"])
+    regs = _registrations_with_values(conn, ev["id"], fields)
+    # Afbud står nederst og uden pladser: listen skal kunne læses som »hvem er med«.
+    raekker = []
+    for r in regs:
+        raekker.append({"r": r, "afbud": is_declined(conn, group["id"], r["id"]),
+                        "gaester": fmt_gaester(r["guest_names"])})
+    raekker.sort(key=lambda x: (x["afbud"], x["r"]["waitlist"]))
+    tal = notifications.event_counts(conn, group, ev)
+    ledere = event_leaders(conn, group, ev)
+    conn.close()
+    return render_template("user/event_sheet.html", group=group, ev=ev, ledere=ledere,
+                           fields=fields, raekker=raekker, tal=tal,
+                           state=event_state(ev))
 
 
 @app.route("/<slug>/<event_slug>/signup", methods=["POST"])
@@ -3373,8 +3499,10 @@ def master_users():
     return render_template("master/users.html", users=users, all_groups=all_groups)
 
 
-# Registrér CSV-byggeren og start påmindelses-/CSV-scheduleren.
+# Registrér de funktioner, scheduleren skal bruge fra app.py, og start den.
 notifications.csv_builder = build_csv
+notifications.list_link_builder = build_list_link
+notifications.leaders_lookup = event_leaders
 notifications.start_scheduler()
 
 

@@ -11,6 +11,54 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 35
+
+**Overblik i CSV-listen, og deltagerlisten til jagtlederne når fristen er nået.**
+
+CSV-listen var en udskrift af tabellen; nu er den et overblik. Gæsterne har fået deres
+eget tal ved siden af navnene — man må gerne tage nogen med uden at kende navnet endnu,
+og så skal tallet kunne ses for sig. Et afbud står som **Afbud** med 0 pladser i stedet
+for »Deltager« med én, så kolonnen kan lægges sammen. Og nederst står en opsummering:
+
+> Medlemmer 8 · Gæster 3 · I alt (pladser) 11 · Forventet antal 22 · Afbud 2 ·
+> Venteliste 0 · Spiser ikke med 1 · Mad til 10
+
+Opsummeringen ligger til sidst og ikke øverst, fordi regneark læser den første linje som
+kolonneoverskrifter.
+
+**Jagtlederne kan nu få listen tilsendt.** Et flueben på eventet (*Notifikationer →
+Deltagerliste til jagtlederne*) sender en besked til de valgte jagtledere, når
+tilmeldingsfristen er nået — på deres egen mail og mobil fra medlemslisten. Beskeden er et
+link til deltagerlisten **som udskrift**, der kan gemmes som PDF på telefonen.
+
+**Madbestillingen siger nu hvilken jagt — og datoerne er på dansk.** Teksten begyndte med
+»Tilmeldingen er lukket«, og hvilken jagt det handlede om, stod kun i emnet. Nu står
+jagtens navn og dato i selve beskeden:
+
+> **Madbestilling**
+> Jagt 3 oktober 2026 d. 03-10-2026 kl. 08:30.
+> Mad til 13. 14 deltagere inkl. gæster, 1 uden mad.
+
+Emnet er samtidig kortet ned til »Madbestilling«, for på SMS klistres emne og tekst sammen
+— stod navnet begge steder, ville det stå der to gange og koste en SMS-del ekstra. Beskeden
+fylder 110 tegn: stadig én SMS.
+
+Datoerne i **alle** beskeder skrives nu som 03-10-2026 i stedet for 2026-10-03, og frister
+som 28-09-2026 23:00 i stedet for 2026-09-28T23:00. Det er de samme to formater, som
+skærmen bruger. Beskeden til jagtlederne har fået samme behandling — den
+begyndte med den samme sætning.
+
+**Og en fejl i admin-oversigten er væk.** Jagten d. 3. oktober skrev »Deltagere: 14 / 22«
+uden at nævne de to afbud, mens jagten d. 24. oktober huskede sine. Admin regnede selv
+afbuddene ud som *antal tilmeldinger minus antal pladser* — og på en jagt med gæster er
+den forskel negativ, så afbuddene forsvandt. Nu står der »8 tilmeldt · 6 gæster · 2 afbud«
+begge steder, fra den samme kilde som bruger-siden og madbestillingen bruger.
+
+Linket virker uden gruppens adgangskode, så det kan åbnes i skoven uden at skulle huske
+koden først. Nøglen i adressen hører til ét event og laves først, når nogen har brug for
+et link. Admin kan se linket og sende beskeden manuelt øverst på deltagerlisten, og
+medlemmerne finder den samme side under **Vis som udskrift** på eventet.
+
 ## Version 34
 
 **Madbestillingen fylder nu én SMS.**

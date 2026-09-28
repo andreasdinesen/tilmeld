@@ -205,6 +205,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
                     # betydningen er den samme, så appen kører videre.
                     print(f"[MIGRATION] kunne ikke fjerne groups.{gammel}: {e}", flush=True)
 
+    # Deltagerliste til jagtlederne, når fristen er nået (rune 35).
+    add("events", "notify_leaders", "INTEGER DEFAULT 0")
+    add("events", "leaders_sent", "INTEGER DEFAULT 0")
+    add("events", "list_token", "TEXT DEFAULT ''")
+
     add("groups", "sms_enabled", "INTEGER DEFAULT 0")
     add("groups", "sms_recipient", "TEXT DEFAULT ''")
     for gid, nummer in gamle_numre.items():

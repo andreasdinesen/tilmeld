@@ -137,6 +137,11 @@ CREATE TABLE IF NOT EXISTS events (
     notify_list_sent    INTEGER DEFAULT 0,
     notify_catering     INTEGER DEFAULT 0,         -- besked til madbestilleren når fristen er nået
     catering_sent       INTEGER DEFAULT 0,
+    notify_leaders      INTEGER DEFAULT 0,         -- deltagerliste til jagtlederne når fristen
+    leaders_sent        INTEGER DEFAULT 0,         -- er nået (link til en side, de kan printe)
+    list_token          TEXT DEFAULT '',           -- hemmelig nøgle i det link: jagtlederen
+                                                   -- skal kunne åbne listen på mobilen uden
+                                                   -- at taste gruppens adgangskode først
     catering_email      TEXT DEFAULT '',           -- tomt = brug gruppens standard
     catering_phone      TEXT DEFAULT '',
     -- Resultatet EFTER jagten. Bevidst uden for event-formularens vals-tuple, så en

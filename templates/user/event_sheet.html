@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "user/_print.html" as pr %}
+{% import "user/_tal.html" as tal_makro %}
+
+{# Deltagerlisten som UDSKRIFT. Én side, der kan læses på en telefon i skoven og
+   gemmes som PDF med browserens egen print-funktion (samme opskrift som
+   medlemslisten og regelsættet — ingen PDF-pakke på serveren).
+
+   Siden er bevidst mager: ingen tilmeldings-formular, ingen redigér-knapper,
+   ingen deling. Det er dagens liste, ikke endnu en indgang til at rette i den. #}
+
+{% block title %}Deltagere · {{ ev.name }}{% endblock %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_event', slug=group.slug, event_slug=ev.slug) }}">Tilbage til jagten</a>
+{% endblock %}
+{% block content %}
+<a class="tilbage noprint" href="{{ url_for('user_event', slug=group.slug, event_slug=ev.slug) }}">← Tilbage til jagten</a>
+<div class="card">
+  <h1>{{ ev.name }}</h1>
+  <div class="muted">
+    {{ ev.event_date|d }}{% if ev.start_time %} kl. {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
+    {% if ev.signup_deadline %}· Tilmeldingsfrist: {{ ev.signup_deadline|dt }}{% endif %}
+  </div>
+  {{ tal_makro.tal_linje(tal, ev, stor=true) }}
+
+  {% if ledere %}
+    <p class="muted small">{{ 'Jagtleder' if ledere|length == 1 else 'Jagtledere' }}:
+      {% for m in ledere %}{{ m.name or m.email or m.whatsapp }}{% if m.whatsapp %}
+        <span class="printlink"><a href="tel:{{ m.whatsapp|replace(' ', '') }}">{{ m.whatsapp }}</a></span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}
+    </p>
+  {% endif %}
+
+  {% if not raekker %}
+    <p>Ingen tilmeldinger endnu.</p>
+  {% else %}
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>Navn</th><th>Gæster</th>
+        {% for f in fields %}<th>{{ f.label }}</th>{% endfor %}
+      </tr></thead>
+      <tbody>
+        {% for x in raekker %}
+          <tr class="{{ 'declined' if x.afbud }}">
+            <td>{{ x.r.name }}{% if x.afbud %} <span class="muted small">(afbud)</span>
+                {% elif x.r.waitlist %} <span class="muted small">(venteliste)</span>{% endif %}</td>
+            {# Tallet FØRST, navnene bagefter: »2 (Ida, Jens)«. Man må gerne tage nogen
+               med uden at kende navnet endnu, og så skal tallet stadig kunne tælles. #}
+            <td class="nowrap">{% if x.afbud or x.r.seats < 2 %}—{% else %}{{ x.r.seats - 1 }}{% if x.gaester %}
+                <span class="muted small">({{ x.gaester|join(', ') }})</span>{% endif %}{% endif %}</td>
+            {% for f in fields %}<td>{{ x.r['values'].get(f.id, '') }}</td>{% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="ialt">
+          <td><strong>{{ tal.signups }} tilmeldt</strong></td>
+          <td class="nowrap"><strong>{{ tal.guests }} gæst{{ '' if tal.guests == 1 else 'er' }}</strong></td>
+          {% if fields %}<td colspan="{{ fields|length }}" class="muted small">
+            I alt {{ tal.count }} pladser{% if tal.declined %} · {{ tal.declined }} afbud{% endif %}{% if tal.no_meals %} · mad til {{ tal.meals }}{% endif %}</td>{% endif %}
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% endif %}
+
+  {{ pr.pdf_knap('Deltagere-' ~ ev.name) }}
+</div>
+{% endblock %}

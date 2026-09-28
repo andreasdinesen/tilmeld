@@ -8,6 +8,7 @@ import smtplib
 import threading
 import time
 import urllib.request
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -17,6 +18,11 @@ import push as webpush
 
 # Sættes af app.py: funktion (conn, group, event) -> csv-tekst. Undgår cirkulær import.
 csv_builder = None
+# Sættes af app.py: funktion (conn, group, event) -> absolut link til deltagerlisten
+# som udskrift (med den hemmelige nøgle i). Samme grund: url_for og tokenen bor i app.py.
+list_link_builder = None
+# Sættes af app.py: funktion (conn, group, event) -> liste af jagtledere.
+leaders_lookup = None
 
 # Standard-mail-skabeloner. Admin kan overskrive dem pr. gruppe (hvis master tillader).
 # Pladsholdere: {event} {name} {date} {group} {deadline} {start} {link}
@@ -45,10 +51,18 @@ DEFAULT_TEMPLATES = {
     # de andre skabeloner har ingen tal at sætte ind.
     # Teksten er holdt kort MED VILJE: på SMS klistres emne og tekst sammen til én
     # besked, og over 160 tegn koster den to dele i stedet for en. Derfor står
-    # navn, dato og klokkeslæt kun ÉN gang — i emnet — og tallene står i teksten.
-    "catering": ("Madbestilling: {event} d. {date}{start}",
-                 "Tilmeldingen er lukket.\n"
+    # jagtens navn og dato kun ÉT sted — og det er i TEKSTEN, ikke i emnet: på mail
+    # er emnelinjen det første, man ser, men i teksten står det, man skal handle på,
+    # og madbestilleren skal kunne se hvilken jagt uden at kigge op i emnet.
+    "catering": ("Madbestilling",
+                 "{event} d. {date}{start}.\n"
                  "Mad til {meals}. {count} deltagere inkl. gæster, {no_meals} uden mad."),
+    # Deltagerlisten til jagtlederne, når fristen er nået. Kort MED VILJE: det
+    # meste af en SMS går til selve linket, og beskeden skal stadig kunne være i
+    # én del. Derfor står datoen ikke i emnet — den er en del af linket alligevel.
+    "leader_list": ("Deltagerliste",
+                    "{event} d. {date}{start}.\n"
+                    "{count} pladser ({signups} + {guests} gæster).\n{link}"),
     # Uden »Hej {name}«: varslingen går også til modtagere UDEN navn — en adresse
     # admin har tastet ind, eller en telefon der har abonneret. »Hej .« er værre
     # end ingen hilsen. Admin kan selv sætte {name} ind, hvis listen har navne.
@@ -82,8 +96,41 @@ def template_for(conn, group, tkey):
     return subject, body
 
 
+def _dansk_dato(v):
+    """»2026-10-03« -> »03-10-2026«, »2026-09-28T23:00« -> »28-09-2026 23:00«.
+
+    Skabelonerne får datoen, som den står i databasen — ISO, fordi den sorterer.
+    Men en besked skal læses af et menneske, og et dansk menneske skriver dagen
+    først. Det er de samme to formater som `dt`- og `d`-filtrene i app.py, så en
+    SMS og skærmen skriver datoen ens.
+    """
+    v = str(v or "")
+    for fmt, ud in (("%Y-%m-%d", "%d-%m-%Y"), ("%Y-%m-%dT%H:%M", "%d-%m-%Y %H:%M"),
+                    ("%Y-%m-%dT%H:%M:%S", "%d-%m-%Y %H:%M")):
+        try:
+            return datetime.strptime(v, fmt).strftime(ud)
+        except ValueError:
+            continue
+    return v
+
+
+def _pretty_dates(ctx):
+    """Samme ctx, men med {date} og {deadline} skrevet på dansk.
+
+    Ét sted, fordi den ellers skulle huskes hver gang en ny besked bygges — og
+    den slags bliver ikke husket."""
+    if not ctx:
+        return ctx
+    ud = dict(ctx)
+    for n in ("date", "deadline"):
+        if n in ud:
+            ud[n] = _dansk_dato(ud[n])
+    return ud
+
+
 def render_message(conn, group, tkey, ctx):
     subject, body = template_for(conn, group, tkey)
+    ctx = _pretty_dates(ctx)
     return _safe_format(subject, ctx), _safe_format(body, ctx)
 
 
@@ -257,6 +304,7 @@ def event_counts(conn, group, ev) -> dict:
 
         count     deltagere + gæster (summen af pladser, uden afbud og venteliste)
         signups   antal tilmeldinger bag `count` (personer, ikke pladser)
+        guests    `count` minus `signups` — pladserne, der ikke er medlemmer
         meals     hvor mange der skal have mad
         no_meals  hvor mange af `count` der har meldt fra til spisning
         waitlist  antal på venteliste
@@ -284,6 +332,7 @@ def event_counts(conn, group, ev) -> dict:
             tal["no_meals"] += pladser
         else:
             tal["meals"] += pladser
+    tal["guests"] = tal["count"] - tal["signups"]
     return tal
 
 
@@ -500,6 +549,57 @@ def send_catering_test(conn, group, ev) -> tuple:
     return phone, err
 
 
+# ---- Deltagerlisten til jagtlederne ------------------------------------------
+
+def notify_leaders_list(conn, group, ev, ledere, link, note="") -> tuple:
+    """Send jagtlederne et link til deltagerlisten. (antal beskeder, fejl-liste).
+
+    `ledere` er opslået i app.py (`event_leaders`), for det er dér medlemslisten
+    bor. Her ligger kun afsendelsen — og den går til PERSONER, ikke til en liste:
+    en jagtleder står med sit eget nummer og sin egen mail.
+
+    Push er ikke med. Et push-abonnement hænger på en enhed, ikke på et navn, så
+    der er ingen måde at ramme netop jagtlederen på.
+    """
+    settings = db.get_settings(conn)
+    tal = event_counts(conn, group, ev)
+    ctx = dict(tal, event=ev["name"], date=ev["event_date"], group=group["name"],
+               deadline=ev["signup_deadline"] or "ingen",
+               start=f" kl. {ev['start_time']}" if ev["start_time"] else "",
+               link=link)
+    suffix = f" ({note})" if note else ""
+    sendt, errors = 0, []
+    if not ledere:
+        return 0, ["der er ikke valgt nogen jagtledere på eventet"]
+    if not link:
+        return 0, ["der er ingen offentlig adresse sat op (master → Opsætning)"]
+
+    for m in ledere:
+        subject, body = render_message(conn, group, "leader_list",
+                                       dict(ctx, name=m["name"]))
+        for kanal, aktiv, modtager, send in (
+                ("mail", group["mail_enabled"], m["email"],
+                 lambda to: send_email(settings, to, subject, body)),
+                ("sms", group["sms_enabled"], m["whatsapp"],
+                 lambda to: send_sms(settings, to, f"{subject}: {body}")),
+                ("whatsapp", group["whatsapp_enabled"], m["whatsapp"],
+                 lambda to: send_whatsapp(settings, to, f"{subject}: {body}"))):
+            if not aktiv or not modtager:
+                continue
+            err = send(modtager)
+            if err:
+                errors.append(f"{modtager}: {err}")
+            else:
+                sendt += 1
+            db.add_log(conn, kanal,
+                       f"Deltagerliste{suffix} til {m['name'] or modtager} "
+                       f"({modtager}): {ev['name']}{_note(err)}", group["slug"])
+    if not sendt and not errors:
+        errors.append("jagtlederne har hverken mail eller mobilnummer på "
+                      "medlemslisten — eller kanalerne er slået fra for gruppen")
+    return sendt, errors
+
+
 # ---- Notifikationsliste: hvem står på den, og hvordan sendes der til dem ------
 
 def _norm_mail(v):
@@ -589,6 +689,7 @@ def send_to_list(conn, group, subject, body, ctx=None, note=""):
                        f"Notifikationsliste{suffix} ikke leveret — {modtager}: {err}",
                        group["slug"])
 
+    ctx = _pretty_dates(ctx)
     for r in list_recipients(conn, group):
         if not r["active"]:
             continue
@@ -793,6 +894,31 @@ def process_scheduled(now=None):
                 # leveres, skal fejle ÉN gang og stå i loggen — ikke prøve igen hvert
                 # 10. minut og sende maden af sted tre dage senere.
                 conn.execute("UPDATE events SET catering_sent = 1 WHERE id = ?", (ev["id"],))
+                conn.commit()
+
+        # Deltagerlisten til jagtlederne, når fristen er nået. Samme udløser som
+        # madbestillingen, men egen kolonne og egen besked: jagtlederen skal have
+        # NAVNENE med i skoven, madbestilleren skal kun bruge et tal.
+        ld_rows = conn.execute(
+            "SELECT * FROM events WHERE notify_leaders = 1 AND leaders_sent = 0 "
+            "AND signup_deadline != ''").fetchall()
+        for ev in ld_rows:
+            try:
+                deadline = datetime.fromisoformat(ev["signup_deadline"])
+            except ValueError:
+                continue
+            if now >= deadline:
+                group = conn.execute(
+                    "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
+                if group and leaders_lookup and list_link_builder:
+                    notify_leaders_list(conn, group, ev,
+                                        leaders_lookup(conn, group, ev),
+                                        list_link_builder(conn, group, ev),
+                                        note="frist nået")
+                # Markeres som sendt uanset udfald — samme begrundelse som
+                # madbestillingen: én fejl i loggen er bedre end et forsøg hvert
+                # 10. minut resten af ugen.
+                conn.execute("UPDATE events SET leaders_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()
 
         # CSV til admin 2 timer efter frist
