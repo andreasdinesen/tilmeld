@@ -112,9 +112,31 @@
     </div>
     {% if liste_link %}
       <label class="small">Linket (virker uden adgangskode)
-        <input type="text" value="{{ liste_link }}" readonly onclick="this.select()">
+        <input type="text" id="listelink" value="{{ liste_link }}" readonly onclick="this.select()">
       </label>
+      <p class="formnote" data-kopi-note="listelink"></p>
     {% endif %}
+
+    {# Samme besked til én, man vælger i øjeblikket: en afløser, en ny jagtleder,
+       eller ens egen telefon som prøve. Egen formular — indlejrede <form> er
+       ugyldig HTML (faldgrube 7). #}
+    <form method="post">
+      <input type="hidden" name="action" value="send_liste">
+      <label class="small">Send listen til en anden
+        <span class="actions">
+          <select name="modtager">
+            <option value="">— vælg fra medlemslisten —</option>
+            {% for m in medlemmer %}
+              <option value="{{ m.ref }}">{{ m.name or m.email or m.whatsapp }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="modtager_fri" placeholder="eller +4520123456 / mail@eksempel.dk">
+          <button class="small" type="submit">Send</button>
+          <button type="button" class="small" data-kopi="listelink"
+                  data-kopi-ok="Linket er kopieret.">Kopiér linket</button>
+        </span>
+      </label>
+    </form>
   </div>
 
   {% if not regs %}<p>Ingen tilmeldinger endnu.</p>{% else %}

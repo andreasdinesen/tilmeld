@@ -1621,6 +1621,27 @@ def admin_event_list(slug, event_id):
             flash(f"Deltagerlisten er sendt ({sendt} besked(er)).", "ok")
         for f in fejl[:5]:
             flash(f"Ikke sendt — {f}", "error")
+    elif request.method == "POST" and request.form.get("action") == "send_liste":
+        # Samme besked som jagtlederne får, men til én, man vælger i øjeblikket:
+        # en afløser, en ny jagtleder, eller bare ens egen telefon som prøve.
+        valgt = request.form.get("modtager", "").strip()
+        fri = request.form.get("modtager_fri", "").strip()
+        folk = [m for m in group_members(conn, group) if m["ref"] == valgt] if valgt else []
+        if fri:
+            # Fritekst: et »@« gør det til en mail, alt andet behandles som et nummer.
+            # Navnet står tomt — skabelonens {name} bliver bare ikke til noget.
+            folk.append({"name": "", "email": fri if "@" in fri else "",
+                         "whatsapp": "" if "@" in fri else fri})
+        if not folk:
+            flash("Vælg et medlem på listen, eller skriv et nummer eller en mailadresse.",
+                  "error")
+        else:
+            sendt, fejl = notifications.notify_leaders_list(
+                conn, group, ev, folk, build_list_link(conn, group, ev), note="valgt modtager")
+            if sendt:
+                flash(f"Deltagerlisten er sendt ({sendt} besked(er)).", "ok")
+            for f in fejl[:5]:
+                flash(f"Ikke sendt — {f}", "error")
     fields = visible_fields(conn, group["id"], ev["id"])
     regs = _registrations_with_values(conn, ev["id"], fields)
     attending = count_attending(conn, group["id"], ev["id"])
@@ -1635,13 +1656,14 @@ def admin_event_list(slug, event_id):
     arter = game_species(conn, group["id"])
     udbytte = event_game(conn, ev["id"])
     ledere = event_leaders(conn, group, ev)
+    medlemmer = group_members(conn, group)
     liste_link = build_list_link(conn, group, ev)
     # `ev` blev læst FØR nøglen blev lavet, så `leaders_sent`/`list_token` skal
     # hentes igen — ellers viser siden en tom nøgle på sit første besøg.
     ev = conn.execute("SELECT * FROM events WHERE id = ?", (ev["id"],)).fetchone()
     conn.close()
     return render_template("admin/event_list.html", arter=arter, udbytte=udbytte, group=group, ev=ev,
-                           ledere=ledere, liste_link=liste_link,
+                           ledere=ledere, liste_link=liste_link, medlemmer=medlemmer,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
                            state=event_state(ev), attended_count=attended_count,

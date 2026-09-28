@@ -642,8 +642,8 @@ def notify_leaders_list(conn, group, ev, ledere, link, note="") -> tuple:
                        f"Deltagerliste{suffix} til {m['name'] or modtager} "
                        f"({modtager}): {ev['name']}{_note(err)}", group["slug"])
     if not sendt and not errors:
-        errors.append("jagtlederne har hverken mail eller mobilnummer på "
-                      "medlemslisten — eller kanalerne er slået fra for gruppen")
+        errors.append("modtageren har hverken mail eller mobilnummer — eller "
+                      "kanalerne er slået fra for gruppen")
     return sendt, errors
 
 

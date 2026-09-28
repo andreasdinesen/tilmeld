@@ -11,6 +11,21 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 50
+
+**Deltagerlisten kan sendes til hvem som helst.**
+
+Øverst på deltagerlisten er der kommet et felt: vælg et medlem fra medlemslisten, eller
+skriv et mobilnummer eller en mailadresse — og tryk **Send**. Modtageren får samme besked
+og samme link som jagtlederne. Til afløseren, til en gæsteskytte, eller til ens egen
+telefon for at se, hvordan det tager sig ud.
+
+Et »@« afgør, om fritekst-feltet er en mail eller et nummer. En manuel afsendelse
+markerer **ikke** eventet som »sendt«, så jagtlederne får stadig deres besked, når fristen
+er nået.
+
+Linket har samtidig fået sin egen kopiér-knap.
+
 ## Version 49
 
 **Ingen SMS midt om natten.**

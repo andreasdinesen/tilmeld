@@ -320,6 +320,11 @@ beskeden med det samme — øverst på deltagerlisten.
 
 Siden findes også for medlemmerne under **Vis som udskrift** på eventet.
 
+Øverst på deltagerlisten kan admin desuden sende listen til **én, han vælger i øjeblikket**
+— et medlem fra listen, eller et nummer/en mailadresse skrevet i hånden. Det er den samme
+besked og det samme link; en manuel afsendelse tæller ikke som den automatiske, så
+jagtlederne får stadig deres, når fristen er nået.
+
 ## Gem som PDF
 
 Medlemslisten, regelsættet og udbyttet har en **Gem som PDF**-knap. Den bruger browserens
