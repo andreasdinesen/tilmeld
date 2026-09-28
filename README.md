@@ -204,6 +204,13 @@ event arver begge dele.
 Deltagerlisten viser, hvem beskeden går til og hvor mange kuverter, med en knap
 **»Send nu«** — til når tallet skal meldes ind før fristen, eller sendes igen.
 
+**Stilletid 22–08:** beskederne fra scheduleren til folks telefoner (madbestilling,
+deltagerliste til jagtlederne, påmindelse før frist, påmindelse før eventet og varsling om
+nye events) sendes ikke om natten. En tilmeldingsfrist kl. 23.00 udløser altså en
+madbestilling kl. 8 næste morgen, ikke ét minut over fristen. Admins egen »frist nået«-besked
+og CSV'en er ikke omfattet — de går til den, der selv har sat dem op. »Send nu«-knapperne
+sender med det samme, uanset klokken.
+
 ### Prøve-SMS
 
 Under **Opsætning → Kontakt → Madbestiller** kan admin sende madbestillingen som en

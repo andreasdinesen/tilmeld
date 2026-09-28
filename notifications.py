@@ -806,6 +806,20 @@ def announce_event(conn, group, ev, note=""):
 
 # ---- Scheduler: påmindelse 24t før frist + CSV 2t efter frist ------------------
 
+# Stilletid: beskeder, scheduleren sender til MENNESKER, venter til om morgenen.
+# En tilmeldingsfrist kl. 23.00 udløste ellers en SMS til madbestilleren og
+# jagtlederne midt om natten — teknisk rigtigt, men ubrugeligt for modtageren.
+# Falder tidspunktet i stilletiden, sendes der ikke; beskeden bliver liggende og
+# går af sted ved første gennemløb efter kl. 8.
+STILLETID_FRA = 22      # fra kl. 22.00
+STILLETID_TIL = 8       # til kl. 08.00
+
+
+def i_stilletid(now) -> bool:
+    """Er klokken for sent (eller for tidligt) til at sende til folks telefoner?"""
+    return now.hour >= STILLETID_FRA or now.hour < STILLETID_TIL
+
+
 def process_scheduled(now=None):
     """Én gennemløb. Adskilt fra loopet så den kan testes direkte."""
     from datetime import datetime, timedelta
@@ -837,6 +851,8 @@ def process_scheduled(now=None):
             days = max(0, group["notify_list_days"] if group["notify_list_days"] is not None else 14)
             if now < start - timedelta(days=days):
                 continue  # endnu ikke tid
+            if i_stilletid(now):
+                continue  # varsling om et nyt event kan vente til i morgen tidlig
             if now <= start:
                 announce_event(conn, group, ev, note=f"{days} dage før")
             # Uanset om der blev sendt: markér som afsendt. Et event, der allerede er
@@ -855,6 +871,8 @@ def process_scheduled(now=None):
             except ValueError:
                 continue
             if now <= start <= now + timedelta(hours=24):
+                if i_stilletid(now):
+                    continue
                 group = conn.execute(
                     "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
                 regs = conn.execute(
@@ -884,6 +902,8 @@ def process_scheduled(now=None):
             # 48 timer, ikke 24: en påmindelse dagen før fanger ikke den, der er
             # på arbejde. To døgn giver en weekend eller en fridag imellem.
             if now <= deadline <= now + timedelta(hours=48):
+                if i_stilletid(now):
+                    continue  # vent til i morgen tidlig; fristen er der endnu
                 group = conn.execute(
                     "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
                 base = (db.get_settings(conn)["base_url"] or "").strip().rstrip("/")
@@ -933,6 +953,8 @@ def process_scheduled(now=None):
             except ValueError:
                 continue
             if now >= deadline:
+                if i_stilletid(now):
+                    continue  # kuverterne skal først bestilles om morgenen
                 group = conn.execute(
                     "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
                 if group:
@@ -955,6 +977,8 @@ def process_scheduled(now=None):
             except ValueError:
                 continue
             if now >= deadline:
+                if i_stilletid(now):
+                    continue
                 group = conn.execute(
                     "SELECT * FROM groups WHERE id = ?", (ev["group_id"],)).fetchone()
                 if group and leaders_lookup and list_link_builder:

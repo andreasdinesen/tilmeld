@@ -11,6 +11,22 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 49
+
+**Ingen SMS midt om natten.**
+
+Tilmeldingsfristen er kl. 23.00, og ét minut senere fik madbestilleren en SMS om kuverter
+og jagtlederne et link til deltagerlisten. Teknisk rigtigt, ubrugeligt for modtageren.
+
+Scheduleren har nu **stilletid mellem kl. 22 og kl. 8**. Falder afsendelsen der, bliver
+beskeden liggende og går af sted ved første gennemløb efter kl. 8. Det gælder alt, der
+sendes til folks telefoner: madbestilling, deltagerliste til jagtlederne, påmindelse før
+frist, påmindelse før eventet og varsling om nye events.
+
+Undtaget er admins egen »frist nået«-besked og CSV'en to timer efter fristen — de går til
+den, der selv har sat dem op. Og »Send nu«-knapperne sender stadig med det samme, uanset
+hvad klokken er.
+
 ## Version 48
 
 **Hent-linjen huskede kun den sidste. Nu står der én linje pr. kalender-app.**
