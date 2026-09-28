@@ -11,6 +11,37 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 44
+
+**Nu kan man se, om kalenderen overhovedet henter.**
+
+»Abonnementet virker ikke« var indtil nu et gæt: man kunne ikke skelne mellem en
+kalender, der aldrig havde spurgt, og en der spurgte og fik noget forkert. Serveren fører
+ingen adgangslog — waitress logger ikke requests — så feedet noterer det nu selv. I boksen
+står der enten:
+
+> Sidst hentet af en kalender: **28-09-2026 15:12** (Google-Calendar-Importer).
+
+eller »Ingen kalender har hentet adressen endnu«. Det er dét, der afgør, om fejlen er hos
+os eller hos kalenderen.
+
+Feedet beder samtidig om at blive hentet hver time (`REFRESH-INTERVAL` og
+`X-PUBLISHED-TTL`). Apple og Outlook retter sig efter det; Google følger sin egen
+tidsplan uanset. `PRODID` er rettet til den form, standarden beskriver.
+
+## Version 43
+
+**Kopiér-knap på kalender-adressen.**
+
+Adressen skulle markeres og kopieres i hånden. Nu er der en knap ved siden af »Tilføj i
+Google Kalender« og »Tilføj i Apple Kalender«.
+
+Knappen er den samme, som deler et event på Facebook, og koden er flyttet til
+`static/kopi.js`, så de to steder ikke kan komme til at opføre sig forskelligt. Den kan
+stadig det vigtigste: udenfor et sikkert kontekst (http, fx panelets IP:port) findes
+browserens clipboard-API ikke, og så markerer knappen teksten og siger »tryk ⌘C« i stedet
+for bare ikke at gøre noget.
+
 ## Version 42
 
 **Kalender-abonnementet blev udleveret som en http-adresse — og Google henter ikke http.**

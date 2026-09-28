@@ -22,7 +22,8 @@
           kommer af sig selv — så kan du slette selve linket fra teksten, hvis du vil.</li>
     </ol>
     <div class="actions">
-      <button type="button" class="primary" data-kopi="delingstekst">Kopiér teksten</button>
+      <button type="button" class="primary" data-kopi="delingstekst"
+              data-kopi-ok="Teksten er kopieret — indsæt den i opslaget.">Kopiér teksten</button>
       {% if share.gruppe %}
         <a class="btn" href="{{ share.gruppe }}" target="_blank" rel="noopener">Åbn Facebook-gruppen</a>
       {% endif %}
@@ -162,27 +163,7 @@
   {% endif %}
 </div>
 
-<script>
-  /* Kopiér-knappen. Clipboard-API'et findes KUN i et sikkert kontekst (https eller
-     localhost) — på panelets IP:port gør det ikke. Derfor er tekstfeltet synligt i
-     forvejen, og knappen falder tilbage til at markere teksten, så den kan kopieres
-     i hånden. En knap, der bare ikke gør noget, er det værste svar. */
-  document.querySelectorAll('[data-kopi]').forEach(function (knap) {
-    var felt = document.getElementById(knap.dataset.kopi);
-    var note = document.querySelector('[data-kopi-note="' + knap.dataset.kopi + '"]');
-    knap.addEventListener('click', function () {
-      function sig(t, daarlig) { note.textContent = t; note.classList.toggle('bad', !!daarlig); }
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(felt.value)
-          .then(function () { sig('Teksten er kopieret — indsæt den i opslaget.'); })
-          .catch(function () { felt.select(); sig('Kunne ikke kopiere — teksten er markeret, tryk ⌘C.', true); });
-      } else {
-        felt.select();
-        sig('Teksten er markeret — tryk ⌘C for at kopiere.');
-      }
-    });
-  });
-</script>
+<script src="{{ url_for('static', filename='kopi.js') }}?v={{ app_version }}" defer></script>
 
 <div class="card" id="resultat">
   <h2>Resultat</h2>

@@ -1823,8 +1823,12 @@ _ICS_FIELDS = ("name", "slug", "event_date", "start_time", "end_time", "descript
 def build_ics(group, events, base_url=""):
     """Byg en iCal-fil med de givne events."""
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Tilmeld//DA//",
+    # REFRESH-INTERVAL (RFC 7986) og X-PUBLISHED-TTL (Microsofts ældre udgave) er et
+    # ØNSKE om, hvor tit klienten skal hente igen. Apple og Outlook retter sig efter
+    # dem; Google gør sin egen tidsplan uanset. Begge sendes, for det koster to linjer.
+    out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Tilmeld//Tilmeld//DA",
            "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+           "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
            f"X-WR-CALNAME:{_ics_escape(group['name'])}"]
     for ev in events:
         try:
@@ -2135,6 +2139,14 @@ def group_calendar_ics(slug):
         "SELECT * FROM events WHERE group_id = ? AND event_date >= ? ORDER BY event_date",
         (group["id"], since)).fetchall()
     base = public_base_url(conn)
+    # Notér hvem der henter. Uden det er »abonnementet virker ikke« et gæt: man kan
+    # ikke se, om kalenderen aldrig har spurgt, eller om den spurgte og fik noget
+    # forkert. Serveren fører ingen adgangslog (waitress logger ikke requests), så
+    # det skal stå her. Én UPDATE pr. hent — en kalender spørger højst hver time.
+    conn.execute(
+        "UPDATE groups SET calendar_fetched_at = ?, calendar_fetched_by = ? WHERE id = ?",
+        (db.now_iso(), (request.headers.get("User-Agent") or "ukendt")[:120], group["id"]))
+    conn.commit()
     conn.close()
     return Response(build_ics(group, events, base), content_type="text/calendar; charset=utf-8")
 

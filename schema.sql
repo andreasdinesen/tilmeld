@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS groups (
     templates_enabled   INTEGER DEFAULT 0,         -- master tillader admin at redigere mail-skabeloner
     user_accounts_enabled INTEGER DEFAULT 0,       -- individuelle bruger-konti (login m. brugernavn)
     calendar_token      TEXT DEFAULT '',           -- hemmelig token til .ics-abonnement
+    calendar_fetched_at TEXT DEFAULT '',           -- sidste gang en kalender-app hentede
+    calendar_fetched_by TEXT DEFAULT '',           -- feedet, og hvem der gjorde det. Svaret
+                                                   -- på »henter Google det overhovedet?«
     notify_list_enabled INTEGER DEFAULT 0,         -- notifikationsliste: varsling om nye events
     notify_list_days    INTEGER DEFAULT 14,        -- varsling sendes X dage før event-start
     notify_list_users   INTEGER DEFAULT 1,         -- medtag gruppens brugere (når konti er slået til)

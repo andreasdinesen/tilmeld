@@ -210,6 +210,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     add("settings", "inmobile_api_key", "TEXT DEFAULT ''")
     add("settings", "inmobile_sender", "TEXT DEFAULT ''")
 
+    # Hvornår blev kalender-feedet sidst hentet, og af hvem (rune 44).
+    add("groups", "calendar_fetched_at", "TEXT DEFAULT ''")
+    add("groups", "calendar_fetched_by", "TEXT DEFAULT ''")
+
     # Tredje SMS-udbyder (rune 41).
     add("settings", "suresms_login", "TEXT DEFAULT ''")
     add("settings", "suresms_password", "TEXT DEFAULT ''")
