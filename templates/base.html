@@ -33,6 +33,10 @@
   <header class="topbar">
     <div class="wrap">
       <span class="brand">{% block brand %}Tilmeld{% endblock %}</span>
+      {# Versionen står i topbaren på ALLE sider — bruger, gruppe-admin og master.
+         Det er den hurtigste måde at se, om en genstart rent faktisk hentede den
+         nye udgave, og den skal kunne ses dér, hvor man opdager problemet. #}
+      <span class="version" title="Tilmeld rune {{ app_version }}">v{{ app_version }}</span>
       <div class="topbar-right">
         <nav>{% block nav %}{% endblock %}</nav>
         <button type="button" class="themetoggle" id="themeToggle"><span aria-hidden="true">🌙</span></button>

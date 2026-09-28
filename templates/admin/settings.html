@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_passkeys.html" as pk %}
 {% import "_push.html" as push %}
-{% import "admin/_sektion.html" as s %}
+{% import "_sektion.html" as s %}
 
 {# Felterne i et tilmeldings-punkt. Samme makro bruges til BÅDE tilføj og redigér,
    så de to formularer ikke kan komme til at tilbyde forskellige muligheder. #}
@@ -336,45 +336,5 @@
 {% endcall %}
 {% endif %}
 
-<script>
-/* Foldbare afsnit: husk hvad der var åbent, og åbn det afsnit man er sendt til.
-
-   sessionStorage, ikke localStorage — samme valg som tema-skifteren: et »Gem«
-   laver et sideskift, og så skal afsnittet stadig stå åbent, men en ny fane må
-   gerne starte foldet sammen igen.
-
-   Ankeret vinder over hukommelsen: kommer man tilbage fra et »Gem« med #punkter,
-   SKAL punkterne være foldet ud — ellers ser det ud som om handlingen forsvandt. */
-(function () {
-  var NOEGLE = 'tilmeld_sektioner_{{ group.slug }}';
-  var afsnit = Array.prototype.slice.call(document.querySelectorAll('details.sektion'));
-  if (!afsnit.length) return;
-
-  function laes() {
-    try { return JSON.parse(sessionStorage.getItem(NOEGLE)) || {}; } catch (e) { return {}; }
-  }
-  function gem(tilstand) {
-    try { sessionStorage.setItem(NOEGLE, JSON.stringify(tilstand)); } catch (e) {}
-  }
-
-  var husket = laes();
-  afsnit.forEach(function (d) {
-    if (husket[d.id]) d.open = true;
-    d.addEventListener('toggle', function () {
-      var t = laes();
-      if (d.open) t[d.id] = 1; else delete t[d.id];
-      gem(t);
-    });
-  });
-
-  var anker = (location.hash || '').slice(1);
-  if (anker) {
-    var maal = document.getElementById(anker);
-    if (maal && maal.tagName === 'DETAILS') {
-      maal.open = true;
-      maal.scrollIntoView();
-    }
-  }
-})();
-</script>
+{{ s.husk('tilmeld_sektioner_' ~ group.slug) }}
 {% endblock %}

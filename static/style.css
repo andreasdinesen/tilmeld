@@ -164,6 +164,18 @@ code {
 }
 .themetoggle:hover { border-color: var(--muted); }
 
+/* Versionsnummeret ved siden af navnet i topbaren. Lille og stille: det skal kunne
+   slås op, ikke læses hver gang. `flex-shrink: 0` fordi brand-navnet ellers skubber
+   det ud af bjælken på en telefon. */
+.version {
+  font-size: 0.7rem; font-weight: 600; color: var(--muted); flex-shrink: 0;
+  letter-spacing: 0.02em; padding: 2px 7px; border-radius: 999px;
+  background: var(--sunken); border: 1px solid var(--line);
+  /* Topbaren er `space-between` med tre børn nu. Auto-margenen æder al luften, så
+     versionen bliver klistret op ad navnet i stedet for at lande midt i bjælken. */
+  margin-right: auto;
+}
+
 /* --- Kort og rækker ----------------------------------------------------- */
 
 .card {

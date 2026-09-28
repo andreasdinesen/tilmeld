@@ -1,0 +1,66 @@
+{# Et foldbart afsnit på opsætnings-siden.
+
+   Kortet ER selve <details>-elementet, så layoutet er præcis det samme som før —
+   der er bare et låg på. `id` bruges som anker efter et »Gem« (se _SETTINGS_ANCHOR
+   i app.py) OG som nøgle, når tilstanden huskes i sessionStorage.
+
+   `hint` er den ene linje, man kan nøjes med at læse, når afsnittet er foldet
+   sammen: hvor mange arter, hvor mange punkter, om der er et password. Uden den
+   ville man skulle folde ud bare for at se, om der stod noget. #}
+
+{% macro sektion(id, titel, hint='') %}
+<details class="card narrow sektion" id="{{ id }}">
+  <summary>
+    <span class="sektion-titel">{{ titel }}</span>
+    {% if hint %}<span class="sektion-hint">{{ hint }}</span>{% endif %}
+  </summary>
+  <div class="sektionkrop">{{ caller() }}</div>
+</details>
+{% endmacro %}
+
+{# Hukommelsen for ALLE foldbare afsnit på en side. Kaldes én gang, nederst.
+   Nøglen er pr. side (gruppens slug eller »master«), så to opsætnings-sider
+   ikke deler tilstand. #}
+{% macro husk(noegle) %}
+<script>
+/* Foldbare afsnit: husk hvad der var åbent, og åbn det afsnit man er sendt til.
+
+   sessionStorage, ikke localStorage — samme valg som tema-skifteren: et »Gem«
+   laver et sideskift, og så skal afsnittet stadig stå åbent, men en ny fane må
+   gerne starte foldet sammen igen.
+
+   Ankeret vinder over hukommelsen: kommer man tilbage fra et »Gem« med #punkter,
+   SKAL punkterne være foldet ud — ellers ser det ud som om handlingen forsvandt. */
+(function () {
+  var NOEGLE = {{ noegle|tojson }};
+  var afsnit = Array.prototype.slice.call(document.querySelectorAll('details.sektion'));
+  if (!afsnit.length) return;
+
+  function laes() {
+    try { return JSON.parse(sessionStorage.getItem(NOEGLE)) || {}; } catch (e) { return {}; }
+  }
+  function gem(tilstand) {
+    try { sessionStorage.setItem(NOEGLE, JSON.stringify(tilstand)); } catch (e) {}
+  }
+
+  var husket = laes();
+  afsnit.forEach(function (d) {
+    if (husket[d.id]) d.open = true;
+    d.addEventListener('toggle', function () {
+      var t = laes();
+      if (d.open) t[d.id] = 1; else delete t[d.id];
+      gem(t);
+    });
+  });
+
+  var anker = (location.hash || '').slice(1);
+  if (anker) {
+    var maal = document.getElementById(anker);
+    if (maal && maal.tagName === 'DETAILS') {
+      maal.open = true;
+      maal.scrollIntoView();
+    }
+  }
+})();
+</script>
+{% endmacro %}

@@ -11,6 +11,26 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 40
+
+**Versionen står nu i topbaren — og master-opsætningen kan foldes sammen.**
+
+Ved siden af navnet i toppen står der `v40`, uanset om du er på bruger-siden, i
+gruppe-admin eller i master. Det er den hurtigste måde at se, om en genstart rent faktisk
+hentede den nye udgave, og den skal kunne ses dér, hvor man opdager problemet.
+
+**Master → Opsætning** har fået de samme foldbare afsnit som gruppe-admin: password,
+startside, events, mail, WhatsApp, SMS, links, versionslog og passkeys — hver med sin
+status ved siden af overskriften (»smtp.gmail.com«, »inMobile«, »4 dages frist«), så man
+kan overskue siden uden at folde noget ud. Fanen husker, hvad du havde åbent.
+
+Der er stadig **ét** »Gem indstillinger« nederst, og det gemmer også det, der står i et
+sammenfoldet afsnit: formularen ligger uden om kortene, og `<details>` skjuler kun
+visuelt. Afprøvet med alle ni afsnit foldet sammen — intet felt blev tømt.
+
+Makroen bag afsnittene er flyttet til `templates/_sektion.html`, så de to opsætnings-sider
+deler den ene udgave.
+
 ## Version 39
 
 **Godkendelsen mod inMobile sendes nu præcis som deres egen klient gør det.**

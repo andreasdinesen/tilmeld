@@ -1,17 +1,27 @@
 {% extends "base.html" %}
 {% import "_passkeys.html" as pk %}
+{% import "_sektion.html" as sek %}
 {% block brand %}Master-admin{% endblock %}
 {% block nav %}<a href="{{ url_for('master_home') }}">Tilbage</a>{% endblock %}
 {% block content %}
 <div class="card narrow">
   <h1>Opsætning</h1>
-  <form method="post">
-    <h2>Master-password</h2>
+  <p class="muted small">Klik på et afsnit for at folde det ud. Siden husker, hvad du har
+     åbent, så længe fanen er åben — og »Gem indstillinger« nederst gemmer det hele,
+     også det, der står i et afsnit, du har foldet sammen.</p>
+</div>
+
+{# Formularen ligger uden om kortene, så der stadig kun er ét »Gem«. Et felt i et
+   sammenfoldet afsnit sendes med: <details> skjuler kun visuelt. #}
+<form method="post">
+{% call sek.sektion('password', 'Master-password', 'skiftes kun hvis feltet udfyldes') %}
     <label>Nyt master-password (tomt = uændret)
       <input type="password" name="new_master_password">
     </label>
 
-    <h2>Startside</h2>
+{% endcall %}
+
+{% call sek.sektion('startside', 'Startside', '/' ~ s.default_group if s.default_group else 'viser oversigten') %}
     <label>Gruppe som forsiden <code>/</code> skal vise
       <select name="default_group">
         <option value="">Ingen — vis oversigten</option>
@@ -25,13 +35,17 @@
        så et rent domæne lander direkte på gruppen. <code>/master</code> og
        <code>/&lt;gruppe&gt;/admin</code> virker uændret.</p>
 
-    <h2>Events</h2>
+{% endcall %}
+
+{% call sek.sektion('events', 'Events', s.default_deadline_days ~ ' dages frist') %}
     <label>Standard tilmeldingsfrist: antal dage før event-start
       <input type="number" name="default_deadline_days" min="0" value="{{ s.default_deadline_days }}">
     </label>
     <p class="muted small">Bruges som forudfyldt frist når en admin opretter et nyt event.</p>
 
-    <h2>E-mail (SMTP)</h2>
+{% endcall %}
+
+{% call sek.sektion('mail', 'E-mail (SMTP)', s.smtp_host or 'ikke sat op') %}
     <details class="help">
       <summary>Sådan sætter du Gmail op</summary>
       <div class="help-body">
@@ -63,7 +77,9 @@
     <p class="muted small">Port <strong>587</strong> = STARTTLS (sæt fluebenet) — fx Gmail og Office 365.
        Port <strong>465</strong> = SSL (vælges automatisk; fluebenet er uden betydning).</p>
 
-    <h2>WhatsApp</h2>
+{% endcall %}
+
+{% call sek.sektion('whatsapp', 'WhatsApp', 'sat op' if s.whatsapp_api_url else 'ikke sat op') %}
     <label>Gateway-URL (din WhatsApp-bro, der modtager POST med JSON)
       <input type="text" name="whatsapp_api_url" value="{{ s.whatsapp_api_url }}" placeholder="https://din-bro.dk/send">
     </label>
@@ -73,7 +89,9 @@
     <p><a class="btn" href="{{ url_for('master_whatsapp_groups') }}" target="_blank" rel="noopener">Hent WhatsApp-gruppe-id'er ↗</a></p>
     {% endif %}
 
-    <h2>SMS</h2>
+{% endcall %}
+
+{% call sek.sektion('sms', 'SMS', 'inMobile' if s.sms_provider == 'inmobile' else 'Gigahost') %}
     {# Én udbyder ad gangen. To gateways, der sendte hver sin kopi af samme besked,
        ville koste dobbelt og se ud som en fejl på telefonen. #}
     <label>Udbyder
@@ -146,12 +164,16 @@
     {% endif %}
     <p class="muted small">Status-siden viser den udbyder, der er valgt ovenfor.</p>
 
-    <h2>Links i mails</h2>
+{% endcall %}
+
+{% call sek.sektion('links', 'Links i mails', s.base_url or 'ingen offentlig URL') %}
     <label>Offentlig URL (bruges til links i mails, fx til deltagerlisten)
       <input type="text" name="base_url" value="{{ s.base_url }}" placeholder="https://tilmeld.eksempel.dk">
     </label>
 
-    <h2>Versionslog (GitHub)</h2>
+{% endcall %}
+
+{% call sek.sektion('versionslog', 'Versionslog (GitHub)', s.github_repo or 'ikke sat') %}
     <label>GitHub-repo (ejer/repo)
       <input type="text" name="github_repo" value="{{ s.github_repo }}" placeholder="andreasdinesen/tilmeld">
     </label>
@@ -160,12 +182,20 @@
        <a href="{{ url_for('master_system') }}">System-siden</a> til repoets
        <code>CHANGELOG.md</code>. Selve opdateringen sker i Yggdrasil-panelet.</p>
 
-    <p class="muted small">Uden konfiguration logges notifikationer blot i serverens konsol — fint til test.</p>
-    <button type="submit">Gem indstillinger</button>
-  </form>
-</div>
+{% endcall %}
 
-<div class="card narrow">
-  {{ pk.manage('master', '', creds, passkey_blocked) }}
-</div>
+  <div class="card narrow">
+    <p class="muted small">Uden konfiguration logges notifikationer blot i serverens
+       konsol — fint til test.</p>
+    <button type="submit" class="primary">Gem indstillinger</button>
+  </div>
+</form>
+
+{% call sek.sektion('passkeys', 'Passkeys',
+                    ('%d nøgle%s' % (creds|length, '' if creds|length == 1 else 'r'))
+                    if creds else 'ingen endnu') %}
+  {{ pk.manage('master', '', creds, passkey_blocked, false) }}
+{% endcall %}
+
+{{ sek.husk('tilmeld_sektioner_master') }}
 {% endblock %}

@@ -39,7 +39,10 @@ MASTER_PASSWORD="dit-hemmelige-kodeord" bash run.sh
 
 `/master` og `/gruppe/admin` er reserverede og kan ikke oprettes som gruppe-/event-navne.
 
-Gruppe-admins **Opsætning** er delt op i foldbare afsnit — password, vildtarter,
+**Versionsnummeret står i topbaren** på alle tre niveauer (`v39` ved siden af navnet), så
+man altid kan se, hvilken udgave serveren kører — fx efter en genstart.
+
+Både gruppe-admins og master-admins **Opsætning** er delt op i foldbare afsnit — password, vildtarter,
 kontakt, tilmeldings-punkter, udseende, dokumenter, skabeloner, passkeys og
 notifikationer. Hvert afsnit viser sin status (»5 arter«, »ingen madbestiller«), så man
 kan overskue siden uden at folde noget ud. Fanen husker, hvad du havde åbent.
