@@ -79,7 +79,7 @@
      med, når noget ændrer sig.</p>
 </div>
 
-{% if udbytte or ev.result_game or ev.result_winner or ev.result_legs or ev.result_note %}
+{% if udbytte or billeder or ev.result_game or ev.result_winner or ev.result_legs or ev.result_note %}
 <div class="card">
   <h2>Resultat</h2>
   {% if udbytte %}
@@ -103,6 +103,18 @@
         <strong>{{ ev.result_winner }}</strong>{% endif %}</p>
   {% endif %}
   {% if ev.result_note %}<div class="description">{{ ev.result_note | md }}</div>{% endif %}
+  {% if billeder %}
+    <div class="billedgitter">
+      {% for b in billeder %}
+        {# Link til billedet selv: på en telefon er det den eneste måde at se det stort. #}
+        <a href="{{ url_for('event_image', slug=group.slug, event_slug=ev.slug, image_id=b.id) }}"
+           target="_blank" rel="noopener">
+          <img src="{{ url_for('event_image', slug=group.slug, event_slug=ev.slug, image_id=b.id) }}"
+               alt="{{ b.original_name }}" loading="lazy">
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -116,7 +128,7 @@
   {% if not regs %}<p>Ingen tilmeldte endnu.</p>{% else %}
   <div class="tablewrap">
   <table>
-    <thead><tr><th>Navn</th>{% for item in fields %}<th>{{ item.f.label }}</th>{% endfor %}<th></th></tr></thead>
+    <thead><tr><th>Navn</th>{% for item in fields %}<th>{{ felt_overskrift(item.f) }}</th>{% endfor %}<th></th></tr></thead>
     <tbody>
       {% set ns_wl = namespace(shown=false) %}
       {% for r in regs %}
@@ -129,7 +141,7 @@
       {% for did in decline_ids %}{% if r['values'].get(did) == 'Ja' %}{% set ns.declined = true %}{% endif %}{% endfor %}
       <tr class="{{ 'declined' if ns.declined }}">
         <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}{% if r.seats > 1 %}{% set g = r.guest_names | gaester %} <span class="muted small">(+{{ r.seats - 1 }} gæst{{ '' if r.seats == 2 else 'er' }}{% if g %}: {{ g | join(', ') }}{% endif %})</span>{% endif %}</td>
-        {% for item in fields %}<td>{{ r['values'].get(item.f.id, '') }}</td>{% endfor %}
+        {% for item in fields %}<td>{{ felt_vaerdi(item.f, r['values'].get(item.f.id, ''), ns.declined) }}</td>{% endfor %}
         <td class="actions">
           {% if state == 'open' and r.can_edit %}
           <a class="btn small" href="{{ url_for('user_edit', slug=group.slug, event_slug=ev.slug, reg_id=r.id) }}">Redigér</a>

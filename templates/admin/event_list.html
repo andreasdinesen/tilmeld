@@ -146,7 +146,7 @@
   <table>
     <thead><tr>
       <th>Navn</th><th>E-mail</th><th>Mobilnummer</th>
-      {% for f in fields %}<th>{{ f.label }}</th>{% endfor %}
+      {% for f in fields %}<th>{{ felt_overskrift(f) }}</th>{% endfor %}
       <th>Tilmeldt</th><th>Mødt</th><th></th>
     </tr></thead>
     <tbody>
@@ -161,7 +161,7 @@
       <tr class="{{ 'declined' if ns.declined }}">
         <td>{{ r.name }}{% if ns.declined %} <span class="muted small">(afbud)</span>{% endif %}{% if r.seats > 1 %}{% set g = r.guest_names | gaester %} <span class="muted small">(+{{ r.seats - 1 }} gæst{{ '' if r.seats == 2 else 'er' }}{% if g %}: {{ g | join(', ') }}{% endif %})</span>{% endif %}</td>
         <td>{{ r.email }}</td><td>{{ r.phone }}</td>
-        {% for f in fields %}<td>{{ r['values'].get(f.id, '') }}</td>{% endfor %}
+        {% for f in fields %}<td>{{ felt_vaerdi(f, r['values'].get(f.id, ''), ns.declined) }}</td>{% endfor %}
         <td class="muted small">{{ r.created_at|dt }}</td>
         <td>{% if not r.waitlist and not ns.declined %}<input type="checkbox" name="att_{{ r.id }}" {{ 'checked' if r.attended }}>{% endif %}</td>
         <td class="actions">
@@ -191,7 +191,9 @@
   <h2>Resultat</h2>
   <p class="muted small">Udfyldes efter jagten. Det, du skriver her, vises på eventets side
      for medlemmerne. Tomme felter vises ikke.</p>
-  <form method="post" action="{{ url_for('admin_event_result', slug=group.slug, event_id=ev.id) }}">
+  {# enctype: formularen bærer nu også billeder fra dagen #}
+  <form method="post" enctype="multipart/form-data"
+        action="{{ url_for('admin_event_result', slug=group.slug, event_id=ev.id) }}">
     <h3>Udbytte</h3>
     {% if not arter %}
       <p class="muted small">Der er ingen vildtarter oprettet endnu. Opret dem under
@@ -228,8 +230,35 @@
     </label>
     <p class="muted small">Noten understøtter Markdown: <code>**fed**</code>,
        <code>- punktliste</code>, <code>[link](https://...)</code>.</p>
+
+    <h3>Billeder fra dagen</h3>
+    <label>Vælg et eller flere billeder (png/jpg/gif/webp)
+      <input type="file" name="billeder" accept="image/*" multiple>
+    </label>
+    <p class="muted small">Vises under resultatet på jagtens side — paraden, en buk,
+       hvad der nu blev skudt.</p>
     <button type="submit" class="primary">Gem resultat</button>
   </form>
+
+  {% if billeder %}
+    {# Slet-knapperne står UDEN FOR formularen ovenfor: indlejrede <form> er
+       ugyldig HTML (faldgrube 7). #}
+    <div class="billedgitter">
+      {% for b in billeder %}
+        <figure>
+          <img src="{{ url_for('event_image', slug=group.slug, event_slug=ev.slug, image_id=b.id) }}"
+               alt="{{ b.original_name }}" loading="lazy">
+          <figcaption>
+            <form method="post" class="inline"
+                  action="{{ url_for('admin_event_image_delete', slug=group.slug, event_id=ev.id, image_id=b.id) }}"
+                  onsubmit="return confirm('Fjern billedet?')">
+              <button class="danger small">Fjern</button>
+            </form>
+          </figcaption>
+        </figure>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>
 
 {% endblock %}

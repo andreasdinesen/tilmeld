@@ -281,6 +281,12 @@ Kræver en **offentlig URL** under master → Opsætning.
 Tillader et event gæster, spørger tilmeldingen om **antal gæster** (0 = du kommer alene),
 og der kommer et navnefelt pr. gæst. Navnene er valgfri.
 
+I **oversigterne** (deltagerlisten på bruger- og admin-siden, udskriften og CSV'en) vises
+et »spiser ikke med«-punkt vendt om, som **»Spiser med«** med Ja/Nej byttet rundt — på en
+liste, man står og læser, er »Spiser med: Ja« hurtigere at afkode end »Spiser ikke med:
+Nej«. Ved tilmeldingen står feltet som det er, for dér giver fra-meldingen mening: man
+rører kun ved det, hvis man IKKE skal have mad. Et afbud får en streg i mad-kolonnen.
+
 Deltagertallet viser både helheden og delene: **6 / 12 deltagere** med
 »3 tilmeldt · 3 gæster · 1 afbud« nedenunder. Databasen regner i pladser
 (gæster + 1), fordi kapaciteten handler om mennesker — oversættelsen sker ét sted på
@@ -299,6 +305,16 @@ regneark læser den første linje som kolonneoverskrifter.
 Admin opretter gruppens **vildtarter** under Opsætning (en knap indsætter en dansk
 standardliste). Resultatet på hver jagt får et talfelt pr. art, og siden **Udbytte** lægger
 sæsonen sammen art for art. Jagtsæsonen regnes 1. april – 31. marts.
+
+Udbyttet tælles i **tre kolonner**: *Fællesjagt* (noteret af jagtlederen under Resultat),
+*Bukkejagt* og *Øvrigt*. De to sidste indberetter medlemmerne selv nederst på Udbytte-siden:
+art, antal, periode, dato, **skytte** og et **billede**. Skuddatoen — ikke
+indberetningsdatoen — afgør, hvilken sæson den hører til, for man indberetter tit bagefter.
+Kun admin kan fjerne en indberetning igen; en anden mands buk skal ikke kunne forsvinde
+ved et uheld.
+
+**Billeder fra dagen** kan lægges på en jagts *Resultat* (admin) og vises som et gitter
+under resultatet på jagtens side.
 
 ## Jagtledere og resultat
 

@@ -272,6 +272,33 @@ CREATE TABLE IF NOT EXISTS event_game (
     PRIMARY KEY (event_id, species_id)
 );
 
+-- Vildt nedlagt UDEN FOR fællesjagterne: bukkejagten og resten af sæsonen.
+-- Fællesjagternes udbytte står i `event_game` og tælles pr. jagt; her er hver
+-- indberetning sin egen række, fordi den bærer et navn, en dato og et billede.
+-- `shot_date` (ikke created_at) bestemmer sæsonen: man indberetter tit bagefter.
+CREATE TABLE IF NOT EXISTS game_entries (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id            INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    species_id          INTEGER NOT NULL REFERENCES game_species(id) ON DELETE CASCADE,
+    periode             TEXT NOT NULL DEFAULT 'bukkejagt',  -- bukkejagt | ovrig
+    antal               INTEGER NOT NULL DEFAULT 1,
+    skytte              TEXT DEFAULT '',
+    shot_date           TEXT NOT NULL,             -- YYYY-MM-DD
+    note                TEXT DEFAULT '',
+    stored_name         TEXT DEFAULT '',           -- billede i uploads/<slug>/vildt/
+    created_at          TEXT NOT NULL
+);
+
+-- Billeder til en jagts RESULTAT (dagens paradebillede m.m.). Egen tabel og ikke
+-- `event_files`: de vises som billeder under resultatet, ikke som en fil, man henter.
+CREATE TABLE IF NOT EXISTS event_images (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id            INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    stored_name         TEXT NOT NULL,             -- <token>.<ext> i events/<id>/billeder/
+    original_name       TEXT DEFAULT '',
+    created_at          TEXT NOT NULL
+);
+
 -- Dokumenter på gruppens forside (vedtægter, jagtplan ...). Samme regler som
 -- event_files: tilfældigt navn på disken, det rigtige i original_name.
 CREATE TABLE IF NOT EXISTS group_files (

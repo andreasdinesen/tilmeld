@@ -25,26 +25,116 @@
       </form>
     {% endif %}
   </div>
-  <p class="muted small">Jagtsæsonen går 1. april – 31. marts. Tallene er summen af det,
-     der er noteret på sæsonens jagter{% if jagter %} — {{ jagter }} jagt{{ '' if jagter == 1 else 'er' }} med udbytte{% endif %}.</p>
+  <p class="muted small">Jagtsæsonen går 1. april – 31. marts. Fællesjagterne tælles op
+     under <em>Resultat</em> på den enkelte jagt{% if jagter %} — {{ jagter }} jagt{{ '' if jagter == 1 else 'er' }} med udbytte{% endif %};
+     bukkejagten og resten af perioden indberettes nedenfor.</p>
 
   <div class="tablewrap">
     <table class="udbytte">
-      <thead><tr><th>Art</th><th>Antal</th></tr></thead>
+      <thead><tr><th>Art</th><th>Fællesjagt</th><th>Bukkejagt</th><th>Øvrigt</th><th>I alt</th></tr></thead>
       <tbody>
-        {% for navn, antal in raekker %}
-          <tr class="{{ '' if antal else 'tom' }}">
-            <td>{{ navn }}</td><td class="nowrap"><strong>{{ antal }}</strong></td>
+        {% for r in raekker %}
+          <tr class="{{ '' if r.i_alt else 'tom' }}">
+            <td>{{ r.navn }}</td>
+            <td class="nowrap">{{ r.jagt }}</td>
+            <td class="nowrap">{{ r.bukkejagt }}</td>
+            <td class="nowrap">{{ r.ovrig }}</td>
+            <td class="nowrap"><strong>{{ r.i_alt }}</strong></td>
           </tr>
         {% endfor %}
-        <tr class="ialt"><td>I alt</td><td class="nowrap"><strong>{{ i_alt }}</strong></td></tr>
+        <tr class="ialt">
+          <td>I alt</td>
+          <td class="nowrap">{{ i_alt.jagt }}</td>
+          <td class="nowrap">{{ i_alt.bukkejagt }}</td>
+          <td class="nowrap">{{ i_alt.ovrig }}</td>
+          <td class="nowrap"><strong>{{ i_alt.i_alt }}</strong></td>
+        </tr>
       </tbody>
     </table>
   </div>
   {{ pr.pdf_knap('Udbytte-' ~ group.name ~ '-' ~ valgt) }}
-  {% if not i_alt %}
-    <p class="muted small">Der er ikke noteret udbytte på nogen jagt i denne sæson endnu.
-       Det udfyldes under <em>Resultat</em> på den enkelte jagt.</p>
+  {% if not i_alt.i_alt %}
+    <p class="muted small">Der er ikke noteret udbytte i denne sæson endnu.</p>
   {% endif %}
 </div>
+
+{# Indberetninger uden for fællesjagterne. Medlemmerne indberetter selv — det er
+   dem, der har skudt bukken, og de har billedet på telefonen. #}
+<div class="card noprint" id="indberet">
+  <h2>Indberet vildt</h2>
+  <p class="muted small">Vildt nedlagt <strong>uden for fællesjagterne</strong> — på
+     bukkejagten eller i resten af sæsonen. Udbyttet på en fællesjagt noteres af
+     jagtlederen under <em>Resultat</em> på jagten.</p>
+  <form method="post" enctype="multipart/form-data"
+        action="{{ url_for('user_game_new', slug=group.slug) }}">
+    <div class="grid2">
+      <label>Art
+        <select name="species_id" required>
+          {% for a in arter %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Antal
+        <input type="number" name="antal" min="1" max="100" value="1">
+      </label>
+      <label>Periode
+        <select name="periode">
+          {% for vaerdi, navn in perioder.items() %}
+            <option value="{{ vaerdi }}">{{ navn }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Dato
+        <input type="date" name="shot_date" value="{{ i_dag }}" required>
+      </label>
+    </div>
+    <label>Skytte
+      <input type="text" name="skytte" maxlength="80" placeholder="fx Brian Timmermann">
+    </label>
+    <label>Billede (valgfrit)
+      <input type="file" name="billede" accept="image/*">
+    </label>
+    <label>Note (valgfrit)
+      <input type="text" name="note" maxlength="500" placeholder="fx 6-ender, skudt i Lunden">
+    </label>
+    <button type="submit" class="primary">Indberet</button>
+  </form>
+</div>
+
+{% if indberetninger %}
+<div class="card">
+  <h2>Indberettet {{ valgt }}/{{ valgt + 1 }}</h2>
+  {% for v in indberetninger %}
+    <div class="fielditem">
+      <div class="row">
+        <div>
+          <strong>{{ v.antal }} {{ v.art }}</strong>
+          <span class="tag">{{ perioder.get(v.periode, v.periode) }}</span>
+          <div class="muted small">
+            {{ v.shot_date|d }}{% if v.skytte %} · {{ v.skytte }}{% endif %}
+          </div>
+          {% if v.note %}<div class="muted small">{{ v.note }}</div>{% endif %}
+        </div>
+        {% if er_admin %}
+          <div class="actions">
+            <form method="post" class="inline noprint"
+                  action="{{ url_for('user_game_delete', slug=group.slug, entry_id=v.id) }}"
+                  onsubmit="return confirm('Fjern indberetningen?')">
+              <button class="danger small">Fjern</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+      {% if v.stored_name %}
+        <div class="billedgitter">
+          <a href="{{ url_for('user_game_image', slug=group.slug, entry_id=v.id) }}"
+             target="_blank" rel="noopener">
+            <img src="{{ url_for('user_game_image', slug=group.slug, entry_id=v.id) }}"
+                 alt="{{ v.art }}" loading="lazy">
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

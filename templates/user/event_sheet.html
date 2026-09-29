@@ -38,7 +38,7 @@
     <table>
       <thead><tr>
         <th>Navn</th><th>Gæster</th>
-        {% for f in fields %}<th>{{ f.label }}</th>{% endfor %}
+        {% for f in fields %}<th>{{ felt_overskrift(f) }}</th>{% endfor %}
       </tr></thead>
       <tbody>
         {% for x in raekker %}
@@ -49,7 +49,7 @@
                med uden at kende navnet endnu, og så skal tallet stadig kunne tælles. #}
             <td class="nowrap">{% if x.afbud or x.r.seats < 2 %}—{% else %}{{ x.r.seats - 1 }}{% if x.gaester %}
                 <span class="muted small">({{ x.gaester|join(', ') }})</span>{% endif %}{% endif %}</td>
-            {% for f in fields %}<td>{{ x.r['values'].get(f.id, '') }}</td>{% endfor %}
+            {% for f in fields %}<td>{{ felt_vaerdi(f, x.r['values'].get(f.id, ''), x.afbud) }}</td>{% endfor %}
           </tr>
         {% endfor %}
       </tbody>

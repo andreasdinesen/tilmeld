@@ -11,6 +11,31 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 52
+
+**Vildt uden for fællesjagterne, billeder fra dagen, og »Spiser med«.**
+
+**Bukkejagten og resten af sæsonen tæller nu med.** Nederst på *Udbytte* kan medlemmerne
+selv indberette: art, antal, periode (bukkejagt eller øvrig), dato, **skytte** og et
+**billede**. Det er skytten, der har bukken og billedet på telefonen, så det er også ham,
+der indberetter — samme tillidsmodel som resten af bruger-siden. Kun admin kan fjerne en
+indberetning igen.
+
+Udbytte-tabellen har fået tre kolonner — *Fællesjagt · Bukkejagt · Øvrigt* — og en total.
+Skuddatoen afgør sæsonen, ikke den dag man indberetter: en buk fra maj hører til den sæson,
+den blev skudt i, også selvom nogen først får den skrevet ind i november.
+
+**Billeder på jagtens resultat.** Admin kan lægge et eller flere billeder ved siden af
+udbyttet under *Resultat*; de vises som et gitter under resultatet på jagtens side, og et
+tryk åbner billedet i fuld størrelse. Billederne kræver adgang til gruppen som alt andet.
+
+**»Spiser ikke med« hedder nu »Spiser med« i oversigterne** — med Ja og Nej byttet rundt.
+På en liste, man står og læser, er »Spiser med: Ja« hurtigere at afkode end »Spiser ikke
+med: Nej«. Ved *tilmeldingen* står feltet uændret, for dér giver fra-meldingen mening: man
+rører kun ved det, hvis man ikke skal have mad. Et afbud får en streg i stedet for et ja
+eller nej — den, der ikke kommer, spiser hverken med eller fra. Reglen bor ét sted og
+bruges af alle fire visninger, inkl. CSV'en.
+
 ## Version 51
 
 **Påmindelsen før fristen rykker kun dem, man ikke har hørt fra.**

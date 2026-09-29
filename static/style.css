@@ -467,6 +467,22 @@ details.help[open] summary { border-bottom: 1px solid var(--line); }
 .help-body ul, .help-body ol { padding-left: 1.3em; margin: 0.4em 0; }
 .help-body li { margin: 0.25em 0; }
 
+/* --- Billeder fra en jagt ------------------------------------------------ */
+/* Et gitter, der selv finder ud af hvor mange der er plads til. `auto-fill` frem
+   for et fast antal kolonner: ét billede skal ikke fylde hele bredden, og fem
+   skal ikke klemmes sammen. */
+.billedgitter {
+  display: grid; gap: 10px; margin: 14px 0 4px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.billedgitter figure { margin: 0; }
+.billedgitter img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border-radius: 10px; border: 1px solid var(--line); display: block;
+}
+.billedgitter figcaption { text-align: center; }
+.billedgitter figcaption button { margin-top: 6px; }
+
 /* --- Opsætning: foldbare afsnit ----------------------------------------- */
 /* Hvert kort på opsætnings-siden ER en <details>. Siden er lang, og de fleste
    afsnit sættes op én gang og røres aldrig igen; foldet sammen kan man overskue

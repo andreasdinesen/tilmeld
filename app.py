@@ -331,6 +331,32 @@ def fmt_d(value):
         return value
 
 
+@app.template_global()
+def felt_overskrift(f) -> str:
+    """Kolonnenavnet i en OVERSIGT. »Spiser ikke med« vendes om til »Spiser med«.
+
+    Ved tilmeldingen giver det mening at krydse en fra-melding af — et tomt felt
+    betyder »ja tak«, og man skal kun røre ved det, hvis man IKKE skal have mad.
+    Men på en liste, man står og læser, er »Spiser med: Ja« hurtigere at afkode
+    end »Spiser ikke med: Nej«. Derfor vendes den ét sted: her, i visningen.
+    """
+    return "Spiser med" if f["is_meal_decline"] else f["label"]
+
+
+@app.template_global()
+def felt_vaerdi(f, raa, afbud=False) -> str:
+    """Værdien i en oversigt, vendt om på samme måde som overskriften.
+
+    Et AFBUD får en streg i mad-kolonnen: den, der ikke kommer, spiser hverken
+    med eller fra — og »Ja« ud for et overstreget navn ville se ud som en fejl.
+    """
+    if not f["is_meal_decline"]:
+        return raa or ""
+    if afbud:
+        return "—"
+    return "Nej" if (raa or "") == "Ja" else "Ja"
+
+
 @app.template_filter("md")
 def render_markdown(text):
     """Render Markdown til sikker HTML (allowlist-renset)."""
@@ -1655,6 +1681,7 @@ def admin_event_list(slug, event_id):
     share = event_share(conn, group, ev)
     arter = game_species(conn, group["id"])
     udbytte = event_game(conn, ev["id"])
+    billeder = event_images(conn, ev["id"])
     ledere = event_leaders(conn, group, ev)
     medlemmer = group_members(conn, group)
     liste_link = build_list_link(conn, group, ev)
@@ -1664,6 +1691,7 @@ def admin_event_list(slug, event_id):
     conn.close()
     return render_template("admin/event_list.html", arter=arter, udbytte=udbytte, group=group, ev=ev,
                            ledere=ledere, liste_link=liste_link, medlemmer=medlemmer,
+                           billeder=billeder,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
                            state=event_state(ev), attended_count=attended_count,
@@ -1715,11 +1743,70 @@ def admin_event_result(slug, event_id):
             conn.execute(
                 "INSERT INTO event_game (event_id, species_id, antal) VALUES (?,?,?)",
                 (event_id, art["id"], n))
+    # Billeder fra dagen — paraden, en buk, hvad der nu blev skudt. Flere ad
+    # gangen; de vises som billeder under resultatet, ikke som filer man henter.
+    nye = 0
+    for fil in request.files.getlist("billeder"):
+        stored = _gem_billede(fil, event_images_dir(group, event_id))
+        if stored:
+            conn.execute("INSERT INTO event_images (event_id, stored_name, original_name, "
+                         "created_at) VALUES (?,?,?,?)",
+                         (event_id, stored, fil.filename[:200], db.now_iso()))
+            nye += 1
     conn.commit()
     db.add_log(conn, "event", f"Resultat opdateret for '{ev['name']}'", group["slug"])
     conn.close()
-    flash("Resultatet er gemt.", "ok")
+    flash(f"Resultatet er gemt{f' — {nye} billede(r) lagt på' if nye else ''}.", "ok")
     return redirect(url_for("admin_event_list", slug=slug, event_id=event_id) + "#resultat")
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/billede/<int:image_id>/slet",
+           methods=["POST"])
+def admin_event_image_delete(slug, event_id, image_id):
+    """Fjern et billede fra en jagts resultat."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        return redirect(url_for("admin_login", slug=slug))
+    conn = db.get_db()
+    row = conn.execute(
+        "SELECT i.* FROM event_images i JOIN events e ON e.id = i.event_id "
+        "WHERE i.id = ? AND i.event_id = ? AND e.group_id = ?",
+        (image_id, event_id, group["id"])).fetchone()
+    if row:
+        conn.execute("DELETE FROM event_images WHERE id = ?", (image_id,))
+        conn.commit()
+        try:
+            os.remove(os.path.join(event_images_dir(group, event_id), row["stored_name"]))
+        except OSError:
+            pass
+        flash("Billedet er fjernet.", "ok")
+    conn.close()
+    return redirect(url_for("admin_event_list", slug=slug, event_id=event_id) + "#resultat")
+
+
+@app.route("/<slug>/<event_slug>/billede/<int:image_id>")
+def event_image(slug, event_slug, image_id):
+    """Et billede fra en jagts resultat. Kræver adgang til gruppen."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    row = conn.execute(
+        "SELECT i.stored_name, i.event_id FROM event_images i "
+        "JOIN events e ON e.id = i.event_id "
+        "WHERE i.id = ? AND e.slug = ? AND e.group_id = ?",
+        (image_id, event_slug, group["id"])).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    sti = os.path.join(event_images_dir(group, row["event_id"]), row["stored_name"])
+    if not os.path.exists(sti):
+        abort(404)
+    return send_file(sti)
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/export.csv")
@@ -1764,7 +1851,7 @@ def build_csv(conn, group, ev):
     writer = csv.writer(buf, delimiter=";")
     writer.writerow(["Navn", "E-mail", "Mobilnummer", "Pladser", "Antal gæster",
                      "Gæster", "Status", "Mødt op"]
-                    + [f["label"] for f in fields] + ["Tilmeldt"])
+                    + [felt_overskrift(f) for f in fields] + ["Tilmeldt"])
     for r in regs:
         afbud = is_declined(conn, group["id"], r["id"])
         if afbud:
@@ -1776,7 +1863,7 @@ def build_csv(conn, group, ev):
         row = [r["name"], r["email"], r["phone"], pladser, gaester,
                ", ".join(fmt_gaester(r["guest_names"])), status,
                "Ja" if r["attended"] else ""]
-        row += [r["values"].get(f["id"], "") for f in fields]
+        row += [felt_vaerdi(f, r["values"].get(f["id"], ""), afbud) for f in fields]
         row.append(r["created_at"])
         writer.writerow(row)
 
@@ -2332,6 +2419,7 @@ def user_event(slug, event_slug):
     filer = event_files(conn, ev["id"]) if group["files_enabled"] else []
     tal = notifications.event_counts(conn, group, ev)
     udbytte_rows = event_game_rows(conn, group, ev)
+    billeder = event_images(conn, ev["id"])
     har_vildt = bool(game_species(conn, group["id"]))
     navne = signup_names(conn, group, ev) if group["signup_from_members"] else []
     share = event_share(conn, group, ev)
@@ -2346,7 +2434,8 @@ def user_event(slug, event_slug):
                            fields=parsed_fields, regs=regs, count=attending, full=full,
                            mail_on=mail_on, wa_on=wa_on, sms_on=sms_on, decline_ids=decline_ids,
                            accounts=accounts, is_admin=is_admin, show_signup=show_signup,
-                           group_users=group_users, my_name=my_name, filer=filer)
+                           group_users=group_users, my_name=my_name, filer=filer,
+                           billeder=billeder)
 
 
 @app.route("/<slug>/<event_slug>/liste")
@@ -2995,6 +3084,54 @@ def event_game_rows(conn, group, ev) -> list:
             if tal.get(a["id"])]
 
 
+PERIODER = {"bukkejagt": "Bukkejagt", "ovrig": "Øvrig periode"}
+
+
+def vildt_dir(group) -> str:
+    return os.path.join(db.DATA_DIR, "uploads", group["slug"], "vildt")
+
+
+def event_images_dir(group, event_id) -> str:
+    return os.path.join(event_files_dir(group, event_id), "billeder")
+
+
+def _gem_billede(fil, mappe) -> str:
+    """Gem ÉT uploadet billede og returnér navnet på disken (»« hvis intet/afvist).
+
+    Samme regler som de øvrige uploads: hvidliste på filtypen, og et tilfældigt
+    navn på disken — brugerens eget navn kan indeholde æ/ø/å og kollidere med en
+    fil, der ligger der i forvejen.
+    """
+    if not fil or not fil.filename:
+        return ""
+    ext = os.path.splitext(fil.filename)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXT:
+        return ""
+    os.makedirs(mappe, exist_ok=True)
+    stored = secrets.token_hex(8) + ext
+    fil.save(os.path.join(mappe, stored))
+    return stored
+
+
+def game_entries(conn, group, fra: str = "", til: str = "") -> list:
+    """Indberetninger uden for fællesjagterne, nyeste først.
+
+    `fra`/`til` afgrænser sæsonen på skudddatoen; uden dem kommer alle med.
+    """
+    sql = ("SELECT v.*, a.name AS art FROM game_entries v "
+           "JOIN game_species a ON a.id = v.species_id WHERE v.group_id = ?")
+    args = [group["id"]]
+    if fra and til:
+        sql += " AND v.shot_date >= ? AND v.shot_date < ?"
+        args += [fra, til]
+    return [dict(r) for r in conn.execute(sql + " ORDER BY v.shot_date DESC, v.id DESC", args)]
+
+
+def event_images(conn, event_id) -> list:
+    return conn.execute("SELECT * FROM event_images WHERE event_id = ? ORDER BY id",
+                        (event_id,)).fetchall()
+
+
 def game_totals(conn, group, fra: str, til: str) -> tuple:
     """(rækker, i_alt, antal_jagter) for perioden [fra, til).
 
@@ -3013,8 +3150,24 @@ def game_totals(conn, group, fra: str, til: str) -> tuple:
         "JOIN events e ON e.id = g.event_id "
         "WHERE e.group_id = ? AND e.event_date >= ? AND e.event_date < ? AND g.antal > 0",
         (group["id"], fra, til)).fetchone()["n"]
-    ud = [(a["name"], pr_art.get(a["id"], 0)) for a in game_species(conn, group["id"])]
-    return ud, sum(n for _, n in ud), jagter
+    # Indberetningerne uden for fællesjagterne, delt op på de to perioder.
+    uden_for = {}
+    for r in conn.execute(
+            "SELECT species_id, periode, SUM(antal) AS antal FROM game_entries "
+            "WHERE group_id = ? AND shot_date >= ? AND shot_date < ? "
+            "GROUP BY species_id, periode", (group["id"], fra, til)).fetchall():
+        uden_for.setdefault(r["species_id"], {})[r["periode"]] = r["antal"] or 0
+
+    ud = []
+    for a in game_species(conn, group["id"]):
+        andre = uden_for.get(a["id"], {})
+        jagt = pr_art.get(a["id"], 0)
+        buk = andre.get("bukkejagt", 0)
+        ovrig = andre.get("ovrig", 0)
+        ud.append({"navn": a["name"], "jagt": jagt, "bukkejagt": buk, "ovrig": ovrig,
+                   "i_alt": jagt + buk + ovrig})
+    i_alt = {n: sum(r[n] for r in ud) for n in ("jagt", "bukkejagt", "ovrig", "i_alt")}
+    return ud, i_alt, jagter
 
 
 def jagt_aar(dato: str) -> int:
@@ -3041,23 +3194,123 @@ def user_game(slug):
     if not arter:
         conn.close()
         abort(404)
-    # Hvilke sæsoner findes der overhovedet tal for?
-    aar = sorted({jagt_aar(r["event_date"]) for r in conn.execute(
+    # Hvilke sæsoner findes der overhovedet tal for? Begge kilder tæller med,
+    # ellers kunne en sæson med kun bukke forsvinde ud af menuen.
+    aar = {jagt_aar(r["event_date"]) for r in conn.execute(
         "SELECT DISTINCT e.event_date FROM events e JOIN event_game g ON g.event_id = e.id "
-        "WHERE e.group_id = ? AND g.antal > 0", (group["id"],))}, reverse=True)
-    if not aar:
-        aar = [jagt_aar(datetime.now().strftime("%Y-%m-%d"))]
+        "WHERE e.group_id = ? AND g.antal > 0", (group["id"],))}
+    aar |= {jagt_aar(r["shot_date"]) for r in conn.execute(
+        "SELECT DISTINCT shot_date FROM game_entries WHERE group_id = ?", (group["id"],))}
+    aar = sorted(aar, reverse=True) or [jagt_aar(datetime.now().strftime("%Y-%m-%d"))]
     try:
         valgt = int(request.args.get("aar") or aar[0])
     except ValueError:
         valgt = aar[0]
-    raekker, i_alt, jagter = game_totals(
-        conn, group, f"{valgt}-04-01", f"{valgt + 1}-04-01")
+    fra, til = f"{valgt}-04-01", f"{valgt + 1}-04-01"
+    raekker, i_alt, jagter = game_totals(conn, group, fra, til)
+    indberetninger = game_entries(conn, group, fra, til)
     conn.close()
     return render_template("user/game.html", group=group, raekker=raekker,
                            i_alt=i_alt, jagter=jagter, aar=aar, valgt=valgt,
-                           har_vildt=True,
+                           har_vildt=True, arter=arter, perioder=PERIODER,
+                           indberetninger=indberetninger,
+                           er_admin=bool(session.get(f"admin_{group['slug']}")),
+                           i_dag=datetime.now().strftime("%Y-%m-%d"),
                            accounts=bool(group["user_accounts_enabled"]))
+
+
+@app.route("/<slug>/vildt/ny", methods=["POST"])
+def user_game_new(slug):
+    """Indberet vildt nedlagt uden for fællesjagterne.
+
+    Medlemmerne må selv indberette — det er dem, der har skudt bukken, og de har
+    billedet på telefonen. Samme tillidsmodel som resten af bruger-siden, hvor
+    alle med adgangskoden kan rette i tilmeldingerne.
+    """
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    arter = {str(a["id"]) for a in game_species(conn, group["id"])}
+    art = (request.form.get("species_id") or "").strip()
+    periode = request.form.get("periode") if request.form.get("periode") in PERIODER else "bukkejagt"
+    dato = (request.form.get("shot_date") or "").strip()
+    try:
+        antal = max(1, min(100, int(request.form.get("antal") or 1)))
+    except ValueError:
+        antal = 1
+    try:
+        datetime.strptime(dato, "%Y-%m-%d")
+    except ValueError:
+        dato = ""
+    if art not in arter or not dato:
+        conn.close()
+        flash("Vælg en art og en dato.", "error")
+        return redirect(url_for("user_game", slug=slug))
+    stored = _gem_billede(request.files.get("billede"), vildt_dir(group))
+    conn.execute(
+        "INSERT INTO game_entries (group_id, species_id, periode, antal, skytte, "
+        "shot_date, note, stored_name, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (group["id"], int(art), periode, antal,
+         request.form.get("skytte", "").strip()[:80], dato,
+         request.form.get("note", "").strip()[:500], stored, db.now_iso()))
+    conn.commit()
+    db.add_log(conn, "event", f"Vildt indberettet ({PERIODER[periode]}): "
+               f"{antal} stk. d. {dato}", group["slug"])
+    conn.close()
+    if request.files.get("billede") and request.files["billede"].filename and not stored:
+        flash("Indberetningen er gemt, men billedet blev ikke gemt "
+              "(brug png/jpg/gif/webp).", "error")
+    else:
+        flash("Tak — vildtet er indberettet.", "ok")
+    return redirect(url_for("user_game", slug=slug, aar=jagt_aar(dato)))
+
+
+@app.route("/<slug>/vildt/<int:entry_id>/slet", methods=["POST"])
+def user_game_delete(slug, entry_id):
+    """Fjern en indberetning. Kun admin: en anden mands buk skal ikke kunne
+    forsvinde ved et uheld."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not admin_has_access(group):
+        abort(404)
+    conn = db.get_db()
+    row = conn.execute("SELECT * FROM game_entries WHERE id = ? AND group_id = ?",
+                       (entry_id, group["id"])).fetchone()
+    if row:
+        conn.execute("DELETE FROM game_entries WHERE id = ?", (entry_id,))
+        conn.commit()
+        if row["stored_name"]:
+            try:
+                os.remove(os.path.join(vildt_dir(group), row["stored_name"]))
+            except OSError:
+                pass
+        flash("Indberetningen er fjernet.", "ok")
+    conn.close()
+    return redirect(url_for("user_game", slug=slug))
+
+
+@app.route("/<slug>/vildt/<int:entry_id>/billede")
+def user_game_image(slug, entry_id):
+    """Billedet til en indberetning. Kræver adgang — det er ikke offentligt."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    conn = db.get_db()
+    row = conn.execute("SELECT stored_name FROM game_entries WHERE id = ? AND group_id = ?",
+                       (entry_id, group["id"])).fetchone()
+    conn.close()
+    if not row or not row["stored_name"]:
+        abort(404)
+    sti = os.path.join(vildt_dir(group), row["stored_name"])
+    if not os.path.exists(sti):
+        abort(404)
+    return send_file(sti)
 
 
 # --------------------------------------------------------------------------- #
