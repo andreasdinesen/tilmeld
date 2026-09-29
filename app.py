@@ -3209,10 +3209,13 @@ def user_game(slug):
     fra, til = f"{valgt}-04-01", f"{valgt + 1}-04-01"
     raekker, i_alt, jagter = game_totals(conn, group, fra, til)
     indberetninger = game_entries(conn, group, fra, til)
+    # Navnene til skytte-feltet. Samme kilde som jagtlederne og navne-rullemenuen
+    # ved tilmelding, så der kun er ét sted at vedligeholde.
+    skytter = [m["name"] for m in group_members(conn, group) if m["name"]]
     conn.close()
     return render_template("user/game.html", group=group, raekker=raekker,
                            i_alt=i_alt, jagter=jagter, aar=aar, valgt=valgt,
-                           har_vildt=True, arter=arter, perioder=PERIODER,
+                           har_vildt=True, arter=arter, perioder=PERIODER, skytter=skytter,
                            indberetninger=indberetninger,
                            er_admin=bool(session.get(f"admin_{group['slug']}")),
                            i_dag=datetime.now().strftime("%Y-%m-%d"),

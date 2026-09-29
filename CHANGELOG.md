@@ -11,6 +11,15 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 53
+
+**Skytten vælges fra medlemslisten.**
+
+Feltet foreslår nu navnene fra medlemslisten, mens man skriver — samme kilde som
+jagtlederne og navne-rullemenuen ved tilmelding. En gæsteskytte kan stadig skrives ind:
+feltet er et tekstfelt med en liste bag, ikke en tvungen rullemenu. Ingen JavaScript, og
+falder en browser over listen, opfører feltet sig som det tekstfelt, det er.
+
 ## Version 52
 
 **Vildt uden for fællesjagterne, billeder fra dagen, og »Spiser med«.**

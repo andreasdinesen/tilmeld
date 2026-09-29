@@ -308,7 +308,8 @@ sæsonen sammen art for art. Jagtsæsonen regnes 1. april – 31. marts.
 
 Udbyttet tælles i **tre kolonner**: *Fællesjagt* (noteret af jagtlederen under Resultat),
 *Bukkejagt* og *Øvrigt*. De to sidste indberetter medlemmerne selv nederst på Udbytte-siden:
-art, antal, periode, dato, **skytte** og et **billede**. Skuddatoen — ikke
+art, antal, periode, dato, **skytte** (navnene fra medlemslisten står klar i feltet, men
+en gæsteskytte kan skrives ind) og et **billede**. Skuddatoen — ikke
 indberetningsdatoen — afgør, hvilken sæson den hører til, for man indberetter tit bagefter.
 Kun admin kan fjerne en indberetning igen; en anden mands buk skal ikke kunne forsvinde
 ved et uheld.

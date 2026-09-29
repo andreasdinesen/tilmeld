@@ -87,9 +87,17 @@
         <input type="date" name="shot_date" value="{{ i_dag }}" required>
       </label>
     </div>
+    {# <datalist> frem for en ren rullemenu: navnene fra medlemslisten står klar,
+       men en gæsteskytte kan stadig skrives ind. Ét felt, ingen JavaScript — og
+       falder browseren over den, opfører den sig som det tekstfelt, den er. #}
     <label>Skytte
-      <input type="text" name="skytte" maxlength="80" placeholder="fx Brian Timmermann">
+      <input type="text" name="skytte" maxlength="80" list="skytteliste"
+             placeholder="{{ 'Vælg på listen eller skriv et navn' if skytter else 'fx Brian Timmermann' }}"
+             autocomplete="off">
     </label>
+    <datalist id="skytteliste">
+      {% for navn in skytter %}<option value="{{ navn }}"></option>{% endfor %}
+    </datalist>
     <label>Billede (valgfrit)
       <input type="file" name="billede" accept="image/*">
     </label>
