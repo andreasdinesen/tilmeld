@@ -43,6 +43,13 @@ Kalender-feedet ligger på `/<gruppe>/kalender-<nøgle>.ics` — nøglen i stien
 `?token=`, fordi Google Kalender afviser at tilføje en adresse med forespørgselsstreng.
 Den gamle `?token=`-adresse svarer stadig, så gamle abonnementer ikke dør.
 
+Der er **to versionsnumre**, og de betyder hver sit: **kodens** står i `VERSION` og er
+det, git-taggen `vN` hedder — det er den, en genstart henter, og den, appen viser.
+**Rune-definitionens** står i `runes/tilmeld.yaml` og ændrer sig kun, når variabler,
+porte eller install-scriptet gør. Derfor beder panelet kun om »Runes → Reload«, når der
+faktisk er noget nyt at hente i selve definitionen; en almindelig kodeopdatering kræver
+bare **Restart**.
+
 **Versionsnummeret står i topbaren** på alle tre niveauer (`v39` ved siden af navnet), så
 man altid kan se, hvilken udgave serveren kører — fx efter en genstart.
 

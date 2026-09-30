@@ -16,14 +16,36 @@ import sys
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RUNE_FILE = os.path.join(BASE_DIR, "runes", "tilmeld.yaml")
+VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
+
+
+def kode_version() -> str:
+    """Kodens udgave: tallet i `VERSION` — det samme som git-taggen `vN`.
+
+    Vises i topbaren og buster CSS-cachen. Falder tilbage til rune-filens
+    `version:`, som bar tallet indtil v54; uden den ville en ældre udrulning
+    vise »ukendt«.
+
+    Rune-filen læses med en regex frem for en YAML-parser, så appen ikke får
+    PyYAML som afhængighed for ét enkelt tal.
+    """
+    try:
+        with open(VERSION_FILE, encoding="utf-8") as f:
+            raa = f.read().strip()
+        if raa:
+            return raa
+    except OSError:
+        pass
+    try:
+        with open(RUNE_FILE, encoding="utf-8") as f:
+            m = re.search(r"^\s*version:\s*(\S+)", f.read(), re.MULTILINE)
+        return m.group(1).strip('"\'') if m else "ukendt"
+    except OSError:
+        return "ukendt"
 
 
 def rune_version() -> str:
-    """Runens `version:` læst direkte fra YAML'en.
-
-    Læses med en regex frem for en YAML-parser, så appen ikke får PyYAML som
-    afhængighed for ét enkelt tal.
-    """
+    """Rune-DEFINITIONENS udgave — kun til visning ved siden af kodens."""
     try:
         with open(RUNE_FILE, encoding="utf-8") as f:
             m = re.search(r"^\s*version:\s*(\S+)", f.read(), re.MULTILINE)

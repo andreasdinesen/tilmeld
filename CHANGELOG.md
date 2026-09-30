@@ -11,6 +11,30 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 54
+
+**Kodens version og runens version er skilt ad.**
+
+Indtil nu var det ét og samme tal: `version:` i rune-filen var både det, git-taggen hed,
+og det, panelet viste. Derfor dukkede der et **»↑ v53«** op i Yggdrasil ved hver eneste
+kodeopdatering — og et »Reload«, der intet lavede om, fordi rune-definitionen var
+uændret siden rune 21.
+
+Nu bor kodens udgave i sin egen fil, **`VERSION`** i repoets rod. Den er det, taggen
+hedder, det, en genstart henter, og det, der står i topbaren. Rune-filens `version:`
+bliver liggende på 53 og røres først, når definitionen selv ændrer sig — variabler,
+porte, watchers eller install-scriptet.
+
+**For dig betyder det:** en kodeopdatering kræver kun **Restart**. Panelet beder først om
+»Runes → Reload«, når der faktisk er en ny definition at hente.
+
+Skiftet er den slags, der kan koste en server, hvis det er halvt tænkt: en udrulning fra
+før v54 har ingen `VERSION`-fil, og uden en reserve ville runen hente det samme tag i en
+uendelighed. Derfor falder opslaget tilbage til rune-filens tal, og der er skrevet en
+prøve, `tests/tjek_opdatering.py`, som kører hele forløbet igennem mod en attrap-GitHub:
+skiftet fra v53 uden `VERSION`-fil, at der ikke hentes igen bagefter, at `KODE_VERSION`
+stadig kan rulle tilbage, og at en netværksfejl ikke rører koden.
+
 ## Version 53
 
 **Skytten vælges fra medlemslisten.**

@@ -6,7 +6,7 @@
   <h1>System</h1>
 
   <div class="versionbox">
-    <div class="l">Version</div>
+    <div class="l">Kodeversion</div>
     {% if changelog_url %}
       <a class="v" href="{{ changelog_url }}" target="_blank" rel="noopener"
          title="Se versionsloggen på GitHub">{{ version }} ↗</a>
@@ -14,7 +14,9 @@
       <span class="v">{{ version }}</span>
     {% endif %}
     <p class="muted small">
-      Samme nummer som runen har i Yggdrasil-panelet.
+      Tallet i git-taggen <code>v{{ version }}</code> — det, en genstart henter.
+      Rune-<em>definitionen</em> i panelet står på <strong>v{{ rune_version }}</strong> og
+      ændrer sig kun, når variabler, porte eller install-scriptet gør.
       {% if changelog_url %}
         Klik for at se, hvad der er kommet til i hver version.
       {% else %}

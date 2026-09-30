@@ -26,11 +26,19 @@ skal kun udgives på ny, når selve rune-definitionen ændrer sig.
 TAG-listen, og det højeste `v<tal>` vinder — ikke det, API'et tilfældigvis
 nævner først.
 
-## Versionsnummeret
+## De to versionsnumre
 
-Der er stadig ÉT nummer: `version:` i `runes/tilmeld.yaml`. Hele repoet pakkes
-ud, så rune-filen følger med koden, og den udpakkede fils `version:` ER den
-kørende udgave. Git-taggen `vN` skal derfor matche rune-versionen ved udgivelse.
+**`VERSION` i repoets rod er KODENS udgave** — tallet i git-taggen `vN`. Det er
+det, der sammenlignes her, og det, appen viser i topbaren.
+
+**`version:` i `runes/tilmeld.yaml` er RUNE-DEFINITIONENS udgave** og røres kun,
+når definitionen selv ændrer sig (variabler, porte, watchers, install-scriptet).
+Før rune 54 var de to det samme tal, og panelet bad derfor om et »Reload« ved
+hver eneste kodeopdatering, selvom definitionen var uændret.
+
+Findes `VERSION` ikke i den udrullede kode (alt før v54), falder opslaget tilbage
+til rune-filens `version:` — ellers ville den første opdatering efter skiftet
+hente det samme tag i en uendelighed.
 
 Kør `python3 kilde.py` lokalt for at se, hvad den ville hente (den rører intet,
 hvis `app/` ikke findes i den mappe, den køres fra).
@@ -85,10 +93,21 @@ def nyeste_tag():
 
 
 def udrullet_version():
-    """Versionen i den kode, der ligger nu — læst af den udpakkede rune-fil."""
-    sti = os.path.join(APP, "runes", "tilmeld.yaml")
+    """Versionen i den kode, der ligger nu.
+
+    Først `VERSION` (kodens eget tal, = git-taggen). Falder tilbage til rune-filens
+    `version:`, som var det samme tal indtil v54 — uden den reserve ville det
+    første skifte hente samme tag om og om igen.
+    """
     try:
-        with open(sti, encoding="utf-8") as f:
+        with open(os.path.join(APP, "VERSION"), encoding="utf-8") as f:
+            raa = f.read().strip()
+        if raa.isdigit():
+            return int(raa)
+    except OSError:
+        pass
+    try:
+        with open(os.path.join(APP, "runes", "tilmeld.yaml"), encoding="utf-8") as f:
             for linje in f:
                 m = re.match(r"\s*version:\s*['\"]?(\d+)", linje)
                 if m:

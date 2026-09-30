@@ -274,7 +274,7 @@ def inject_app_version():
     # Bruges som cache-bust på style.css/passkey.js: Cloudflare edge-cacher statiske
     # filer i timevis og ignorerer Cache-Control, så en ny udgivelse skal have en ny URL.
     # Runens version bumpes ved hver udgivelse og er derfor det rigtige tal.
-    return {"app_version": system_info.rune_version()}
+    return {"app_version": system_info.kode_version()}
 
 
 @app.template_filter("gaester")
@@ -707,11 +707,11 @@ def master_system():
     update_log = None
     if request.method == "POST" and request.form.get("action") == "update_deps":
         update_log = system_info.update_dependencies()
-    version = system_info.rune_version()
+    version = system_info.kode_version()
     return render_template(
         "master/system.html", s=s,
         components=system_info.component_versions(),
-        version=version,
+        version=version, rune_version=system_info.rune_version(),
         changelog_url=system_info.changelog_url(
             s["github_repo"], s["update_branch"], version),
         update_log=update_log)

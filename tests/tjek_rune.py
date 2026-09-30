@@ -12,6 +12,7 @@ import yaml
 
 ROD = pathlib.Path(__file__).resolve().parent.parent
 RUNE = ROD / "runes" / "tilmeld.yaml"
+VERSION = ROD / "VERSION"
 
 
 def bootstrap_blok(script):
@@ -25,9 +26,19 @@ def main():
     d = yaml.safe_load(raa)["gameskill"]
     fejl = []
 
-    # Versionen skal være et tal — taggen vN udledes af den.
+    # To tal med hver sin opgave (fra v54): `VERSION` er KODENS udgave og det,
+    # git-taggen hedder; rune-filens `version:` er DEFINITIONENS og røres kun,
+    # når definitionen selv ændrer sig. Blandes de sammen, beder panelet om et
+    # »Reload« ved hver kodeopdatering — eller endnu værre: runen henter det
+    # samme tag i en uendelighed, fordi den tror, den mangler en opdatering.
     if not isinstance(d.get("version"), int):
-        fejl.append(f"version skal være et tal, ikke {d.get('version')!r}")
+        fejl.append(f"rune-definitionens version skal være et tal, ikke {d.get('version')!r}")
+    kode = VERSION.read_text(encoding="utf-8").strip() if VERSION.exists() else ""
+    if not kode.isdigit():
+        fejl.append(f"VERSION skal indeholde ét tal (kodens udgave), ikke {kode!r}")
+    elif isinstance(d.get("version"), int) and int(kode) < d["version"]:
+        fejl.append(f"VERSION (v{kode}) er lavere end rune-definitionen "
+                    f"(v{d['version']}) — taggen ville pege bagud")
 
     install = d["install"]["script"]
     update = d["update"]["script"]
@@ -68,7 +79,7 @@ def main():
         print(f"[fejl] {f}")
     if fejl:
         return 1
-    print(f"Rune {d['version']}: alle kontroller ok "
+    print(f"Kode v{kode} · rune-definition v{d['version']}: alle kontroller ok "
           f"(bootstrap i begge knapper, DATA_DIR sat, backup uden kode/venv)")
     return 0
 
