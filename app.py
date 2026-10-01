@@ -30,6 +30,7 @@ import auth
 import db
 import gigasms
 import inmobile
+import jagttider
 import suresms
 import notifications
 import smstekst
@@ -1096,6 +1097,51 @@ def admin_settings(slug):
                      request.form.get(f"subject_{tkey}", "").strip(),
                      request.form.get(f"body_{tkey}", "").strip()))
             flash("Mail-skabeloner gemt.", "ok")
+        elif action == "jagt_adresse":
+            adresse = request.form.get("jagt_adresse", "").strip()[:200]
+            if not adresse:
+                flash("Skriv en adresse.", "error")
+            else:
+                try:
+                    fund = jagttider.slaa_op(adresse, _jagt_user_agent())
+                except ValueError as e:
+                    # Adressen gemmes alligevel, så feltet ikke tømmes, og admin kan
+                    # vælge kommunen i hånden lige nedenunder.
+                    conn.execute("UPDATE groups SET jagt_adresse = ? WHERE id = ?",
+                                 (adresse, group["id"]))
+                    flash(str(e), "error")
+                else:
+                    _gem_jagt_sted(conn, group["id"], adresse, fund)
+                    flash(f"Fundet: {fund['kommune']} Kommune. Tjek områderne nedenfor.", "ok")
+        elif action == "jagt_kommune":
+            kommune = request.form.get("jagt_kommune", "")
+            if kommune not in jagttider.KOMMUNE_REGION:
+                flash("Vælg en kommune.", "error")
+            else:
+                _gem_jagt_sted(conn, group["id"], group["jagt_adresse"],
+                               {"sted": "", "kommune": kommune, "postnr": "", "oe": "",
+                                "lat": None, "lon": None})
+                flash(f"{kommune} Kommune valgt. Tjek områderne nedenfor.", "ok")
+        elif action == "jagt_omraader":
+            # Kun værdier, der faktisk er mulige for kommunen, eller »ingen«/»ikke valgt«.
+            k = group["jagt_kommune"]
+            gyldige = {
+                "jagt_oe": {x["id"] for x in jagttider.oe_kandidater(k)},
+                "jagt_kron": {x["id"] for x in jagttider.kandidater(jagttider.KRON_OMRAADER, k)},
+                "jagt_daa": {x["id"] for x in jagttider.kandidater(jagttider.DAA_OMRAADER, k)},
+            }
+            for felt, ok in gyldige.items():
+                v = request.form.get(felt, "")
+                if v in ok or v in ("", jagttider.INGEN_LOKALE):
+                    conn.execute(f"UPDATE groups SET {felt} = ? WHERE id = ?",
+                                 (v, group["id"]))
+            flash("Områderne er gemt.", "ok")
+        elif action == "jagt_slet":
+            conn.execute(
+                "UPDATE groups SET jagt_adresse = '', jagt_sted = '', jagt_kommune = '', "
+                "jagt_postnr = '', jagt_lat = NULL, jagt_lon = NULL, jagt_oe = '', "
+                "jagt_kron = '', jagt_daa = '' WHERE id = ?", (group["id"],))
+            flash("Jagttider er slået fra — punktet er væk fra bruger-siden.", "ok")
         elif action == "catering_test":
             # Prøven bruger det event, der ligger nærmest, og rører hverken
             # `catering_sent` eller de andre kanaler — se notifications.send_catering_test.
@@ -1176,6 +1222,7 @@ def admin_settings(slug):
     parsed = [{"f": f, "options": json.loads(f["options"] or "[]"),
                "used": used.get(f["id"], 0)} for f in fields]
     return render_template("admin/settings.html", group=group, fields=parsed,
+                           jagt=_jagt_valg(group),
                            mail_on=mail_on, wa_on=wa_on, templates=templates,
                            creds=creds, passkey_blocked=passkeys.blocked_reason(request),
                            notify_on=mail_on or wa_on or sms_on or push_on, push_on=push_on,
@@ -1196,7 +1243,83 @@ _SETTINGS_ANCHOR = {
     "branding": "#udseende",
     "templates": "#skabeloner",
     "catering_test": "#kontakt",
+    "jagt_adresse": "#jagttider", "jagt_kommune": "#jagttider",
+    "jagt_omraader": "#jagttider", "jagt_slet": "#jagttider",
 }
+
+
+# --------------------------------------------------------------------------- #
+# Jagttider — data og regler bor i jagttider.py; her er kun opsætning og side.
+# --------------------------------------------------------------------------- #
+def _jagt_user_agent() -> str:
+    """Nominatim kræver et kendetegn, der siger, hvem der spørger."""
+    return (f"Tilmeld/{system_info.kode_version()} "
+            "(+https://github.com/andreasdinesen/tilmeld)")
+
+
+def _gem_jagt_sted(conn, group_id, adresse, fund):
+    """Et nyt sted nulstiller områdevalgene til forslaget — et kronvildt-område fra
+    den gamle adresse giver ingen mening ved den nye."""
+    forslag = jagttider.foreslaa(fund["kommune"], fund["postnr"], fund["oe"])
+    conn.execute(
+        "UPDATE groups SET jagt_adresse = ?, jagt_sted = ?, jagt_kommune = ?, "
+        "jagt_postnr = ?, jagt_lat = ?, jagt_lon = ?, jagt_oe = ?, jagt_kron = ?, "
+        "jagt_daa = ? WHERE id = ?",
+        (adresse, fund["sted"], fund["kommune"], fund["postnr"], fund["lat"], fund["lon"],
+         forslag["oe"], forslag["kron"], forslag["daa"], group_id))
+
+
+def _jagt_valg(group) -> dict:
+    """Det opsætningen skal vise: kandidaterne for kommunen og hvad der mangler."""
+    k = group["jagt_kommune"] or ""
+    oer = jagttider.oe_kandidater(k) if k else []
+    kron = jagttider.kandidater(jagttider.KRON_OMRAADER, k) if k else []
+    daa = jagttider.kandidater(jagttider.DAA_OMRAADER, k) if k else []
+    mangler = [navn for navn, liste, v in (("ø", oer, group["jagt_oe"]),
+                                           ("kronvildt", kron, group["jagt_kron"]),
+                                           ("dåvildt", daa, group["jagt_daa"]))
+               if liste and not v]
+    return {"kommuner": jagttider.KOMMUNER, "kommune": k,
+            "region": jagttider.KOMMUNE_REGION.get(k, ""),
+            "oer": oer, "kron": kron, "daa": daa, "mangler": mangler,
+            "ingen": jagttider.INGEN_LOKALE, "kilde": jagttider.KILDE}
+
+
+@app.route("/<slug>/jagttider")
+def user_jagttider(slug):
+    """Hvad må der skydes, og hvornår — for gruppens område."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    is_admin = bool(session.get(f"admin_{group['slug']}"))
+    # Som regelsættet: uden et sted findes siden ikke for medlemmerne, men admin
+    # får den med en henvisning til opsætningen.
+    if not group["jagt_kommune"] and not is_admin:
+        abort(404)
+    conn = db.get_db()
+    har_vildt = bool(game_species(conn, group["id"]))
+    conn.close()
+    idag = datetime.now().date()
+    sted = {"kommune": group["jagt_kommune"], "oe": group["jagt_oe"],
+            "kron": group["jagt_kron"], "daa": group["jagt_daa"]}
+    tabel = jagttider.tabel(sted, idag) if group["jagt_kommune"] else []
+    aabne = [r["navn"] for _, rk in tabel for r in rk if r["aaben"]]
+    sol = None
+    if group["jagt_lat"] is not None and group["jagt_lon"] is not None:
+        tider = jagttider.sol(group["jagt_lat"], group["jagt_lon"], idag)
+        if tider:
+            op, ned = tider
+            sol = {"op": op.strftime("%H:%M"), "ned": ned.strftime("%H:%M"),
+                   "and_op": (op - timedelta(minutes=90)).strftime("%H:%M"),
+                   "and_ned": (ned + timedelta(minutes=90)).strftime("%H:%M")}
+    lokale = [navn for navn, _ in jagttider.lag(sted)] if group["jagt_kommune"] else []
+    return render_template("user/jagttider.html", group=group, is_admin=is_admin,
+                           har_vildt=har_vildt, tabel=tabel, aabne=aabne, sol=sol,
+                           lokale=lokale, idag=jagttider.lang_dato(idag),
+                           jagt=_jagt_valg(group),
+                           accounts=bool(group["user_accounts_enabled"]))
 
 
 def _field_from_form(form) -> dict:

@@ -72,6 +72,15 @@ CREATE TABLE IF NOT EXISTS groups (
     rules_text          TEXT DEFAULT '',           -- Markdown: gruppens ordensregler (egen side)
     facebook_url        TEXT DEFAULT '',           -- adressen på klubbens Facebook-gruppe,
                                                    -- så »Del«-kortet kan åbne den direkte
+    jagt_adresse        TEXT DEFAULT '',           -- adressen, jagttiderne slås op for (admin taster)
+    jagt_sted           TEXT DEFAULT '',           -- hvad opslaget fandt (OSM's display_name)
+    jagt_kommune        TEXT DEFAULT '',           -- kommunen — afgør region og lokale tider
+    jagt_postnr         TEXT DEFAULT '',
+    jagt_lat            REAL DEFAULT NULL,         -- til solopgang/solnedgang
+    jagt_lon            REAL DEFAULT NULL,
+    jagt_oe             TEXT DEFAULT '',           -- småø i bilag 2; '-' = fastland, '' = ikke valgt
+    jagt_kron           TEXT DEFAULT '',           -- kronvildt-område (jagttider.KRON_OMRAADER)
+    jagt_daa            TEXT DEFAULT '',           -- dåvildt-område (jagttider.DAA_OMRAADER)
     files_enabled       INTEGER DEFAULT 0,         -- må admin vedhæfte filer på events (master styrer
                                                    -- det: filerne fylder på SERVERENS disk)
     created_at          TEXT NOT NULL

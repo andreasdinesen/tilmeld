@@ -7,6 +7,7 @@
   {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
   {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Regelsæt</a>{% endif %}
   {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
+  {% if group.jagt_kommune %}<a href="{{ url_for('user_jagttider', slug=group.slug) }}">Jagttider</a>{% endif %}
   <a href="{{ url_for('admin_home', slug=group.slug) }}">Admin</a>
   {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
@@ -97,7 +98,7 @@
   {% endif %}
 </div>
 
-{% if group.members_visible or group.rules_text or har_vildt %}
+{% if group.members_visible or group.rules_text or har_vildt or group.jagt_kommune %}
 {# Linkene står OGSÅ her, ikke kun i topbaren: på en telefon er menuen det første,
    man scroller forbi, og så findes de reelt ikke. #}
 <div class="card">
@@ -110,6 +111,9 @@
     {% endif %}
     {% if har_vildt %}
       <a class="btn" href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>
+    {% endif %}
+    {% if group.jagt_kommune %}
+      <a class="btn" href="{{ url_for('user_jagttider', slug=group.slug) }}">Jagttider</a>
     {% endif %}
   </div>
 </div>

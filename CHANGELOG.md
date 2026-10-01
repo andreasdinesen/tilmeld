@@ -11,6 +11,33 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 55
+
+**Nyt punkt: Jagttider.**
+
+Under **Opsætning → Jagttider** skriver admin adressen på terrænet. Appen finder
+kommunen, og bruger-siden får et nyt punkt, **Jagttider**, der viser:
+
+- **Hvad der må jages i dag**, og solopgang og solnedgang for adressen. Jagt må kun
+  drives i tidsrummet derimellem. Ænder og gæs har halvanden time ekstra i begge ender.
+- **En tabel over alle arter** med jagttid og status: *åben til 31. jan.*, *åbner
+  16. okt.* eller *fredet*. Hvor de lokale jagttider afviger fra de generelle, står
+  der **lokal**.
+
+Tiderne kommer fra jagttidsbekendtgørelsen, **BEK nr. 470 af 17/05/2024**, som stadig
+gælder. Revisionen, der skulle være trådt i kraft 1. juli 2026, er endnu ikke udstedt.
+Hele bekendtgørelsen ligger i én fil, `jagttider.py`, så det kun er dér, der skal
+rettes, når den nye kommer.
+
+**Kron- og dåvildt er afgrænset af veje, ikke af kommuner.** Ligger kommunen helt i ét
+lokalt område, vælges det automatisk. Ellers viser opsætningen de mulige områder med
+deres afgrænsning, og admin vælger. Det samme gælder småøerne med egne tider (Sejerø,
+Fejø, Femø, Lyø, Strynø, Als, Kegnæs, Mandø og Endelave). Dem foreslår appen ud fra
+postnummeret. Indtil der er valgt, viser siden de generelle tider og en advarsel til admin.
+
+Adressen slås op hos **OpenStreetMap**. DAWA, det officielle danske adresse-API, lukkede
+1. juli 2026. Fejler opslaget, kan kommunen vælges i hånden.
+
 ## Version 54
 
 **Kodens version og runens version er skilt ad.**

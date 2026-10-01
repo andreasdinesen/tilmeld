@@ -58,6 +58,22 @@ kontakt, tilmeldings-punkter, udseende, dokumenter, skabeloner, passkeys og
 notifikationer. Hvert afsnit viser sin status (»5 arter«, »ingen madbestiller«), så man
 kan overskue siden uden at folde noget ud. Fanen husker, hvad du havde åbent.
 
+## Jagttider
+
+Under **Opsætning → Jagttider** taster gruppe-admin adressen på terrænet. Bruger-siden
+får så punktet **Jagttider** (`/<gruppe>/jagttider`). Det viser, hvad der må jages i dag,
+solopgang og solnedgang, og en tabel over alle arter med de jagttider, der gælder netop
+dér, både de generelle og de lokale.
+
+- Kilden er jagttidsbekendtgørelsen (BEK nr. 470 af 17/05/2024). Hele bekendtgørelsen
+  ligger i `jagttider.py` og skal kun rettes dér, når en ny udstedes.
+- Adressen slås op hos OpenStreetMap (Nominatim), fordi DAWA er lukket. Fejler opslaget,
+  kan kommunen vælges i hånden.
+- De lokale kron- og dåvildt-områder følger veje, ikke kommunegrænser. Ligger kommunen
+  helt i ét område, vælges det automatisk. Ellers vælger admin området, og det samme
+  gælder småøerne med egne tider.
+- Uden adresse er punktet væk fra bruger-siden.
+
 ## Startside
 
 Under **master → Opsætning → Startside** kan du vælge, hvilken gruppe forsiden `/` skal vise.

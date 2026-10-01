@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "user/_print.html" as pr %}
+{% block title %}Jagttider · {{ group.name }}{% endblock %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
+  {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
+  {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
+  {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Regelsæt</a>{% endif %}
+  {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
+  {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
+{% endblock %}
+{% block content %}
+<a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til forsiden</a>
+{% if not tabel %}
+<div class="card">
+  <h1>Jagttider</h1>
+  <div class="tag locked big">Der er ikke angivet nogen adresse endnu — kun du kan se denne
+    side. Skriv den under
+    <a href="{{ url_for('admin_settings', slug=group.slug) }}#jagttider">Opsætning → Jagttider</a>.</div>
+</div>
+{% else %}
+<div class="card">
+  <h1>Jagttider</h1>
+  <p class="muted small">{{ jagt.kommune }} Kommune{% if group.jagt_sted %} · {{ group.jagt_sted }}{% endif %}</p>
+  <h2>I dag, {{ idag }}</h2>
+  {% if aabne %}
+    <p>Må jages i dag: <strong>{{ aabne|join(', ') }}</strong>.</p>
+  {% else %}
+    <p>Der er ingen arter med jagttid i dag.</p>
+  {% endif %}
+  {% if sol %}
+    <p class="small">Solopgang ca. <strong>{{ sol.op }}</strong> · solnedgang ca.
+       <strong>{{ sol.ned }}</strong>. Jagt må kun drives mellem solopgang og solnedgang —
+       ænder og gæs dog fra {{ sol.and_op }} til {{ sol.and_ned }}, krager og husskade fra
+       en time før solopgang.</p>
+  {% endif %}
+  {% if lokale %}
+    <p class="muted small">Lokale jagttider, der gælder her: {{ lokale|join(' · ') }}.
+       Rækker med <span class="tag lokal">lokal</span> afviger fra de generelle tider.</p>
+  {% endif %}
+  {% if is_admin and jagt.mangler %}
+    <div class="tag locked big">Der er ikke valgt område for {{ jagt.mangler|join(' og ') }},
+      så de generelle tider vises. Vælg det under
+      <a href="{{ url_for('admin_settings', slug=group.slug) }}#jagttider">Opsætning → Jagttider</a>.</div>
+  {% endif %}
+</div>
+
+{% for gruppe, raekker in tabel %}
+<div class="card">
+  <h2>{{ gruppe }}</h2>
+  <div class="tablewrap">
+    <table class="jagttider">
+      <thead><tr><th>Art</th><th>Jagttid</th><th>I dag</th></tr></thead>
+      <tbody>
+        {% for r in raekker %}
+          <tr>
+            <td>{{ r.navn }}{% if r.lokal %} <span class="tag lokal" title="{{ r.lokal }}">lokal</span>{% endif %}
+              {% if r.note %}<div class="muted small">{{ r.note }}</div>{% endif %}</td>
+            <td>{{ r.periode }}</td>
+            <td class="nowrap"><span class="tag {{ 'aaben' if r.aaben else ('fredet' if r.status == 'fredet' else 'finished') }}">{{ r.status }}</span></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+<div class="card">
+  <p class="muted small">Kilde: <a href="{{ jagt.kilde.url }}" target="_blank" rel="noopener">{{ jagt.kilde.navn }}</a>,
+     gældende fra {{ jagt.kilde.gyldig_fra }}. Oversigten er en hjælp, ikke en juridisk
+     afgørelse — tjek bekendtgørelsen ved tvivl, især nær grænsen mellem to lokale områder.
+     Sol-tiderne er beregnet for adressen og kan afvige et par minutter.</p>
+  {{ pr.pdf_knap('Jagttider-' ~ group.name) }}
+</div>
+{% endif %}
+{% endblock %}

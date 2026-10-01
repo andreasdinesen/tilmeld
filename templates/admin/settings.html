@@ -101,6 +101,88 @@
   </form>
 {% endcall %}
 
+{% call s.sektion('jagttider', 'Jagttider',
+                  ('%s Kommune%s' % (jagt.kommune, ' — vælg område' if jagt.mangler else ''))
+                  if jagt.kommune else 'ingen adresse') %}
+  <p class="muted small">Adressen på jeres terræn. Den afgør, hvilke lokale jagttider der
+     gælder, og siden <a href="{{ url_for('user_jagttider', slug=group.slug) }}">Jagttider</a>
+     viser medlemmerne, hvad de må skyde i dag. Uden adresse er punktet væk fra bruger-siden.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="jagt_adresse">
+    <label>Adresse
+      <input type="text" name="jagt_adresse" value="{{ group.jagt_adresse }}"
+             placeholder="fx Skovvej 12, 5600 Faaborg">
+    </label>
+    <button type="submit">Slå op</button>
+  </form>
+  {% if group.jagt_sted %}
+    <p class="small">Fundet: <strong>{{ group.jagt_sted }}</strong></p>
+  {% endif %}
+  <form method="post">
+    <input type="hidden" name="action" value="jagt_kommune">
+    <label>Kommune {% if jagt.kommune %}(Region {{ jagt.region }}){% endif %}
+      <select name="jagt_kommune">
+        <option value="">— vælg —</option>
+        {% for k in jagt.kommuner %}
+          <option value="{{ k }}" {{ 'selected' if k == jagt.kommune }}>{{ k }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="small">Vælg kommune i hånden</button>
+  </form>
+  {% if jagt.kommune and (jagt.oer or jagt.kron or jagt.daa) %}
+    <h3>Lokale områder</h3>
+    <p class="muted small">Kron- og dåvildtets lokale områder er afgrænset af veje og
+       vandløb, ikke af kommunegrænser. Ligger kommunen helt i ét område, er det valgt
+       for dig; ellers vælger du her. Er du i tvivl, så se kortene i
+       <a href="{{ jagt.kilde.url }}" target="_blank" rel="noopener">bekendtgørelsens bilag</a>.</p>
+    {% if jagt.mangler %}
+      <div class="tag locked big">Vælg område for {{ jagt.mangler|join(' og ') }} — indtil
+        da viser siden de generelle tider for {{ 'den' if jagt.mangler|length == 1 else 'dem' }}.</div>
+    {% endif %}
+    <form method="post">
+      <input type="hidden" name="action" value="jagt_omraader">
+      {% if jagt.oer %}
+        <label>Ø med egne jagttider
+          <select name="jagt_oe">
+            <option value="" {{ 'selected' if not group.jagt_oe }}>— vælg —</option>
+            <option value="{{ jagt.ingen }}" {{ 'selected' if group.jagt_oe == jagt.ingen }}>Ingen af dem (fastlandet)</option>
+            {% for o in jagt.oer %}
+              <option value="{{ o.id }}" {{ 'selected' if group.jagt_oe == o.id }}>{{ o.navn }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      {% endif %}
+      {% for felt, titel, liste, vaerdi in [('jagt_kron', 'Kronvildt', jagt.kron, group.jagt_kron),
+                                            ('jagt_daa', 'Dåvildt', jagt.daa, group.jagt_daa)] %}
+        {% if liste %}
+          <label>{{ titel }}
+            <select name="{{ felt }}">
+              <option value="" {{ 'selected' if not vaerdi }}>— vælg —</option>
+              <option value="{{ jagt.ingen }}" {{ 'selected' if vaerdi == jagt.ingen }}>Uden for de lokale områder (generelle tider)</option>
+              {% for o in liste %}
+                <option value="{{ o.id }}" {{ 'selected' if vaerdi == o.id }}>{{ o.navn }}{% if not o.hele %} — dele af kommunen{% endif %}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% for o in liste %}
+            <p class="muted small"><strong>{{ o.navn }}:</strong> {{ o.beskrivelse }}</p>
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <button type="submit">Gem områder</button>
+    </form>
+  {% endif %}
+  {% if group.jagt_adresse or jagt.kommune %}
+    <form method="post" onsubmit="return confirm('Fjern adressen og punktet Jagttider fra bruger-siden?')">
+      <input type="hidden" name="action" value="jagt_slet">
+      <button type="submit" class="danger small">Fjern jagttider</button>
+    </form>
+  {% endif %}
+  <p class="muted small">Kilde: {{ jagt.kilde.navn }}, gældende fra {{ jagt.kilde.gyldig_fra }}.
+     Adressen slås op hos OpenStreetMap.</p>
+{% endcall %}
+
 {% call s.sektion('facebook', 'Facebook-gruppe',
                   'adresse sat' if group.facebook_url else 'ingen adresse') %}
   <p class="muted small">Adressen på klubbens Facebook-gruppe. Så kan du åbne den med ét klik

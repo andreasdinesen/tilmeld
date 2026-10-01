@@ -296,6 +296,21 @@ button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: non
 .tag.cat-user { background: var(--cat-user-soft); color: var(--cat-user-ink); }
 .tag.cat-push { background: var(--cat-push-soft); color: var(--cat-push-ink); }
 /* × inde i et mærkat: skal arve mærkatets tekstfarve, ikke være hvid */
+/* Jagttider: åben i dag / fredet / lokal afvigelse */
+.tag.aaben { background: var(--good-soft); color: var(--good-ink); }
+.tag.fredet { background: var(--danger-soft); color: var(--danger-ink); }
+.tag.lokal { background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
+table.jagttider td:first-child { min-width: 11rem; }
+/* På en telefon stables rækken: art, periode, status under hinanden. Tre kolonner
+   kan ikke være der, og en vandret scroll gemmer netop svaret (»i dag«). */
+@media (max-width: 640px) {
+  .tablewrap > table.jagttider { min-width: 0; }
+  table.jagttider thead { display: none; }
+  table.jagttider tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  table.jagttider td { display: block; border: none; padding: 2px 0; max-width: none; }
+  table.jagttider td:first-child { min-width: 0; font-weight: 600; }
+  table.jagttider td:first-child .muted { font-weight: 400; }
+}
 .tag .x { background: none; border: none; color: inherit; cursor: pointer; padding: 0 2px; margin: 0; font: inherit; }
 .tag .x:hover { border: none; opacity: 0.7; }
 
