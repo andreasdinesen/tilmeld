@@ -9,6 +9,7 @@
   <a href="{{ url_for('master_logout') }}">Log ud</a>
 {% endblock %}
 {% block content %}
+{% if jagt_advarsel %}<div class="tag locked big">{{ jagt_advarsel }}</div>{% endif %}
 <div class="page-head">
   <h1>Grupper</h1>
   <a class="btn primary" href="{{ url_for('master_group_new') }}">+ Ny gruppe</a>

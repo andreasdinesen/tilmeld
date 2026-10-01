@@ -39,6 +39,9 @@
     {{ ev.event_date|d }}{% if ev.start_time %} kl. {{ ev.start_time }}{% endif %}{% if ev.end_time %}–{{ ev.end_time }}{% endif %}
     {% if ev.signup_deadline %}· Tilmeldingsfrist: {{ ev.signup_deadline|dt }}{% endif %}
   </div>
+  {% if group.jagt_kommune %}
+    <p class="small"><a href="{{ url_for('user_jagttider', slug=group.slug, dato=ev.event_date) }}">Hvad må skydes på dagen?</a></p>
+  {% endif %}
   {{ tal_makro.tal_linje(tal, ev, stor=true) }}
   {% if full %}<div class="tag locked big">FULDT</div>{% endif %}
   {% if ledere %}

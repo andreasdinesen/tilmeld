@@ -69,9 +69,14 @@ dér, både de generelle og de lokale.
   ligger i `jagttider.py` og skal kun rettes dér, når en ny udstedes.
 - Adressen slås op hos OpenStreetMap (Nominatim), fordi DAWA er lukket. Fejler opslaget,
   kan kommunen vælges i hånden.
-- De lokale kron- og dåvildt-områder følger veje, ikke kommunegrænser. Ligger kommunen
-  helt i ét område, vælges det automatisk. Ellers vælger admin området, og det samme
-  gælder småøerne med egne tider.
+- De lokale kron- og dåvildt-områder følger veje og åer, ikke kommunegrænser. Appen
+  finder området ud fra adressens placering: hvilken side af rute 16, E45 osv. adressen
+  ligger på, og om den ligger på en af småøerne med egne tider. Vejene og øerne ligger
+  forenklet i `jagtgraenser.json` (data © OpenStreetMap-bidragydere, ODbL). Byg filen igen
+  med `python3 tools/byg_jagtgraenser.py`. Kan placeringen ikke afgøre det, vælger admin.
+- Siden er lavet til telefonen. Øverst står antallet af arter, der må skydes, og sol op
+  og ned. Derefter kommer én linje pr. art, som man kan trykke på for at se detaljer.
+  `?dato=ÅÅÅÅ-MM-DD` viser en anden dag, og et event linker til sin egen dato.
 - Uden adresse er punktet væk fra bruger-siden.
 
 ## Startside

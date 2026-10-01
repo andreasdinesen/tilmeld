@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% import "user/_print.html" as pr %}
 {% block title %}Jagttider · {{ group.name }}{% endblock %}
 {% block brand %}{{ group.name }}{% endblock %}
 {% block nav %}
@@ -10,6 +9,25 @@
   {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
   {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
 {% endblock %}
+
+{# Én art som en linje, der kan foldes ud. Lukket viser den kun navn og svar —
+   det er dét, man skal bruge, når jagtlederen gennemgår, hvad der må skydes.
+   Detaljerne (periode, tidsrum, lokalt område) ligger bag et tryk. #}
+{% macro art(r) %}
+<details class="art">
+  <summary>
+    <span class="art-navn">{{ r.navn }}{% if r.lokal %} <span class="tag lokal">lokal</span>{% endif %}</span>
+    <span class="tag {{ 'aaben' if r.aaben else ('saerlig' if r.aaben is none else ('fredet' if r.status == 'fredet' else 'finished')) }}">{{ r.status }}</span>
+  </summary>
+  <dl class="art-info">
+    <dt>Jagttid</dt><dd>{{ r.periode }}</dd>
+    {% if r.tidsrum and r.aaben is not sameas false %}<dt>Tidsrum</dt><dd>{{ r.tidsrum }}{% if r.lokal and 'solopgang' in r.note %} (se bemærkning){% endif %}</dd>{% endif %}
+    {% if r.note %}<dt>Bemærk</dt><dd>{{ r.note }}</dd>{% endif %}
+    {% if r.lokal %}<dt>Lokal jagttid</dt><dd>{{ r.lokal }}</dd>{% endif %}
+  </dl>
+</details>
+{% endmacro %}
+
 {% block content %}
 <a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til forsiden</a>
 {% if not tabel %}
@@ -20,24 +38,29 @@
     <a href="{{ url_for('admin_settings', slug=group.slug) }}#jagttider">Opsætning → Jagttider</a>.</div>
 </div>
 {% else %}
-<div class="card">
+<div class="card jagt-top">
   <h1>Jagttider</h1>
-  <p class="muted small">{{ jagt.kommune }} Kommune{% if group.jagt_sted %} · {{ group.jagt_sted }}{% endif %}</p>
-  <h2>I dag, {{ idag }}</h2>
-  {% if aabne %}
-    <p>Må jages i dag: <strong>{{ aabne|join(', ') }}</strong>.</p>
-  {% else %}
-    <p>Der er ingen arter med jagttid i dag.</p>
-  {% endif %}
+  {% if jagt.advarsel %}<div class="tag locked big">{{ jagt.advarsel }}
+    <a href="{{ jagt.kilde.url }}" target="_blank" rel="noopener">Åbn bekendtgørelsen</a></div>{% endif %}
+  <p class="muted small">{{ group.jagt_sted or (jagt.kommune ~ ' Kommune') }}</p>
+  <form method="get" class="jagt-dato">
+    <label>{{ 'I dag' if er_idag else ugedag|capitalize }}
+      <input type="date" name="dato" value="{{ dag_iso }}" onchange="this.form.submit()">
+    </label>
+    {% if not er_idag %}<a href="{{ url_for('user_jagttider', slug=group.slug) }}">Tilbage til i dag</a>{% endif %}
+    <noscript><button type="submit" class="small">Vis</button></noscript>
+  </form>
+  <div class="jagt-tal">
+    <div><strong>{{ antal_aabne }}</strong><span>må skydes</span></div>
+    {% if sol %}
+      <div><strong>{{ sol.op }}</strong><span>solopgang</span></div>
+      <div><strong>{{ sol.ned }}</strong><span>solnedgang</span></div>
+    {% endif %}
+  </div>
   {% if sol %}
-    <p class="small">Solopgang ca. <strong>{{ sol.op }}</strong> · solnedgang ca.
-       <strong>{{ sol.ned }}</strong>. Jagt må kun drives mellem solopgang og solnedgang —
-       ænder og gæs dog fra {{ sol.and_op }} til {{ sol.and_ned }}, krager og husskade fra
-       en time før solopgang.</p>
-  {% endif %}
-  {% if lokale %}
-    <p class="muted small">Lokale jagttider, der gælder her: {{ lokale|join(' · ') }}.
-       Rækker med <span class="tag lokal">lokal</span> afviger fra de generelle tider.</p>
+    <p class="muted small">Jagt kun mellem solopgang og solnedgang. Ænder og gæs
+       {{ sol.and_op }}–{{ sol.and_ned }}, krager og husskade fra en time før solopgang.
+       Tiderne er beregnet og kan afvige et par minutter.</p>
   {% endif %}
   {% if is_admin and jagt.mangler %}
     <div class="tag locked big">Der er ikke valgt område for {{ jagt.mangler|join(' og ') }},
@@ -46,33 +69,37 @@
   {% endif %}
 </div>
 
-{% for gruppe, raekker in tabel %}
-<div class="card">
-  <h2>{{ gruppe }}</h2>
-  <div class="tablewrap">
-    <table class="jagttider">
-      <thead><tr><th>Art</th><th>Jagttid</th><th>I dag</th></tr></thead>
-      <tbody>
-        {% for r in raekker %}
-          <tr>
-            <td>{{ r.navn }}{% if r.lokal %} <span class="tag lokal" title="{{ r.lokal }}">lokal</span>{% endif %}
-              {% if r.note %}<div class="muted small">{{ r.note }}</div>{% endif %}</td>
-            <td>{{ r.periode }}</td>
-            <td class="nowrap"><span class="tag {{ 'aaben' if r.aaben else ('fredet' if r.status == 'fredet' else 'finished') }}">{{ r.status }}</span></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="card jagtliste">
+  <h2>Må skydes {{ 'i dag' if er_idag else dag }}</h2>
+  {% if not aabne %}<p>Ingen arter har jagttid denne dag.</p>{% endif %}
+  {% for gruppe, raekker in aabne %}
+    <h3>{{ gruppe }}</h3>
+    {% for r in raekker %}{{ art(r) }}{% endfor %}
+  {% endfor %}
+  {% if saerlige %}
+    <h3>Kun bestemte dage — tjek selv</h3>
+    {% for r in saerlige %}{{ art(r) }}{% endfor %}
+  {% endif %}
+  <p class="muted small">Tryk på en art for at se jagttid og bemærkninger.
+     {% if lokale %}<span class="tag lokal">lokal</span> = afviger fra de generelle tider.{% endif %}</p>
 </div>
-{% endfor %}
+
+{% if lukkede %}
+<details class="card sektion jagtliste lukkede">
+  <summary><span class="sektion-titel">Må ikke skydes {{ 'i dag' if er_idag else 'denne dag' }}</span>
+    <span class="sektion-hint">{{ antal_lukkede }} arter</span></summary>
+  {% for gruppe, raekker in lukkede %}
+    <h3>{{ gruppe }}</h3>
+    {% for r in raekker %}{{ art(r) }}{% endfor %}
+  {% endfor %}
+</details>
+{% endif %}
 
 <div class="card">
+  {% if lokale %}<p class="muted small">Lokale jagttider her: {{ lokale|join(' · ') }}.</p>{% endif %}
   <p class="muted small">Kilde: <a href="{{ jagt.kilde.url }}" target="_blank" rel="noopener">{{ jagt.kilde.navn }}</a>,
      gældende fra {{ jagt.kilde.gyldig_fra }}. Oversigten er en hjælp, ikke en juridisk
-     afgørelse — tjek bekendtgørelsen ved tvivl, især nær grænsen mellem to lokale områder.
-     Sol-tiderne er beregnet for adressen og kan afvige et par minutter.</p>
-  {{ pr.pdf_knap('Jagttider-' ~ group.name) }}
+     afgørelse — tjek bekendtgørelsen ved tvivl, især nær grænsen mellem to lokale områder.</p>
 </div>
 {% endif %}
 {% endblock %}

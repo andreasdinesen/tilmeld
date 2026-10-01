@@ -30,7 +30,11 @@ CREATE TABLE IF NOT EXISTS settings (
     update_branch       TEXT DEFAULT 'main',
     default_group       TEXT DEFAULT '',             -- slug: forsiden "/" sender videre hertil
     vapid_public        TEXT DEFAULT '',             -- Web Push: afsender-nøglepar. Laves én
-    vapid_private       TEXT DEFAULT ''              -- gang; skiftes de, dør ALLE abonnementer.
+    vapid_private       TEXT DEFAULT '',             -- gang; skiftes de, dør ALLE abonnementer.
+    jagt_kilde_id       TEXT DEFAULT '',             -- den bekendtgørelse, kontrollen gjaldt
+    jagt_kilde_status   TEXT DEFAULT '',             -- ok | historisk | aendret ('' = ikke tjekket)
+    jagt_kilde_note     TEXT DEFAULT '',
+    jagt_kilde_tjekket  TEXT DEFAULT ''              -- hvornår (ISO); der tjekkes ugentligt
 );
 
 CREATE TABLE IF NOT EXISTS groups (

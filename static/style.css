@@ -300,16 +300,47 @@ button:disabled, .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: non
 .tag.aaben { background: var(--good-soft); color: var(--good-ink); }
 .tag.fredet { background: var(--danger-soft); color: var(--danger-ink); }
 .tag.lokal { background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
-table.jagttider td:first-child { min-width: 11rem; }
-/* På en telefon stables rækken: art, periode, status under hinanden. Tre kolonner
-   kan ikke være der, og en vandret scroll gemmer netop svaret (»i dag«). */
+.tag.saerlig { background: var(--warn-soft); color: var(--warn-ink); }
+
+/* --- Jagttider ----------------------------------------------------------- */
+/* Bygget til at blive læst på en telefon på jagten: én linje pr. art med navn og
+   svar, detaljerne bag et tryk. Store tal øverst — det er dem, man kigger efter. */
+.jagt-dato { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 6px 0 2px; }
+.jagt-dato label { margin: 0; }
+.jagt-dato input { width: auto; }
+.jagt-tal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 8px; }
+.jagt-tal > div {
+  background: var(--sunken); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 8px; text-align: center;
+}
+.jagt-tal strong { display: block; font-size: 1.5rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.jagt-tal span { font-size: 0.74rem; color: var(--muted); }
+.jagtliste h3 {
+  margin: 16px 0 2px; font-size: 0.74rem; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--muted);
+}
+details.art { border-bottom: 1px solid var(--line); }
+details.art > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  list-style: none; cursor: pointer; padding: 11px 2px; min-height: 44px;
+}
+details.art > summary::-webkit-details-marker { display: none; }
+details.art > summary .tag { flex-shrink: 0; font-size: 0.78rem; padding: 3px 10px; }
+.art-navn { font-weight: 600; }
+.art-navn::before {
+  content: "\25b8"; display: inline-block; width: 1em; color: var(--muted);
+  transition: transform .15s;
+}
+details.art[open] .art-navn::before { transform: rotate(90deg); }
+.art-info {
+  display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px;
+  margin: 0 0 12px 1em; font-size: 0.9rem;
+}
+.art-info dt { color: var(--muted); }
+.art-info dd { margin: 0; }
 @media (max-width: 640px) {
-  .tablewrap > table.jagttider { min-width: 0; }
-  table.jagttider thead { display: none; }
-  table.jagttider tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  table.jagttider td { display: block; border: none; padding: 2px 0; max-width: none; }
-  table.jagttider td:first-child { min-width: 0; font-weight: 600; }
-  table.jagttider td:first-child .muted { font-weight: 400; }
+  .art-info { grid-template-columns: 1fr; gap: 0; }
+  .art-info dd { margin-bottom: 6px; }
 }
 .tag .x { background: none; border: none; color: inherit; cursor: pointer; padding: 0 2px; margin: 0; font: inherit; }
 .tag .x:hover { border: none; opacity: 0.7; }

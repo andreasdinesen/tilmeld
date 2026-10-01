@@ -11,6 +11,41 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 56
+
+**Jagttider er bygget om til brug på selve jagten.**
+
+Siden er lavet til at blive læst på en telefon, mens man gennemgår, hvad der må skydes:
+
+- Øverst tre store tal: **antal arter, der må skydes**, og **solopgang** og
+  **solnedgang**.
+- Under dem kommer **»Må skydes i dag«**, med én linje pr. art: navnet og *åben til
+  31. jan.* Et tryk folder arten ud med jagttiden, dagens tidsrum (ænder og gæs har
+  halvanden time ekstra, krager en time før solopgang) og eventuelle bemærkninger og
+  lokale regler.
+- Arter, der **ikke** må skydes, ligger foldet sammen nederst.
+- **Datovælger:** se hvad der må skydes en anden dag. Et event har nu linket
+  *»Hvad må skydes på dagen?«*, der åbner siden på jagtens dato.
+
+**Kron- og dåvildt-området findes nu automatisk ud fra adressen.**
+
+Bekendtgørelsen afgrænser områderne med veje og åer (»nord for rute 16«, »øst for E45«).
+Appen gør det samme: den ser efter, hvilken side af vejen adressen ligger på. For de
+småøer, der har egne jagttider, tjekker den, om adressen ligger på øen. Vejene, åerne og
+øerne ligger forenklet i `jagtgraenser.json`, bygget fra OpenStreetMap med
+`tools/byg_jagtgraenser.py`. Appen spørger altså ikke OpenStreetMap, hver gang den skal
+afgøre et område. Kan placeringen ikke afgøre det, vælger admin som før.
+
+**Appen holder øje med, om bekendtgørelsen stadig gælder.**
+
+Jagttiderne er skrevet ind i appen og opdaterer sig ikke selv. Den reelle risiko er
+derfor, at der kommer en ny bekendtgørelse, uden at nogen opdager det. En gang om ugen
+spørger appen nu Retsinformation, om BEK 470/2024 stadig gælder, og om den er blevet
+ændret. Er den ikke længere gældende, eller er der kommet en ændring, vises en advarsel
+på jagttider-siden, i gruppe-opsætningen og på masters forside. Der skrives også en
+linje i aktivitetsloggen. Advarslen forsvinder af sig selv, når appen er opdateret til
+den nye bekendtgørelse.
+
 ## Version 55
 
 **Nyt punkt: Jagttider.**

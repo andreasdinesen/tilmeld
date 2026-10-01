@@ -8,7 +8,7 @@ import smtplib
 import threading
 import time
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -1067,12 +1067,56 @@ def process_scheduled(now=None):
         conn.close()
 
 
+JAGT_KILDE_INTERVAL = timedelta(days=7)
+
+
+def jagt_kilde_tjek(now=None, force=False):
+    """Spørg Retsinformation, om jagttidsbekendtgørelsen stadig gælder — højst én
+    gang om ugen, og kun hvis en gruppe overhovedet bruger jagttider. Fejler
+    kaldet, beholdes det forrige svar (et netværksudfald må ikke slette en
+    advarsel), og der prøves igen ved næste gennemløb."""
+    import jagttider
+    now = now or datetime.now()
+    conn = db.get_db()
+    try:
+        if not conn.execute("SELECT 1 FROM groups WHERE jagt_kommune != '' LIMIT 1").fetchone():
+            return
+        s = db.get_settings(conn)
+        samme = str(s["jagt_kilde_id"]) == str(jagttider.KILDE["id"])
+        if not force and samme and s["jagt_kilde_tjekket"]:
+            try:
+                if now - datetime.fromisoformat(s["jagt_kilde_tjekket"]) < JAGT_KILDE_INTERVAL:
+                    return
+            except ValueError:
+                pass
+        try:
+            svar = jagttider.tjek_kilde("Tilmeld (+https://github.com/andreasdinesen/tilmeld)")
+        except Exception as e:  # noqa: BLE001
+            print(f"[JAGTTIDER] kontrol af bekendtgørelsen fejlede: {e}", flush=True)
+            return
+        if svar["status"] != "ok" and (not samme or svar["status"] != s["jagt_kilde_status"]):
+            db.add_log(conn, "group", f"Jagttider: {jagttider.KILDE['navn']} er {svar['note']} "
+                                      "— oversigten skal opdateres.")
+        conn.execute(
+            "UPDATE settings SET jagt_kilde_id = ?, jagt_kilde_status = ?, "
+            "jagt_kilde_note = ?, jagt_kilde_tjekket = ? WHERE id = 1",
+            (str(jagttider.KILDE["id"]), svar["status"], svar["note"],
+             now.isoformat(timespec="seconds")))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _reminder_loop():
     while True:
         try:
             process_scheduled()
         except Exception as e:
             print(f"[SCHEDULER-FEJL] {e}", flush=True)
+        try:
+            jagt_kilde_tjek()
+        except Exception as e:
+            print(f"[SCHEDULER-FEJL] jagttider: {e}", flush=True)
         time.sleep(600)  # tjek hvert 10. minut
 
 

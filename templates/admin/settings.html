@@ -133,8 +133,10 @@
   {% if jagt.kommune and (jagt.oer or jagt.kron or jagt.daa) %}
     <h3>Lokale områder</h3>
     <p class="muted small">Kron- og dåvildtets lokale områder er afgrænset af veje og
-       vandløb, ikke af kommunegrænser. Ligger kommunen helt i ét område, er det valgt
-       for dig; ellers vælger du her. Er du i tvivl, så se kortene i
+       åer, ikke af kommunegrænser. Områderne er fundet ud fra adressens placering:
+       hvilken side af vejene den ligger på, og om den ligger på en ø med egne tider.
+       Kunne placeringen ikke afgøre det (fx tæt på en grænse), vælger du her. Er du i
+       tvivl, så se kortene i
        <a href="{{ jagt.kilde.url }}" target="_blank" rel="noopener">bekendtgørelsens bilag</a>.</p>
     {% if jagt.mangler %}
       <div class="tag locked big">Vælg område for {{ jagt.mangler|join(' og ') }} — indtil
@@ -179,8 +181,11 @@
       <button type="submit" class="danger small">Fjern jagttider</button>
     </form>
   {% endif %}
+  {% if jagt.advarsel %}<div class="tag locked big">{{ jagt.advarsel }}</div>{% endif %}
   <p class="muted small">Kilde: {{ jagt.kilde.navn }}, gældende fra {{ jagt.kilde.gyldig_fra }}.
-     Adressen slås op hos OpenStreetMap.</p>
+     {% if jagt.tjekket and not jagt.advarsel %}Retsinformation bekræftede senest {{ jagt.tjekket }},
+     at den stadig gælder uændret.{% endif %}
+     Der tjekkes en gang om ugen. Adressen slås op hos OpenStreetMap.</p>
 {% endcall %}
 
 {% call s.sektion('facebook', 'Facebook-gruppe',

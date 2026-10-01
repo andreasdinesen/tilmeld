@@ -6,3 +6,4 @@ __pycache__/
 # Intern handover-/kontekstfil til Claude Code — skal ikke på GitHub
 CLAUDE.md
 claude-noter/
+tools/.osm-cache/

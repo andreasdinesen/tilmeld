@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -33,8 +34,12 @@ KILDE = {
     "navn": "BEK nr. 470 af 17/05/2024 (jagttidsbekendtgørelsen)",
     "gyldig_fra": "1. juli 2024",
     "url": "https://www.retsinformation.dk/eli/lta/2024/470",
+    # Til den ugentlige kontrol (tjek_kilde): Retsinformations dokument-id og ELI-sti.
+    "id": 243198,
+    "eli": "eli/lta/2024/470",
 }
 
+UGEDAGE = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"]
 MAANEDER = ["januar", "februar", "marts", "april", "maj", "juni", "juli",
             "august", "september", "oktober", "november", "december"]
 
@@ -168,6 +173,22 @@ GENERELLE = [
         ("mink", "Mink", P("01.09-31.01"), ""),
     ]),
 ]
+
+# Jagt kun mellem solopgang og solnedgang (§ 3) — undtagen disse (§ 3, stk. 3).
+ANDER_GAES = {"graaand", "atlingand", "krikand", "spidsand", "pibeand", "skeand", "knarand",
+              "graagaas", "blisgaas", "kortnaeb", "canadagaas", "saedgaas", "troldand",
+              "bjergand", "hvinand", "ederfugl", "sortand", "nilgaas"}
+KRAGER = {"husskade", "krage"}
+
+
+def tidsrum(keys, op: datetime, ned: datetime) -> str:
+    """Dagens tidsrum for en art som »07:21–18:58«."""
+    if keys & ANDER_GAES:
+        op, ned = op - timedelta(minutes=90), ned + timedelta(minutes=90)
+    elif keys & KRAGER:
+        op = op - timedelta(minutes=60)
+    return f"{op:%H:%M}–{ned:%H:%M}"
+
 
 KRON = ("kronhjort", "kronspidshjort", "kronhind", "kronkalv")
 RAA = ("raabuk", "raa")
@@ -368,7 +389,7 @@ KRON_OMRAADER = {
     "k_vendsyssel_oest": {
         "navn": "Nord for Limfjorden, øst for E39 (bilag 12)",
         "beskrivelse": "Nord for Limfjorden og øst for motorvej E39 (Aalborg-Hirtshals).",
-        "hele": {"Frederikshavn"}, "delvis": {"Hjørring", "Brønderslev", "Aalborg", "Læsø"},
+        "hele": {"Frederikshavn", "Læsø"}, "delvis": {"Hjørring", "Brønderslev", "Aalborg"},
         "regler": [
             R("Kronspidshjort og kronhjort med mindst 5 sprosser (min. 2 cm)",
               ["01.11-31.12"], ("kronspidshjort", "kronhjort")),
@@ -568,7 +589,8 @@ def oe_kandidater(kommune: str) -> list:
             if o["kommune"] == kommune]
 
 
-def foreslaa(kommune: str, postnr: str = "", oe_navn: str = "") -> dict:
+def foreslaa(kommune: str, postnr: str = "", oe_navn: str = "",
+             lat: float | None = None, lon: float | None = None) -> dict:
     """Forslaget, der gemmes lige efter et adresseopslag. Kun det sikre vælges;
     resten står tomt (= »vælg«), så siden kan bede admin om at tage stilling."""
     def omr(omraader):
@@ -594,7 +616,267 @@ def foreslaa(kommune: str, postnr: str = "", oe_navn: str = "") -> dict:
             # Småøerne har egne postnumre — fastlandet er det sikre bud. Undtagen
             # Sønderborg, hvor Als og fastlandet (Sundeved) deler 6400.
             oe = "" if kommune == "Sønderborg" else INGEN_LOKALE
-    return {"oe": oe, "kron": omr(KRON_OMRAADER), "daa": omr(DAA_OMRAADER)}
+    forslag = {"oe": oe, "kron": omr(KRON_OMRAADER), "daa": omr(DAA_OMRAADER)}
+    if lat is not None and lon is not None:
+        # Placeringen vinder over gættet — men kun dér, hvor den giver et svar.
+        for felt, v in afgoer(kommune, lat, lon).items():
+            if v is not None:
+                forslag[felt] = v
+    return forslag
+
+
+# --------------------------------------------------------------------------- #
+# Afgørelse ud fra koordinater
+#
+# Bekendtgørelsen beskriver områderne som »nord for rute 16«, »øst for E45«,
+# »syd for Gudenåen«. Det er præcis det, der testes: på adressens længdegrad
+# findes vejens bredde; ligger adressen nordligere, er den nord for vejen. Øst/
+# vest tilsvarende på adressens breddegrad. Linjerne og øerne ligger forenklet i
+# jagtgraenser.json (tools/byg_jagtgraenser.py) — appen spørger aldrig OSM selv.
+#
+# Hver test svarer True/False, eller None når vejen ikke krydser adressens
+# længde-/breddegrad i nærheden. Et None giver intet forslag, og admin vælger.
+# --------------------------------------------------------------------------- #
+_GRAENSER = None
+
+
+def _graenser() -> dict:
+    global _GRAENSER
+    if _GRAENSER is None:
+        sti = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jagtgraenser.json")
+        try:
+            with open(sti, encoding="utf-8") as f:
+                _GRAENSER = json.load(f)
+        except (OSError, ValueError):
+            _GRAENSER = {"veje": {}, "aaer": {}, "oer": {}}
+    return _GRAENSER
+
+
+def _linjer(navn: str) -> list:
+    g = _graenser()
+    return g["veje"].get(navn) or g["aaer"].get(navn) or []
+
+
+def _krydsning(navn, fast, akse, vindue):
+    """Hvor krydser linjen den lodrette (akse=1: fast længdegrad) eller vandrette
+    (akse=0: fast breddegrad) linje gennem adressen? Returnerer den værdi på den
+    anden akse, der ligger nærmest adressen, inden for `vindue` grader."""
+    a_idx, b_idx = akse, 1 - akse
+    bedst = None
+    for linje in _linjer(navn):
+        for p, q in zip(linje, linje[1:]):
+            lo, hi = sorted((p[a_idx], q[a_idx]))
+            if not lo <= fast[a_idx] <= hi or hi == lo:
+                continue
+            t = (fast[a_idx] - p[a_idx]) / (q[a_idx] - p[a_idx])
+            v = p[b_idx] + t * (q[b_idx] - p[b_idx])
+            if abs(v - fast[b_idx]) <= vindue and (bedst is None
+                                                   or abs(v - fast[b_idx]) < abs(bedst - fast[b_idx])):
+                bedst = v
+    return bedst
+
+
+def nord_for(navn, lat, lon, vindue=0.35):
+    v = _krydsning(navn, (lat, lon), 1, vindue)
+    return None if v is None else lat > v
+
+
+def oest_for(navn, lat, lon, vindue=0.6):
+    v = _krydsning(navn, (lat, lon), 0, vindue)
+    return None if v is None else lon > v
+
+
+def paa_oe(navn, lat, lon):
+    """Stråle mod øst; ulige antal krydsninger = inde. Ringenes stykker behøver
+    ikke at hænge sammen i rækkefølge — paritetstællingen er ligeglad."""
+    stykker = _graenser()["oer"].get(navn)
+    if not stykker:
+        return None
+    inde = False
+    for linje in stykker:
+        for p, q in zip(linje, linje[1:]):
+            if (p[0] > lat) != (q[0] > lat):
+                x = p[1] + (lat - p[0]) / (q[0] - p[0]) * (q[1] - p[1])
+                if x > lon:
+                    inde = not inde
+    return inde
+
+
+def _foerste(*vals):
+    """Første svar, der ikke er ukendt."""
+    return next((v for v in vals if v is not None), None)
+
+
+def _alle(*vals):
+    """Og-kombination, der springer ukendte over: en vej, der ikke når adressens
+    længdegrad, afgør ikke noget dér. Er ALT ukendt, er svaret ukendt."""
+    kendte = [v for v in vals if v is not None]
+    return None if not kendte else all(kendte)
+
+
+OE_OSM = {"sejeroe": "Sejerø", "fejoe": "Fejø", "femoe": "Femø", "lyoe": "Lyø",
+          "strynoe": "Strynø", "kegnaes": "Kegnæs", "als": "Als", "mandoe": "Mandø",
+          "endelave": "Endelave"}
+
+
+def afgoer(kommune: str, lat: float, lon: float) -> dict:
+    """{oe, kron, daa} ud fra placeringen; None hvor den ikke kan afgøres."""
+    N = lambda v: nord_for(v, lat, lon)   # noqa: E731
+    O = lambda v: oest_for(v, lat, lon)   # noqa: E731
+    ud = {"oe": None, "kron": None, "daa": None}
+
+    # Småøerne. Kegnæs før Als — hænger halvøen sammen med Als, rammer begge.
+    oer = [x["id"] for x in oe_kandidater(kommune)]
+    if oer:
+        svar = {oid: paa_oe(OE_OSM[oid], lat, lon)
+                for oid in sorted(oer, key=lambda o: o != "kegnaes")}
+        for oid, v in svar.items():
+            if v:
+                ud["oe"] = oid
+                break
+        else:
+            if all(v is False for v in svar.values()):
+                ud["oe"] = INGEN_LOKALE
+
+    def saet(kron, daa):
+        ud["kron"], ud["daa"] = kron, daa
+
+    k = kommune
+    if k == "Roskilde":
+        # Syd for motorvej 21 er det sikkert Sjælland. Nord for den gælder bilag 5
+        # »mellem Roskilde og Region Hovedstaden« — den grænse står kun på kortet,
+        # så dér vælger admin.
+        if N("21") is False:
+            ud["kron"] = "k_sjaelland"
+    elif k == "Vordingborg":
+        moen = [paa_oe(n, lat, lon) for n in ("Møn", "Bogø", "Farø", "Nyord")]
+        if any(moen):
+            saet(INGEN_LOKALE, "d_lolland_falster")
+        elif all(v is False for v in moen):
+            saet("k_sjaelland", INGEN_LOKALE)
+    elif k in ("Esbjerg", "Vejen", "Kolding", "Fredericia"):
+        if k == "Esbjerg" and paa_oe("Mandø", lat, lon):
+            saet("k_soenderjylland", "d_toender")
+        else:
+            v = N("E20")
+            if v is True:
+                saet("k_sydvestjylland", "d_sydvestjylland")
+            elif v is False:
+                saet("k_soenderjylland", "d_toender" if k == "Esbjerg" else "d_soenderjylland")
+    elif k == "Vejle":
+        # Sydvest-området: syd for Vejle Å / rute 28, eller vest for rute 176 (Give).
+        if lon > 9.56:  # øst for åens udløb: Vejle Fjord, ca. 55,70° N
+            syd = lat < 55.70
+        else:
+            syd = N("Vejle Å")
+            syd = (not syd) if syd is not None else (None if N("28") is None else not N("28"))
+        vest = O("176")
+        vest = None if vest is None else not vest
+        if syd or vest:
+            saet("k_sydvestjylland", "d_sydvestjylland")
+        elif syd is False and vest is not True:
+            saet("k_midtjylland", "d_midtjylland")
+    elif k == "Ikast-Brande":
+        v = O("18")
+        if v is not None:
+            ud["kron"] = "k_midtjylland" if v else "k_sydvestjylland"
+    elif k == "Herning":
+        n15 = N("15")
+        if n15 is True:
+            v = O("12")
+            if v is not None:
+                ud["kron"] = "k_midtjylland" if v else "k_vestjylland"
+        elif n15 is False:
+            v = O("18")
+            if v is not None:
+                ud["kron"] = "k_midtjylland" if v else "k_sydvestjylland"
+    elif k == "Ringkøbing-Skjern":
+        aa = N("Skjern Å")
+        if aa is None and lon < 8.37:
+            # Vest for åens udløb: Ringkøbing Fjord. Grænsen fortsætter »syd for
+            # fjordens udløb i Hvide Sande« (56,0° N); på østbredden går den ved
+            # udløbet (ca. 55,93° N).
+            aa = lat > (56.0 if lon < 8.2 else 55.93)
+        if aa is False:
+            ud["kron"] = "k_sydvestjylland"
+        elif aa is True:
+            n15, v467 = N("15"), O("467")
+            if n15 or v467 is False:
+                ud["kron"] = "k_vestjylland"
+            elif n15 is False and v467 is True:
+                ud["kron"] = "k_sydvestjylland"
+    elif k in ("Aarhus", "Favrskov", "Randers"):
+        oest = O("E45")
+        if oest is True:
+            nord = _alle(N("180"), N("Gudenå")) if k != "Aarhus" else False
+            if nord is True:
+                saet("k_randers", "d_randers")
+            elif nord is False:
+                # Rute 26 går skråt mod nordvest fra Aarhus; øst for den er nord for den.
+                v26 = _foerste(N("26"), O("26")) if k == "Aarhus" else True
+                if v26 is True:
+                    saet("k_djursland", INGEN_LOKALE)
+                elif v26 is False:
+                    saet("k_midtjylland", "d_midtjylland")
+        elif oest is False:
+            nord = N("16") if k != "Aarhus" else False
+            if nord is True:
+                saet("k_randers", "d_randers")
+            elif nord is False:
+                saet("k_midtjylland", "d_midtjylland")
+    elif k == "Viborg":
+        n16 = N("16")
+        if n16 is True:
+            v = O("533")
+            if v is not None:
+                saet(*(("k_randers", "d_randers") if v else ("k_vestjylland", INGEN_LOKALE)))
+        elif n16 is False:
+            v = N("12")
+            v = (not v) if v is not None else _alle(O("13"), O("26"))
+            if v is not None:
+                saet(*(("k_midtjylland", "d_midtjylland") if v
+                       else ("k_vestjylland", INGEN_LOKALE)))
+    elif k in ("Rebild", "Vesthimmerland", "Aalborg"):
+        if k == "Aalborg" and paa_oe("Nørrejyske Ø", lat, lon):
+            _vendsyssel(ud, N, O, lat)
+        else:
+            vmose = _alle(N("535"), O("533"), None if O("E45") is None else not O("E45"))
+            if vmose is not None:
+                saet(*(("k_himmerland", "d_himmerland") if vmose
+                       else ("k_randers", "d_randers")))
+    elif k in ("Hjørring", "Brønderslev", "Frederikshavn"):
+        _vendsyssel(ud, N, O, lat)
+        if k == "Frederikshavn":
+            ud["kron"] = "k_vendsyssel_oest"
+    elif k == "Svendborg":
+        v = paa_oe("Tåsinge", lat, lon)
+        if v is not None:
+            ud["daa"] = "d_taasinge" if v else "d_fyn"
+    # Et forslag skal være et af kommunens egne områder — ellers intet forslag.
+    for felt, omraader in (("kron", KRON_OMRAADER), ("daa", DAA_OMRAADER)):
+        gyldige = {x["id"] for x in kandidater(omraader, kommune)} | {INGEN_LOKALE}
+        if ud[felt] not in gyldige:
+            ud[felt] = None
+    return ud
+
+
+def _vendsyssel(ud, N, O, lat):
+    """Nord for Limfjorden: E39 deler kronvildtet, E39/E45/rute 585 dåvildtet."""
+    # Tæt på Aalborg deler E39 vej med E45 (eller begynder først lidt nordligere),
+    # så krydser den ikke adressens breddegrad. Dér er E45 den samme linje.
+    oest39 = _foerste(O("E39"), O("E45"))
+    vest39 = None if oest39 is None else not oest39
+    if vest39 is True:
+        ud["kron"], ud["daa"] = "k_thy_mors", "d_thy_mors"
+        return
+    if vest39 is False:
+        ud["kron"] = "k_vendsyssel_oest"
+    if O("E45") is True:
+        ud["daa"] = "d_oest_e45"
+    elif N("585") is True or (N("585") is None and lat > 57.5):  # Skagen-odden
+        ud["daa"] = "d_vendsyssel_nord"
+    elif vest39 is False:
+        ud["daa"] = "d_vendsyssel_midt"
 
 
 # --------------------------------------------------------------------------- #
@@ -810,3 +1092,66 @@ def slaa_op(adresse: str, user_agent: str) -> dict:
     return {"sted": hit.get("display_name", adresse), "kommune": kommune,
             "postnr": a.get("postcode", ""), "oe": a.get("island", ""),
             "lat": float(hit["lat"]), "lon": float(hit["lon"])}
+
+
+# --------------------------------------------------------------------------- #
+# Gælder bekendtgørelsen stadig?
+#
+# Tiderne her er skrevet ind i hånden og bliver ikke opdateret af sig selv. Den
+# reelle risiko er derfor ikke, at de forældes år for år, men at der kommer en ny
+# bekendtgørelse, uden at nogen opdager det. Scheduleren spørger Retsinformation
+# en gang om ugen (notifications.jagt_kilde_tjek), og siden viser en advarsel,
+# så snart svaret ikke længere er »gældende og uændret«.
+#
+# To kald, to slags ændring:
+#   - isHistorical: bekendtgørelsen er ERSTATTET af en ny (821/2022 → 470/2024).
+#   - »Senere ændringer til forskriften«: en ændrings-bekendtgørelse retter i
+#     den gældende uden at erstatte den.
+# --------------------------------------------------------------------------- #
+RETSINFO = "https://www.retsinformation.dk"
+
+
+def tjek_kilde(user_agent: str) -> dict:
+    """{status: 'ok'|'historisk'|'aendret', note}. Rejser ved netværksfejl —
+    kalderen beholder så det forrige svar og prøver igen senere."""
+    def hent(url, post=False):
+        req = urllib.request.Request(
+            url, data=b"{}" if post else None, method="POST" if post else "GET",
+            headers={"User-Agent": user_agent, "Content-Type": "application/json",
+                     "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    dok = hent(f"{RETSINFO}/api/document/{KILDE['eli']}", post=True)
+    dok = dok[0] if isinstance(dok, list) else dok
+    if dok.get("isHistorical"):
+        return {"status": "historisk",
+                "note": f"historisk siden {dok.get('historicalDate') or 'ukendt dato'}"}
+    ref = hent(f"{RETSINFO}/api/document/{KILDE['id']}/references/0")
+    senere = [r.get("shortName", "").strip()
+              for g in ref.get("referenceGroups", [])
+              if g.get("header", "").lower().startswith("senere ændringer")
+              for r in g.get("references", [])]
+    if senere:
+        return {"status": "aendret", "note": "ændret ved " + ", ".join(senere)}
+    return {"status": "ok", "note": ""}
+
+
+def kilde_advarsel(settings) -> str:
+    """Teksten til advarslen, eller "" når alt er i orden. Et svar om en ANDEN
+    bekendtgørelse end den, koden nu bruger, tæller ikke — så forsvinder
+    advarslen af sig selv, når tiderne er opdateret til den nye."""
+    try:
+        if str(settings["jagt_kilde_id"]) != str(KILDE["id"]):
+            return ""
+        status, note = settings["jagt_kilde_status"], settings["jagt_kilde_note"]
+    except (KeyError, IndexError):
+        return ""
+    if status == "historisk":
+        return (f"Der er kommet en ny jagttidsbekendtgørelse — {KILDE['navn']} er {note}. "
+                "Oversigten er ikke opdateret endnu, så tjek tiderne på retsinformation.dk.")
+    if status == "aendret":
+        return (f"Jagttidsbekendtgørelsen er {note}. Oversigten er ikke opdateret med "
+                "ændringen endnu, så tjek tiderne på retsinformation.dk.")
+    return ""
+

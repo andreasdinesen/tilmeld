@@ -432,10 +432,12 @@ def master_home():
             "SELECT COUNT(*) AS c FROM events WHERE group_id = ?", (g["id"],)
         ).fetchone()["c"]
         data.append({"g": g, "events": ev_count})
-    start_slug = (db.get_settings(conn)["default_group"] or "").strip()
+    indstillinger = db.get_settings(conn)
+    start_slug = (indstillinger["default_group"] or "").strip()
     start_group = next((g for g in groups if g["slug"] == start_slug), None)
     conn.close()
-    return render_template("master/home.html", groups=data, start_group=start_group)
+    return render_template("master/home.html", groups=data, start_group=start_group,
+                           jagt_advarsel=jagttider.kilde_advarsel(indstillinger))
 
 
 @app.route("/master/groups/new", methods=["GET", "POST"])
@@ -1260,7 +1262,8 @@ def _jagt_user_agent() -> str:
 def _gem_jagt_sted(conn, group_id, adresse, fund):
     """Et nyt sted nulstiller områdevalgene til forslaget — et kronvildt-område fra
     den gamle adresse giver ingen mening ved den nye."""
-    forslag = jagttider.foreslaa(fund["kommune"], fund["postnr"], fund["oe"])
+    forslag = jagttider.foreslaa(fund["kommune"], fund["postnr"], fund["oe"],
+                                 fund["lat"], fund["lon"])
     conn.execute(
         "UPDATE groups SET jagt_adresse = ?, jagt_sted = ?, jagt_kommune = ?, "
         "jagt_postnr = ?, jagt_lat = ?, jagt_lon = ?, jagt_oe = ?, jagt_kron = ?, "
@@ -1279,7 +1282,17 @@ def _jagt_valg(group) -> dict:
                                            ("kronvildt", kron, group["jagt_kron"]),
                                            ("dåvildt", daa, group["jagt_daa"]))
                if liste and not v]
-    return {"kommuner": jagttider.KOMMUNER, "kommune": k,
+    conn = db.get_db()
+    s = db.get_settings(conn)
+    conn.close()
+    tjekket = ""
+    if s["jagt_kilde_tjekket"] and str(s["jagt_kilde_id"]) == str(jagttider.KILDE["id"]):
+        try:
+            tjekket = datetime.fromisoformat(s["jagt_kilde_tjekket"]).strftime("%d-%m-%Y")
+        except ValueError:
+            pass
+    return {"advarsel": jagttider.kilde_advarsel(s), "tjekket": tjekket,
+            "kommuner": jagttider.KOMMUNER, "kommune": k,
             "region": jagttider.KOMMUNE_REGION.get(k, ""),
             "oer": oer, "kron": kron, "daa": daa, "mangler": mangler,
             "ingen": jagttider.INGEN_LOKALE, "kilde": jagttider.KILDE}
@@ -1302,22 +1315,45 @@ def user_jagttider(slug):
     har_vildt = bool(game_species(conn, group["id"]))
     conn.close()
     idag = datetime.now().date()
+    # ?dato=ÅÅÅÅ-MM-DD: hvad må der skydes på jagtens dag. Linket fra et event
+    # sætter den; en ugyldig dato er bare »i dag«.
+    try:
+        dag = datetime.strptime(request.args.get("dato", ""), "%Y-%m-%d").date()
+    except ValueError:
+        dag = idag
     sted = {"kommune": group["jagt_kommune"], "oe": group["jagt_oe"],
             "kron": group["jagt_kron"], "daa": group["jagt_daa"]}
-    tabel = jagttider.tabel(sted, idag) if group["jagt_kommune"] else []
-    aabne = [r["navn"] for _, rk in tabel for r in rk if r["aaben"]]
+    tabel = jagttider.tabel(sted, dag) if group["jagt_kommune"] else []
+    # Tre bunker: det man må skyde (det man leder efter på jagten), de særlige
+    # dage, man selv skal tjekke, og resten — foldet sammen nederst.
+    def bunke(test):
+        return [(g, [r for r in rk if test(r)]) for g, rk in tabel
+                if any(test(r) for r in rk)]
+    aabne = bunke(lambda r: r["aaben"] is True)
+    saerlige = [r for _, rk in tabel for r in rk if r["aaben"] is None]
+    lukkede = bunke(lambda r: r["aaben"] is False)
+    antal_aabne = sum(len(rk) for _, rk in aabne)
+    antal_lukkede = sum(len(rk) for _, rk in lukkede)
+    idag = dag
     sol = None
     if group["jagt_lat"] is not None and group["jagt_lon"] is not None:
         tider = jagttider.sol(group["jagt_lat"], group["jagt_lon"], idag)
         if tider:
             op, ned = tider
+            for _, rk in tabel:
+                for r in rk:
+                    r["tidsrum"] = jagttider.tidsrum(r["keys"], op, ned)
             sol = {"op": op.strftime("%H:%M"), "ned": ned.strftime("%H:%M"),
                    "and_op": (op - timedelta(minutes=90)).strftime("%H:%M"),
                    "and_ned": (ned + timedelta(minutes=90)).strftime("%H:%M")}
     lokale = [navn for navn, _ in jagttider.lag(sted)] if group["jagt_kommune"] else []
     return render_template("user/jagttider.html", group=group, is_admin=is_admin,
                            har_vildt=har_vildt, tabel=tabel, aabne=aabne, sol=sol,
-                           lokale=lokale, idag=jagttider.lang_dato(idag),
+                           saerlige=saerlige, lukkede=lukkede, antal_aabne=antal_aabne,
+                           antal_lukkede=antal_lukkede, lokale=lokale,
+                           dag=jagttider.lang_dato(dag), dag_iso=dag.isoformat(),
+                           er_idag=dag == datetime.now().date(),
+                           ugedag=jagttider.UGEDAGE[dag.weekday()],
                            jagt=_jagt_valg(group),
                            accounts=bool(group["user_accounts_enabled"]))
 
