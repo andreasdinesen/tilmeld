@@ -1,0 +1,23 @@
+{# Billeder og videoer fra dagen som gitter. Bruges af event-siden og af den
+   samlede Billeder-side, så de to ikke kan komme til at vise dem forskelligt. #}
+{% macro galleri(group, ev, billeder) %}
+<div class="billedgitter">
+  {% for b in billeder %}
+    {% set src = url_for('event_image', slug=group.slug, event_slug=ev.slug, image_id=b.id) %}
+    {% if b.video %}
+      {# preload=metadata: første billede og længde, ikke hele filen — vigtigt på
+         en mobilforbindelse. Hent-linket er til de browsere, der ikke kan afspille
+         formatet (iPhone-video på Android). #}
+      <figure class="video">
+        <video src="{{ src }}" controls preload="metadata" playsinline></video>
+        <figcaption><a href="{{ src }}" download="{{ b.original_name }}">Hent videoen</a></figcaption>
+      </figure>
+    {% else %}
+      {# Link til billedet selv: på en telefon er det den eneste måde at se det stort. #}
+      <a href="{{ src }}" target="_blank" rel="noopener">
+        <img src="{{ src }}" alt="{{ b.original_name }}" loading="lazy">
+      </a>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endmacro %}

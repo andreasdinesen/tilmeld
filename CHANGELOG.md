@@ -11,6 +11,27 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 57
+
+**Video fra dagen, og en samlet side med alle billeder.**
+
+Under *Resultat* på et event kan admin nu lægge **videoer** på, ved siden af billederne:
+mp4, mov (iPhone), m4v og webm, højst 1 GB stk. Videoerne står i galleriet på event-siden
+med en afspiller og et *Hent videoen*-link. Det sidste er til browsere, der ikke kan
+afspille formatet, fx iPhone-video på nogle Android-telefoner.
+
+Uploaden sker i **bidder på 8 MB**. Serveren nås via Cloudflare Tunnel, og den afviser
+alt over 100 MB i ét stykke, og et minuts telefonvideo er let større. Bidderne sættes
+sammen på serveren. Fejler en bid (dårlig dækning), sendes den igen, og en bid, serveren
+allerede har, bliver ignoreret. En statuslinje viser, hvor langt den er nået, og
+uploaden afvises på forhånd, hvis der ikke er plads på serverens disk. Videoerne
+afspilles med Range-svar, så iPhone kan spole i dem uden at hente hele filen først.
+
+**Ny side: Billeder** (`/<gruppe>/billeder`). Den samler alle billeder og videoer fra alle
+events, sorteret under hvert event med det nyeste først. Øverst er der genveje til de
+enkelte events. Punktet står i menuen, så snart der er lagt billeder eller videoer på
+mindst ét event.
+
 ## Version 56
 
 **Jagttider er bygget om til brug på selve jagten.**

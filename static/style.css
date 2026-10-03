@@ -528,6 +528,22 @@ details.help[open] summary { border-bottom: 1px solid var(--line); }
 }
 .billedgitter figcaption { text-align: center; }
 .billedgitter figcaption button { margin-top: 6px; }
+/* Video i galleriet: samme kvadrat som billederne, sort bag afspilleren. */
+.billedgitter video {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #000;
+  border-radius: 10px; display: block;
+}
+.billedgitter figure.video { grid-column: span 2; }
+.billedgitter figure.video video { aspect-ratio: 16 / 9; }
+.billedgitter figcaption a { font-size: 0.82rem; }
+.billed-indhold { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.billed-indhold .chip { text-decoration: none; font-size: 0.8rem; }
+.billed-event { scroll-margin-top: 80px; }
+.billed-event h2 { margin: 0; }
+.videostatus { list-style: none; padding: 0; margin: 6px 0; }
+.videostatus li { display: grid; gap: 4px; margin: 8px 0; font-size: 0.86rem; }
+.videostatus li.fejl { color: var(--danger-ink); }
+.videostatus progress { width: 100%; height: 8px; accent-color: var(--accent); }
 
 /* --- Opsætning: foldbare afsnit ----------------------------------------- */
 /* Hvert kort på opsætnings-siden ER en <details>. Siden er lang, og de fleste

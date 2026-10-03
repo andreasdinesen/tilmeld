@@ -8,6 +8,7 @@
   {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Regelsæt</a>{% endif %}
   {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
   {% if group.jagt_kommune %}<a href="{{ url_for('user_jagttider', slug=group.slug) }}">Jagttider</a>{% endif %}
+  {% if har_billeder(group) %}<a href="{{ url_for('user_billeder', slug=group.slug) }}">Billeder</a>{% endif %}
   <a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>
 {% endblock %}
 {% block content %}

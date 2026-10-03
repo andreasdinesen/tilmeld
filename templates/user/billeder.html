@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "user/_galleri.html" as gal %}
+{% block title %}Billeder · {{ group.name }}{% endblock %}
+{% block brand %}{{ group.name }}{% endblock %}
+{% block nav %}
+  <a href="{{ url_for('user_home', slug=group.slug) }}">Alle events</a>
+  {% if accounts and not is_admin %}<a href="{{ url_for('user_profile', slug=group.slug) }}">Min profil</a>{% endif %}
+  {% if group.members_visible %}<a href="{{ url_for('user_members', slug=group.slug) }}">Medlemmer</a>{% endif %}
+  {% if group.rules_text %}<a href="{{ url_for('user_rules', slug=group.slug) }}">Regelsæt</a>{% endif %}
+  {% if har_vildt %}<a href="{{ url_for('user_game', slug=group.slug) }}">Udbytte</a>{% endif %}
+  {% if group.jagt_kommune %}<a href="{{ url_for('user_jagttider', slug=group.slug) }}">Jagttider</a>{% endif %}
+  {% if accounts or group.user_password %}<a href="{{ url_for('user_logout', slug=group.slug) }}">Log ud</a>{% endif %}
+{% endblock %}
+{% block content %}
+<a class="tilbage" href="{{ url_for('user_home', slug=group.slug) }}">← Tilbage til forsiden</a>
+<div class="card">
+  <h1>Billeder</h1>
+  {% if not afsnit %}
+    <p>Der er ikke lagt billeder eller videoer på nogen events endnu.</p>
+    {% if is_admin %}<p class="muted small">De lægges på under <em>Resultat</em> på det
+       enkelte event.</p>{% endif %}
+  {% else %}
+    <p class="muted small">{{ antal_billeder }} billede{{ 'r' if antal_billeder != 1 }}{% if antal_videoer %}
+       og {{ antal_videoer }} video{{ 'er' if antal_videoer != 1 }}{% endif %} fra
+       {{ afsnit|length }} event{{ 's' if afsnit|length != 1 }}, nyeste først.</p>
+    {% if afsnit|length > 1 %}
+      {# Hop direkte til en jagt — på en telefon er siden lang. #}
+      <nav class="billed-indhold">
+        {% for a in afsnit %}
+          <a class="chip" href="#ev-{{ a.ev.id }}">{{ a.ev.name }} · {{ a.ev.event_date|d }}</a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+  {% endif %}
+</div>
+{% for a in afsnit %}
+<section class="card billed-event" id="ev-{{ a.ev.id }}">
+  <div class="row">
+    <h2><a href="{{ url_for('user_event', slug=group.slug, event_slug=a.ev.slug) }}">{{ a.ev.name }}</a></h2>
+    <span class="muted small nowrap">{{ a.ev.event_date|d }} · {{ a.billeder|length }} stk.</span>
+  </div>
+  {{ gal.galleri(group, a.ev, a.billeder) }}
+</section>
+{% endfor %}
+{% endblock %}

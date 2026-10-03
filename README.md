@@ -58,6 +58,17 @@ kontakt, tilmeldings-punkter, udseende, dokumenter, skabeloner, passkeys og
 notifikationer. Hvert afsnit viser sin status (»5 arter«, »ingen madbestiller«), så man
 kan overskue siden uden at folde noget ud. Fanen husker, hvad du havde åbent.
 
+## Billeder og video fra dagen
+
+Under **Resultat** på et event kan admin lægge billeder og videoer på (mp4, mov, m4v, webm,
+højst 1 GB stk.). De vises i galleriet på event-siden og på den samlede side **Billeder**
+(`/<gruppe>/billeder`), sorteret under hvert event med det nyeste først.
+
+Videoer uploades i bidder på 8 MB (`static/video.js`), fordi Cloudflare Tunnel afviser
+requests over 100 MB. Serveren sætter bidderne sammen, tåler at en bid sendes igen, og
+rydder halvfærdige uploads væk efter et døgn. Der skal være mindst 2 GB fri disk efter
+videoen, ellers afvises den.
+
 ## Jagttider
 
 Under **Opsætning → Jagttider** taster gruppe-admin adressen på terrænet. Bruger-siden

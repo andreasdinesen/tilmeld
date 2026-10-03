@@ -21,7 +21,7 @@ except AttributeError:  # findes ikke på Windows
 
 import bleach
 import markdown as markdown_lib
-from flask import (Flask, Response, abort, flash, redirect, render_template,
+from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template,
                    request, send_file, session, url_for)
 from markupsafe import Markup
 from werkzeug.utils import secure_filename
@@ -47,6 +47,16 @@ _MD_TAGS = ["p", "br", "hr", "strong", "em", "b", "i", "u", "del", "a",
 _MD_ATTRS = {"a": ["href", "title"]}
 
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+# Video fra dagen ligger i samme galleri som billederne (event_images). .mov er
+# iPhonens format. Videoer uploades i BIDDER (VIDEO_BID_MB) af static/video.js:
+# Cloudflare Tunnel afviser enhver request over 100 MB, og et minuts video fra en
+# telefon fylder let mere. Bidderne holder sig også under MAX_UPLOAD_MB.
+ALLOWED_VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm"}
+MAX_VIDEO_MB = 1024
+VIDEO_BID_MB = 8
+# Så meget skal der være tilbage på disken EFTER videoen — /data deles med alt andet.
+VIDEO_DISK_RESERVE_MB = 2048
 
 # Filer der kan vedhæftes et event. En hvidliste, ikke en sortliste: en sortliste
 # er forkert første gang der kommer en ny farlig filtype. Filerne leveres altid som
@@ -330,6 +340,19 @@ def fmt_d(value):
         return datetime.strptime(value, "%Y-%m-%d").strftime("%d-%m-%Y")
     except (ValueError, TypeError):
         return value
+
+
+@app.template_global()
+def har_billeder(group) -> bool:
+    """Om gruppen har billeder eller videoer fra dagen — styrer menupunktet
+    »Billeder«. Global, så de seks bruger-sider ikke hver skal regne det ud."""
+    conn = db.get_db()
+    try:
+        return conn.execute(
+            "SELECT 1 FROM event_images i JOIN events e ON e.id = i.event_id "
+            "WHERE e.group_id = ? LIMIT 1", (group["id"],)).fetchone() is not None
+    finally:
+        conn.close()
 
 
 @app.template_global()
@@ -1850,7 +1873,7 @@ def admin_event_list(slug, event_id):
     conn.close()
     return render_template("admin/event_list.html", arter=arter, udbytte=udbytte, group=group, ev=ev,
                            ledere=ledere, liste_link=liste_link, medlemmer=medlemmer,
-                           billeder=billeder,
+                           billeder=billeder, max_video_mb=MAX_VIDEO_MB,
                            fields=fields, regs=regs, count=attending,
                            total=len(regs), decline_ids=decline_ids,
                            state=event_state(ev), attended_count=attended_count,
@@ -1940,9 +1963,156 @@ def admin_event_image_delete(slug, event_id, image_id):
             os.remove(os.path.join(event_images_dir(group, event_id), row["stored_name"]))
         except OSError:
             pass
-        flash("Billedet er fjernet.", "ok")
+        flash("Videoen er fjernet." if os.path.splitext(row["stored_name"])[1].lower()
+              in ALLOWED_VIDEO_EXT else "Billedet er fjernet.", "ok")
     conn.close()
     return redirect(url_for("admin_event_list", slug=slug, event_id=event_id) + "#resultat")
+
+
+# --------------------------------------------------------------------------- #
+# Video fra dagen — upload i bidder
+#
+#   1. POST  …/video/start           {navn, stoerrelse}  → {id, bid}
+#   2. PUT   …/video/<id>?fra=<byte>  rå bytes, højst VIDEO_BID_MB
+#   3. POST  …/video/<id>/faerdig                         → videoen kommer i galleriet
+#
+# Bidderne lægges i forlængelse af hinanden i .tmp/<id>.part. `fra` gør det sikkert
+# at sende en bid igen: er den allerede modtaget, svares der bare med størrelsen.
+# Halvfærdige uploads ryddes væk efter et døgn.
+#
+# CSRF: start/færdig kræver Content-Type: application/json og bidderne er PUT —
+# ingen af delene kan en fremmed side sende uden en CORS-preflight, som vi ikke
+# besvarer. Samme spærre som passkey-endpointsene.
+# --------------------------------------------------------------------------- #
+def _video_tmp(group, event_id) -> str:
+    return os.path.join(event_images_dir(group, event_id), ".tmp")
+
+
+def _video_meta(group, event_id, uid):
+    if not re.fullmatch(r"[0-9a-f]{32}", uid or ""):
+        return None
+    try:
+        with open(os.path.join(_video_tmp(group, event_id), uid + ".json"),
+                  encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _ryd_gamle_videoer(mappe):
+    graense = time.time() - 86400
+    try:
+        for navn in os.listdir(mappe):
+            sti = os.path.join(mappe, navn)
+            if os.path.getmtime(sti) < graense:
+                os.remove(sti)
+    except OSError:
+        pass
+
+
+def _video_adgang(slug, event_id):
+    """(group, ev) hvis admin har adgang til eventet, ellers None."""
+    group = get_group(slug)
+    if not group or not admin_has_access(group):
+        return None
+    conn = db.get_db()
+    ev = conn.execute("SELECT * FROM events WHERE id = ? AND group_id = ?",
+                      (event_id, group["id"])).fetchone()
+    conn.close()
+    return (group, ev) if ev else None
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/video/start", methods=["POST"])
+def admin_video_start(slug, event_id):
+    adgang = _video_adgang(slug, event_id)
+    if not adgang:
+        return jsonify({"fejl": "Ingen adgang."}), 403
+    group, _ev = adgang
+    if not request.is_json:
+        return jsonify({"fejl": "Forkert forespørgsel."}), 400
+    data = request.get_json(silent=True) or {}
+    navn = str(data.get("navn") or "")[:200]
+    try:
+        stoerrelse = int(data.get("stoerrelse") or 0)
+    except (TypeError, ValueError):
+        stoerrelse = 0
+    ext = os.path.splitext(navn)[1].lower()
+    if ext not in ALLOWED_VIDEO_EXT:
+        return jsonify({"fejl": f"»{navn}« er ikke en video, vi kan vise "
+                                f"({', '.join(sorted(e[1:] for e in ALLOWED_VIDEO_EXT))})."}), 400
+    if not 0 < stoerrelse <= MAX_VIDEO_MB * 1024 * 1024:
+        return jsonify({"fejl": f"»{navn}« er større end {MAX_VIDEO_MB} MB."}), 400
+    mappe = _video_tmp(group, event_id)
+    os.makedirs(mappe, exist_ok=True)
+    _ryd_gamle_videoer(mappe)
+    fri = shutil.disk_usage(mappe).free
+    if fri - stoerrelse < VIDEO_DISK_RESERVE_MB * 1024 * 1024:
+        return jsonify({"fejl": "Der er ikke plads til videoen på serveren."}), 507
+    uid = secrets.token_hex(16)
+    with open(os.path.join(mappe, uid + ".json"), "w", encoding="utf-8") as f:
+        json.dump({"navn": navn, "ext": ext, "stoerrelse": stoerrelse}, f)
+    open(os.path.join(mappe, uid + ".part"), "wb").close()
+    return jsonify({"id": uid, "bid": VIDEO_BID_MB * 1024 * 1024})
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/video/<uid>", methods=["PUT"])
+def admin_video_bid(slug, event_id, uid):
+    adgang = _video_adgang(slug, event_id)
+    if not adgang:
+        return jsonify({"fejl": "Ingen adgang."}), 403
+    group, _ev = adgang
+    meta = _video_meta(group, event_id, uid)
+    if not meta:
+        return jsonify({"fejl": "Uploaden findes ikke (mere). Prøv igen."}), 404
+    sti = os.path.join(_video_tmp(group, event_id), uid + ".part")
+    try:
+        fra = int(request.args.get("fra", "-1"))
+    except ValueError:
+        fra = -1
+    har = os.path.getsize(sti)
+    bid = request.get_data(cache=False)
+    if len(bid) > VIDEO_BID_MB * 1024 * 1024:
+        return jsonify({"fejl": "For stor bid."}), 413
+    if fra + len(bid) <= har:      # sendt igen efter et udfald — har den allerede
+        return jsonify({"modtaget": har})
+    if fra != har:
+        return jsonify({"fejl": "Bidderne kom i forkert rækkefølge.", "modtaget": har}), 409
+    if har + len(bid) > meta["stoerrelse"]:
+        return jsonify({"fejl": "Videoen blev større end anmeldt."}), 400
+    with open(sti, "ab") as f:
+        f.write(bid)
+    return jsonify({"modtaget": har + len(bid)})
+
+
+@app.route("/<slug>/admin/events/<int:event_id>/video/<uid>/faerdig", methods=["POST"])
+def admin_video_faerdig(slug, event_id, uid):
+    adgang = _video_adgang(slug, event_id)
+    if not adgang:
+        return jsonify({"fejl": "Ingen adgang."}), 403
+    group, ev = adgang
+    if not request.is_json:
+        return jsonify({"fejl": "Forkert forespørgsel."}), 400
+    meta = _video_meta(group, event_id, uid)
+    if not meta:
+        return jsonify({"fejl": "Uploaden findes ikke (mere). Prøv igen."}), 404
+    tmp = _video_tmp(group, event_id)
+    part = os.path.join(tmp, uid + ".part")
+    if os.path.getsize(part) != meta["stoerrelse"]:
+        return jsonify({"fejl": "Videoen kom ikke helt igennem. Prøv igen."}), 400
+    stored = secrets.token_hex(8) + meta["ext"]
+    os.replace(part, os.path.join(event_images_dir(group, event_id), stored))
+    try:
+        os.remove(os.path.join(tmp, uid + ".json"))
+    except OSError:
+        pass
+    conn = db.get_db()
+    conn.execute("INSERT INTO event_images (event_id, stored_name, original_name, created_at) "
+                 "VALUES (?,?,?,?)", (event_id, stored, meta["navn"], db.now_iso()))
+    conn.commit()
+    db.add_log(conn, "event", f"Video lagt på '{ev['name']}': {meta['navn']} "
+                              f"({meta['stoerrelse'] // (1024 * 1024)} MB)", group["slug"])
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/<slug>/<event_slug>/billede/<int:image_id>")
@@ -1965,7 +2135,8 @@ def event_image(slug, event_slug, image_id):
     sti = os.path.join(event_images_dir(group, row["event_id"]), row["stored_name"])
     if not os.path.exists(sti):
         abort(404)
-    return send_file(sti)
+    # conditional=True giver Range-svar (206) — uden dem afspiller iPhone ingen video.
+    return send_file(sti, conditional=True)
 
 
 @app.route("/<slug>/admin/events/<int:event_id>/export.csv")
@@ -3287,8 +3458,15 @@ def game_entries(conn, group, fra: str = "", til: str = "") -> list:
 
 
 def event_images(conn, event_id) -> list:
-    return conn.execute("SELECT * FROM event_images WHERE event_id = ? ORDER BY id",
-                        (event_id,)).fetchall()
+    """Billeder OG videoer fra dagen. `video` afgøres af endelsen på disken —
+    den er sat af serveren (hvidlisten), ikke af brugeren."""
+    ud = []
+    for r in conn.execute("SELECT * FROM event_images WHERE event_id = ? ORDER BY id",
+                          (event_id,)).fetchall():
+        d = dict(r)
+        d["video"] = os.path.splitext(d["stored_name"])[1].lower() in ALLOWED_VIDEO_EXT
+        ud.append(d)
+    return ud
 
 
 def game_totals(conn, group, fra: str, til: str) -> tuple:
@@ -3543,6 +3721,31 @@ def event_leaders(conn, group, ev) -> list:
         return []
     medlemmer = {m["ref"]: m for m in group_members(conn, group)}
     return [medlemmer[r] for r in refs if r in medlemmer]
+
+
+@app.route("/<slug>/billeder")
+def user_billeder(slug):
+    """Alle billeder og videoer fra dagen, samlet under hvert event — nyeste først."""
+    group = get_group(slug)
+    if not group:
+        abort(404)
+    if not user_has_access(group):
+        return redirect(url_for("user_login", slug=slug))
+    is_admin = bool(session.get(f"admin_{group['slug']}"))
+    conn = db.get_db()
+    events = conn.execute(
+        "SELECT e.* FROM events e WHERE e.group_id = ? AND EXISTS "
+        "(SELECT 1 FROM event_images i WHERE i.event_id = e.id) "
+        "ORDER BY e.event_date DESC, e.id DESC", (group["id"],)).fetchall()
+    afsnit = [{"ev": ev, "billeder": event_images(conn, ev["id"])} for ev in events]
+    har_vildt = bool(game_species(conn, group["id"]))
+    conn.close()
+    antal_b = sum(1 for a in afsnit for b in a["billeder"] if not b["video"])
+    antal_v = sum(1 for a in afsnit for b in a["billeder"] if b["video"])
+    return render_template("user/billeder.html", group=group, afsnit=afsnit,
+                           antal_billeder=antal_b, antal_videoer=antal_v,
+                           har_vildt=har_vildt, is_admin=is_admin,
+                           accounts=bool(group["user_accounts_enabled"]))
 
 
 @app.route("/<slug>/ordensregler")
