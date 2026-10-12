@@ -4218,7 +4218,8 @@ def _flash_send_result(mails, whatsapps, smses, pushes, errors):
             dele.append(f"{pushes} push")
         flash("Sendt: " + " og ".join(dele) + ".", "ok")
     elif not errors:
-        flash("Ingen modtagere på listen at sende til.", "error")
+        flash("Ingen at sende til — listen er tom, eller alle har allerede svaret.",
+              "error")
     for e in errors[:5]:
         flash(f"Ikke leveret — {e}", "error")
 

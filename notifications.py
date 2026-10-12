@@ -744,8 +744,9 @@ def send_to_list(conn, group, subject, body, ctx=None, note="", modtagere=None):
     aktiveret for gruppen: er mail slået fra, sendes der ikke mail, uanset hvad der står
     i listen.
 
-    `modtagere` er hele listen, når den ikke gives. Påmindelsen før fristen sender kun
-    til dem, der ikke har svaret (se `list_recipients_uden_svar`).
+    `modtagere` er hele listen, når den ikke gives. Varslingen om et event og
+    påmindelsen før fristen sender kun til dem, der ikke har svaret (se
+    `list_recipients_uden_svar`).
 
     Modtagerens mobilnummer bruges af BÅDE WhatsApp og SMS — det er ét nummer, og
     hvilke kanaler det nås på, er masters valg pr. gruppe. Er begge slået til, får
@@ -832,10 +833,17 @@ def announce_message(conn, group, ev, base_url=""):
 
 
 def announce_event(conn, group, ev, note=""):
-    """Varsl notifikationslisten om ét event."""
+    """Varsl notifikationslisten om ét event.
+
+    Kun dem, der ikke allerede har svaret — tilmeldt eller afbud. Et event kan være
+    delt på anden vis, før varslingen går ud, og så er »der er et nyt event« bare
+    støj for dem, der allerede har taget stilling. Push-abonnenterne har ingen
+    identitet og kan ikke matches, så de får varslingen uanset.
+    """
     subject, body, ctx = announce_message(
         conn, group, ev, (db.get_settings(conn)["base_url"] or "").strip())
-    return send_to_list(conn, group, subject, body, ctx, note=note)
+    return send_to_list(conn, group, subject, body, ctx, note=note,
+                        modtagere=list_recipients_uden_svar(conn, group, ev))
 
 
 # ---- Scheduler: påmindelse 24t før frist + CSV 2t efter frist ------------------

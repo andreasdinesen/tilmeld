@@ -11,6 +11,18 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 58
+
+**Varslingen om et nyt event springer dem over, der allerede har svaret.**
+
+Hvis man har tilmeldt sig eller meldt afbud, før varslingen går ud, fordi linket fx er
+blevet delt på anden vis, får man ikke længere en »der er et nyt event«-besked bagefter.
+Det gælder både den automatiske varsling X dage før og »Send nu« for et valgt event.
+Svar matches på navn, ligesom ved påmindelsen før fristen. Den, der står på listen uden
+navn, får stadig varslingen. Push-abonnenter har ingen identitet og får den altid.
+
+En fri besked med »Send nu« går stadig til hele listen.
+
 ## Version 57
 
 **Video fra dagen, og en samlet side med alle billeder.**

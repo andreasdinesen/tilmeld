@@ -220,11 +220,14 @@ ekstra modtagere i hånden, og dubletter sendes der kun til én gang.
 Listen bruges to steder:
 
 - **48 timer før tilmeldingsfristen**, hvis eventet har fluebenet »Påmindelse 48t før
-  frist«. Går til hele listen — også dem, der ikke har svaret endnu — med et link til eventet.
+  frist«. Går kun til dem på listen, der hverken har tilmeldt sig eller meldt afbud, med et
+  link til eventet.
 - **Automatisk**, når der er et valgt antal dage (standard 14) til et events start. Et
   event oprettet tættere på end det varsles med det samme. Hvert event kan holdes ude
-  med fluebenet under *Notifikationer* i event-formularen.
-- **Manuelt**, med »Send nu«: enten varslingen om et valgt event eller en helt fri besked.
+  med fluebenet under *Notifikationer* i event-formularen. Varslingen springer dem over,
+  der allerede har svaret (tilmeldt eller afbud); push-abonnenter får den altid.
+- **Manuelt**, med »Send nu«: enten varslingen om et valgt event (også kun til dem, der
+  ikke har svaret) eller en helt fri besked til hele listen.
   `{name}` bliver modtagerens navn og `{group}` gruppens.
 
 Teksten er en mail-skabelon (»Nyt event«) og kan rettes under **Opsætning**, hvis master

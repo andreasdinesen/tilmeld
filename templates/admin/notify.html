@@ -68,6 +68,7 @@
     </label>
     <p class="muted small">Varslingen sendes, når der er så få dage til eventets start.
        Oprettes et event tættere på end det, sendes varslingen med det samme.
+       Den går kun til dem, der ikke allerede har tilmeldt sig eller meldt afbud.
        Hvert event kan slå varslingen fra under <em>Notifikationer</em> i event-formularen.</p>
     {% if group.user_accounts_enabled %}
       <label class="chk"><input type="checkbox" name="notify_list_users"
