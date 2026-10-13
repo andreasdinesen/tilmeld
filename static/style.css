@@ -184,6 +184,14 @@ code {
 }
 .card.narrow { max-width: 520px; }
 .card.state-locked { border-left: 5px solid var(--warn-line); background: var(--warn-soft); }
+.varsling-fra {
+  border-left: 5px solid var(--warn-line); background: var(--warn-soft); color: var(--warn-ink);
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+}
+.varsling-fra p { margin: 0 0 8px; }
+.varsling-fra ul { margin: 0 0 12px; padding-left: 20px; }
+.varsling-fra .muted { color: inherit; opacity: 0.8; }
+.varsling-fra p.small { margin: 8px 0 0; }
 
 .row {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;

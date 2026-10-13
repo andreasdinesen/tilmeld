@@ -58,6 +58,25 @@
   {% endif %}
 
   <h2 id="indstillinger">Indstillinger</h2>
+  {% if group.notify_list_enabled and uden_varsling %}
+    <div class="varsling-fra">
+      <p><strong>{{ uden_varsling|length }} kommende event{{ 's' if uden_varsling|length != 1 }}
+         bliver ikke varslet</strong>, fordi fluebenet »Varsl notifikationslisten om dette
+         event« ikke er sat på selve eventet:</p>
+      <ul>
+        {% for e in uden_varsling %}
+          <li><a href="{{ url_for('admin_event_edit', slug=group.slug, event_id=e.id) }}">{{ e.name }}</a>
+              <span class="muted">· {{ e.event_date|d }}</span></li>
+        {% endfor %}
+      </ul>
+      <form method="post">
+        <input type="hidden" name="action" value="list_all_on">
+        <button type="submit" class="small">Slå varslingen til på dem alle</button>
+      </form>
+      <p class="muted small">Events, der allerede er inden for {{ group.notify_list_days if group.notify_list_days is not none else 14 }}
+         dage, bliver varslet inden for ca. 10 minutter (efter kl. 8, hvis det er nat).</p>
+    </div>
+  {% endif %}
   <form method="post">
     <input type="hidden" name="action" value="settings">
     <label class="chk"><input type="checkbox" name="notify_list_enabled"
@@ -69,7 +88,9 @@
     <p class="muted small">Varslingen sendes, når der er så få dage til eventets start.
        Oprettes et event tættere på end det, sendes varslingen med det samme.
        Den går kun til dem, der ikke allerede har tilmeldt sig eller meldt afbud.
-       Hvert event kan slå varslingen fra under <em>Notifikationer</em> i event-formularen.</p>
+       Hvert event kan slå varslingen fra under <em>Notifikationer</em> i event-formularen.
+       Når du slår varslingen til her, bliver den også slået til på alle kommende events,
+       der ikke er varslet endnu.</p>
     {% if group.user_accounts_enabled %}
       <label class="chk"><input type="checkbox" name="notify_list_users"
         {{ 'checked' if group.notify_list_users }}> Medtag gruppens brugere automatisk</label>

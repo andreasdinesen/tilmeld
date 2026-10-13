@@ -224,7 +224,9 @@ Listen bruges to steder:
   link til eventet.
 - **Automatisk**, når der er et valgt antal dage (standard 14) til et events start. Et
   event oprettet tættere på end det varsles med det samme. Hvert event kan holdes ude
-  med fluebenet under *Notifikationer* i event-formularen. Varslingen springer dem over,
+  med fluebenet under *Notifikationer* i event-formularen. Slår du varslingen til for
+  gruppen, bliver fluebenet sat på alle kommende events, der ikke er varslet endnu, og
+  siden viser en advarsel, hvis et kommende event mangler det. Varslingen springer dem over,
   der allerede har svaret (tilmeldt eller afbud); push-abonnenter får den altid.
 - **Manuelt**, med »Send nu«: enten varslingen om et valgt event (også kun til dem, der
   ikke har svaret) eller en helt fri besked til hele listen.

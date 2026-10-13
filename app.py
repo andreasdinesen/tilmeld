@@ -4105,6 +4105,8 @@ def admin_notify(slug):
                 days = max(0, min(365, int(request.form.get("notify_list_days") or 14)))
             except ValueError:
                 days = 14
+            slaas_til = (request.form.get("notify_list_enabled")
+                         and not group["notify_list_enabled"])
             conn.execute(
                 "UPDATE groups SET members_visible = ?, signup_from_members = ? WHERE id = ?",
                 (1 if request.form.get("members_visible") else 0,
@@ -4115,6 +4117,17 @@ def admin_notify(slug):
                 (1 if request.form.get("notify_list_enabled") else 0, days,
                  1 if request.form.get("notify_list_users") else 0, group["id"]))
             flash("Indstillinger for notifikationslisten gemt.", "ok")
+            # Fluebenet på det enkelte event tager sin startværdi fra gruppen, når
+            # eventet oprettes. Events oprettet, mens varslingen var slået fra, fik
+            # derfor 0 — og blev aldrig varslet, selv efter at gruppen slog den til.
+            if slaas_til:
+                n = _varsling_til_for_kommende(conn, group)
+                if n:
+                    flash(f"Varslingen er også slået til på {n} kommende "
+                          f"event{'s' if n != 1 else ''}.", "ok")
+        elif action == "list_all_on":
+            n = _varsling_til_for_kommende(conn, group)
+            flash(f"Varslingen er slået til på {n} event{'s' if n != 1 else ''}.", "ok")
         elif action == "add":
             r, err = _recipient_from_form(request.form, mail_on, tlf_on,
                                           bool(group["members_visible"]))
@@ -4193,6 +4206,8 @@ def admin_notify(slug):
         [e for e in conn.execute("SELECT * FROM events WHERE group_id = ?",
                                  (group["id"],)).fetchall()
          if event_state(e) != "finished"], key=event_sort_key)
+    uden_varsling = [e for e in events
+                     if not e["notify_list"] and not e["notify_list_sent"]]
     reach = sum(1 for r in recipients
                 if r["active"] and ((mail_on and r["email"]) or (tlf_on and r["whatsapp"])))
     push_devices = conn.execute(
@@ -4202,7 +4217,23 @@ def admin_notify(slug):
     return render_template("admin/notify.html", group=group, recipients=recipients,
                            events=events, mail_on=mail_on, wa_on=wa_on, sms_on=sms_on,
                            tlf_on=tlf_on, push_on=push_on,
-                           reach=reach, push_devices=push_devices)
+                           reach=reach, push_devices=push_devices,
+                           uden_varsling=uden_varsling)
+
+
+def _varsling_til_for_kommende(conn, group) -> int:
+    """Sæt »Varsl notifikationslisten« på gruppens kommende events, der ikke er
+    varslet endnu. Returnér antallet, der blev slået til.
+
+    Et event inde i varslingsvinduet bliver varslet ved schedulerens næste
+    gennemløb — det er netop meningen."""
+    ids = [e["id"] for e in conn.execute(
+        "SELECT * FROM events WHERE group_id = ? AND notify_list = 0 "
+        "AND notify_list_sent = 0", (group["id"],)).fetchall()
+        if event_state(e) != "finished"]
+    for i in ids:
+        conn.execute("UPDATE events SET notify_list = 1 WHERE id = ?", (i,))
+    return len(ids)
 
 
 def _flash_send_result(mails, whatsapps, smses, pushes, errors):
@@ -4226,7 +4257,7 @@ def _flash_send_result(mails, whatsapps, smses, pushes, errors):
 
 # Anker til afsnittet man arbejdede i, så siden ikke hopper til toppen ved hvert klik.
 _NOTIFY_ANCHOR = {
-    "settings": "#indstillinger",
+    "settings": "#indstillinger", "list_all_on": "#indstillinger",
     "add": "#modtagere", "edit": "#modtagere",
     "toggle": "#modtagere", "toggle_hidden": "#modtagere", "delete": "#modtagere",
     "send_event": "#send", "send_text": "#send",

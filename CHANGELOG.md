@@ -11,6 +11,23 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 59
+
+**Events, der aldrig ville blive varslet, kan ikke længere gemme sig.**
+
+Fluebenet »Varsl notifikationslisten om dette event« på det enkelte event får sin
+startværdi fra gruppen, når eventet oprettes. Events, der blev oprettet, mens »Varsl
+listen automatisk« var slået fra, fik derfor fluebenet slået fra. De blev aldrig varslet,
+heller ikke efter at gruppen slog varslingen til.
+
+- **Slår du »Varsl listen automatisk« til**, bliver fluebenet nu også sat på alle kommende
+  events, der ikke er varslet endnu.
+- **Siden *Notifikationsliste* viser en advarsel**, når varslingen er slået til for gruppen,
+  men et eller flere kommende events ikke har fluebenet. Hvert event er et link til
+  formularen, og knappen *Slå varslingen til på dem alle* ordner det i én omgang. Events,
+  der allerede er inden for varslingsvinduet, bliver varslet ved næste gennemløb (ca. 10
+  minutter, eller efter kl. 8, hvis det er nat).
+
 ## Version 58
 
 **Varslingen om et nyt event springer dem over, der allerede har svaret.**
