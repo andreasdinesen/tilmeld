@@ -735,7 +735,8 @@ def list_recipients_uden_svar(conn, group, ev) -> list:
             if _norm_navn(m["name"]) not in svaret]
 
 
-def send_to_list(conn, group, subject, body, ctx=None, note="", modtagere=None):
+def send_to_list(conn, group, subject, body, ctx=None, note="", modtagere=None,
+                 push=True):
     """Send én besked til hele notifikationslisten.
     Returnér (mails, whatsapps, sms'er, push, fejl).
 
@@ -747,6 +748,10 @@ def send_to_list(conn, group, subject, body, ctx=None, note="", modtagere=None):
     `modtagere` er hele listen, når den ikke gives. Varslingen om et event og
     påmindelsen før fristen sender kun til dem, der ikke har svaret (se
     `list_recipients_uden_svar`).
+
+    `push=False` holder beskeden væk fra de anonyme push-abonnenter. Påmindelsen
+    før fristen er en rykker til bestemte personer; et abonnement uden identitet
+    kan ikke vide, om ejeren har svaret, og ville rykke dem, der har meldt fra.
 
     Modtagerens mobilnummer bruges af BÅDE WhatsApp og SMS — det er ét nummer, og
     hvilke kanaler det nås på, er masters valg pr. gruppe. Er begge slået til, får
@@ -800,7 +805,7 @@ def send_to_list(conn, group, subject, body, ctx=None, note="", modtagere=None):
     # identitet — det ER pointen: en gruppe med delt adgangskode har ingen brugere
     # at hænge et abonnement på, men kan stadig sige »giv mig besked om nye events«.
     pushes = 0
-    if push_on:
+    if push_on and push:
         subj = _safe_format(subject, dict(ctx or {}, name=""))
         text = _safe_format(body, dict(ctx or {}, name=""))
         pushes = send_push(conn, group, push_targets(conn, group, "list"), subj, text,
@@ -855,6 +860,24 @@ def announce_event(conn, group, ev, note=""):
 # går af sted ved første gennemløb efter kl. 8.
 STILLETID_FRA = 22      # fra kl. 22.00
 STILLETID_TIL = 8       # til kl. 08.00
+
+
+def reminder_summary(ctx, mangler, link="") -> tuple:
+    """(emne, tekst) til admin, når påmindelsen før fristen er gået ud: hvem
+    der blev rykket — ikke rykkeren selv."""
+    ctx = _pretty_dates(ctx)
+    subject = f"Påmindelse sendt: {ctx['event']}"
+    aktive = [m for m in mangler if m["active"]]
+    if aktive:
+        navne = ", ".join(m["name"] or m["whatsapp"] or m["email"] for m in aktive)
+        body = (f"Tilmeldingsfristen er {ctx['deadline']}. "
+                f"Påmindelsen er sendt til {len(aktive)}, der ikke har svaret: {navne}.")
+    else:
+        body = (f"Tilmeldingsfristen er {ctx['deadline']}. "
+                f"Alle på listen har svaret, så der er ikke sendt nogen påmindelse.")
+    if link:
+        body += f"\n{link}"
+    return subject, body
 
 
 def i_stilletid(now) -> bool:
@@ -959,14 +982,22 @@ def process_scheduled(now=None):
                 # Kun dem, vi ikke har hørt fra. Har alle svaret — tilmeldt eller
                 # afbud — er der ingen at rykke, og så skal der ikke sendes noget.
                 mangler = list_recipients_uden_svar(conn, group, ev)
+                # Ingen push: abonnementerne på bruger-siden er anonyme og kan ikke
+                # vide, om ejeren har svaret. De får varslingen om nye events, ikke
+                # rykkeren.
                 if mangler:
                     send_to_list(conn, group, subject, body, ctx,
-                                 note="48t før frist", modtagere=mangler)
+                                 note="48t før frist", modtagere=mangler, push=False)
                 else:
                     db.add_log(conn, "event",
                                f"Påmindelse ikke sendt — alle på listen har svaret: "
                                f"{ev['name']}", group["slug"])
-                notify_admin(conn, group, *render_message(conn, group, "reminder", ctx))
+                # Admin får en OPSUMMERING, ikke selve rykkeren: »husk at tilmelde
+                # dig« er forkert at sende til en admin, der selv har meldt fra.
+                liste = (f"{base}/{group['slug']}/admin/events/{ev['id']}/list"
+                         if base else "")
+                notify_admin(conn, group, *reminder_summary(ctx, mangler, liste),
+                             link=liste)
                 conn.execute("UPDATE events SET reminder_sent = 1 WHERE id = ?", (ev["id"],))
                 conn.commit()
 

@@ -11,6 +11,20 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 60
+
+**Påmindelsen før fristen når ikke længere dem, der har meldt fra.**
+
+Rykkeren til notifikationslisten sprang allerede dem over, der havde svaret. Men den gik
+også ad to andre veje, der ikke tjekkede det:
+
+- **Admin fik selve rykkeren** (»Husk at tilmelde dig …«), også selv om admin havde meldt
+  afbud. Nu får admin i stedet en opsummering: hvem påmindelsen er sendt til, med et link
+  til deltagerlisten. Har alle svaret, står der det.
+- **Push-abonnenterne på bruger-siden fik den altid.** Et abonnement uden konto ved ikke,
+  hvem der ejer enheden, og kan derfor ikke springes over. Påmindelsen sendes ikke længere
+  som push til dem. De får stadig varslingen om nye events, som er det, de har sagt ja til.
+
 ## Version 59
 
 **Events, der aldrig ville blive varslet, kan ikke længere gemme sig.**

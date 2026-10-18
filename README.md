@@ -221,7 +221,8 @@ Listen bruges to steder:
 
 - **48 timer før tilmeldingsfristen**, hvis eventet har fluebenet »Påmindelse 48t før
   frist«. Går kun til dem på listen, der hverken har tilmeldt sig eller meldt afbud, med et
-  link til eventet.
+  link til eventet. Den sendes ikke som push til bruger-sidens abonnenter, for de er
+  anonyme og kan ikke springes over.
 - **Automatisk**, når der er et valgt antal dage (standard 14) til et events start. Et
   event oprettet tættere på end det varsles med det samme. Hvert event kan holdes ude
   med fluebenet under *Notifikationer* i event-formularen. Slår du varslingen til for
@@ -252,7 +253,8 @@ Påmindelsen **48 timer før fristen** går kun til dem på notifikationslisten,
 har tilmeldt sig eller meldt afbud — et afbud er også et svar. Sammenligningen er på navn
 (og på brugeren bag tilmeldingen i grupper med konti); den, der står på listen uden navn,
 kan ikke matches og får påmindelsen. Har alle svaret, sendes der ingenting, og det noteres
-i aktivitetsloggen.
+i aktivitetsloggen. Admin får ikke selve rykkeren, men en opsummering af, hvem den er sendt
+til, med et link til deltagerlisten.
 
 **Stilletid 22–08:** beskederne fra scheduleren til folks telefoner (madbestilling,
 deltagerliste til jagtlederne, påmindelse før frist, påmindelse før eventet og varsling om
