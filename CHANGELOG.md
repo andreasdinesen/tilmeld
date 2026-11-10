@@ -11,6 +11,24 @@ Databasen i `/data` overlever begge dele.
 
 ---
 
+## Version 61
+
+**Påmindelsen før fristen er kortere og nævner jagten én gang.**
+
+Emnet var »Påmindelse: tilmeldingsfrist for {event}«, og på SMS står emnet foran teksten,
+som selv begynder med »Tilmeldingsfristen for {event} …«. Jagtens navn stod derfor to
+gange. Emnet er nu bare »Påmindelse«, og på SMS og WhatsApp står emnet på sin egen linje:
+
+```
+Påmindelse:
+Tilmeldingsfristen for Jagt 14 november 2026 er 10-11-2026 12:00.
+Husk at tilmelde dig eller opdatere din tilmelding.
+https://svaljagt.dk/jagt/…
+```
+
+Linjeskiftet efter emnet gælder alle SMS- og WhatsApp-beskeder (det fylder det samme som
+»: «). En gruppe, der selv har tilpasset påmindelsens skabelon, beholder sin egen tekst.
+
 ## Version 60
 
 **Påmindelsen før fristen når ikke længere dem, der har meldt fra.**

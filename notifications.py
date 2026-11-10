@@ -36,7 +36,9 @@ DEFAULT_TEMPLATES = {
                "{name} har ændret sin tilmelding til {event}."),
     "receipt": ("Kvittering: {event}",
                 "Tak for din tilmelding til {event} d. {date}."),
-    "reminder": ("Påmindelse: tilmeldingsfrist for {event}",
+    # Emnet er bare »Påmindelse«: på SMS/WhatsApp står emnet foran teksten, og
+    # teksten nævner allerede jagtens navn — »for {event}« i emnet stod der to gange.
+    "reminder": ("Påmindelse",
                  "Tilmeldingsfristen for {event} er {deadline}.\n"
                  "Husk at tilmelde dig eller opdatere din tilmelding.\n{link}"),
     "deadline": ("Tilmeldingsfrist nået: {event}",
@@ -156,6 +158,14 @@ def channels(conn, group):
             bool(s["whatsapp_api_url"]) and bool(group["whatsapp_enabled"]),
             sms_configured(s) and bool(group["sms_enabled"]),
             bool((s["base_url"] or "").strip()) and bool(group["push_enabled"]))
+
+
+def kort_besked(subject: str, body: str) -> str:
+    """Emne og tekst i én besked til SMS/WhatsApp: emnet på sin egen linje.
+
+    »:\n« fylder lige så meget som »: «, så en SMS bliver ikke længere af det.
+    """
+    return f"{subject}:\n{body}"
 
 
 def _log(channel: str, to: str, subject: str, body: str) -> None:
@@ -451,14 +461,14 @@ def notify_admin(conn, group, subject: str, body: str, link: str = "") -> None:
         db.add_log(conn, "mail",
                    f"Mail til {group['admin_email']}: {subject}{_note(err)}", group["slug"])
     if group["whatsapp_enabled"] and group["whatsapp_recipient"]:
-        err = send_whatsapp(settings, group["whatsapp_recipient"], f"{subject}: {body}")
+        err = send_whatsapp(settings, group["whatsapp_recipient"], kort_besked(subject, body))
         db.add_log(conn, "whatsapp",
                    f"WhatsApp til {group['whatsapp_recipient']}: {subject}{_note(err)}",
                    group["slug"])
     # SMS har sit eget modtagerfelt: `whatsapp_recipient` kan være en gruppechat,
     # og et gruppe-id kan man ikke sende en SMS til.
     if group["sms_enabled"] and group["sms_recipient"]:
-        err = send_sms(settings, group["sms_recipient"], f"{subject}: {body}")
+        err = send_sms(settings, group["sms_recipient"], kort_besked(subject, body))
         db.add_log(conn, "sms",
                    f"SMS til {group['sms_recipient']}: {subject}{_note(err)}",
                    group["slug"])
@@ -479,11 +489,11 @@ def notify_participant(conn, group, email: str, whatsapp: str, subject: str, bod
     # Ét mobilnummer, to kanaler: er både WhatsApp og SMS slået til for gruppen,
     # får deltageren begge dele. Det er master, der vælger kanalerne pr. gruppe.
     if group["whatsapp_enabled"] and whatsapp:
-        err = send_whatsapp(settings, whatsapp, f"{subject}: {body}")
+        err = send_whatsapp(settings, whatsapp, kort_besked(subject, body))
         db.add_log(conn, "whatsapp", f"WhatsApp til {whatsapp}: {subject}{_note(err)}",
                    group["slug"])
     if group["sms_enabled"] and whatsapp:
-        err = send_sms(settings, whatsapp, f"{subject}: {body}")
+        err = send_sms(settings, whatsapp, kort_besked(subject, body))
         db.add_log(conn, "sms", f"SMS til {whatsapp}: {subject}{_note(err)}",
                    group["slug"])
     # Push følger BRUGERKONTOEN, ikke tilmeldingen: en deltager uden konto har
@@ -548,9 +558,9 @@ def notify_catering(conn, group, ev, note="") -> tuple:
     if group["mail_enabled"] and email:
         _kanal("mail", email, send_email(settings, email, subject, body), "mail")
     if group["sms_enabled"] and phone:
-        _kanal("sms", phone, send_sms(settings, phone, f"{subject}: {body}"), "SMS")
+        _kanal("sms", phone, send_sms(settings, phone, kort_besked(subject, body)), "SMS")
     if group["whatsapp_enabled"] and phone:
-        _kanal("whatsapp", phone, send_whatsapp(settings, phone, f"{subject}: {body}"),
+        _kanal("whatsapp", phone, send_whatsapp(settings, phone, kort_besked(subject, body)),
                "WhatsApp")
     if not sendt and not errors:
         errors.append("hverken mail, SMS eller WhatsApp er slået til for gruppen")
@@ -569,7 +579,7 @@ def catering_sms(conn, group, ev) -> str:
     `gigasms.prepare()`, så admin kan få længden at se uden at gætte.
     """
     subject, body, _ = catering_message(conn, group, ev)
-    return gigasms.prepare(f"{subject}: {body}")
+    return gigasms.prepare(kort_besked(subject, body))
 
 
 def catering_test_sms(conn, group, ev) -> str:
@@ -628,9 +638,9 @@ def notify_leaders_list(conn, group, ev, ledere, link, note="") -> tuple:
                 ("mail", group["mail_enabled"], m["email"],
                  lambda to: send_email(settings, to, subject, body)),
                 ("sms", group["sms_enabled"], m["whatsapp"],
-                 lambda to: send_sms(settings, to, f"{subject}: {body}")),
+                 lambda to: send_sms(settings, to, kort_besked(subject, body))),
                 ("whatsapp", group["whatsapp_enabled"], m["whatsapp"],
-                 lambda to: send_whatsapp(settings, to, f"{subject}: {body}"))):
+                 lambda to: send_whatsapp(settings, to, kort_besked(subject, body)))):
             if not aktiv or not modtager:
                 continue
             err = send(modtager)
